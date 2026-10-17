@@ -1,0 +1,799 @@
+<!--
+Copyright 2026 rimbaud.io
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>rimBaud // DMAN MAKER</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --bg: #020804;
+  --panel: #041208;
+  --border: #0d3b1f;
+  --green: #00ff6a;
+  --green-dim: #00b347;
+  --green-glow: rgba(0, 255, 106, 0.15);
+  --text: #9dffc0;
+  --muted: #3d7a55;
+  --rose: #ff4d6d;
+  --rose-dim: rgba(255, 77, 109, 0.12);
+  --cyan: #7ecbff;
+  --amber: #ffc857;
+  --gold: #a78bfa;
+  --font: 'IBM Plex Mono', 'Share Tech Mono', ui-monospace, monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { min-height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13px;
+  line-height: 1.45;
+  background-image:
+    linear-gradient(rgba(0,255,106,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,255,106,0.03) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+a { color: var(--green); text-decoration: none; }
+a:hover { color: #fff; text-shadow: 0 0 8px var(--green); }
+
+body::after {
+  content: "";
+  pointer-events: none;
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(
+    0deg, transparent, transparent 2px,
+    rgba(0,0,0,0.12) 2px, rgba(0,0,0,0.12) 4px
+  );
+  z-index: 9999;
+  opacity: 0.35;
+}
+
+header {
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, #03160a 0%, #020804 100%);
+  padding: 14px 22px;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 12px;
+  position: sticky; top: 0; z-index: 50;
+  box-shadow: 0 0 30px rgba(167,139,250,0.08);
+}
+.brand {
+  font-size: 15px; font-weight: 600; letter-spacing: 2px;
+  color: #2A9FD6; text-shadow: 0 0 12px rgba(42, 159, 214, 0.55);
+}
+.brand span { color: var(--muted); font-weight: 400; letter-spacing: 1px; }
+.nav { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.nav a, .pill {
+  border: 1px solid var(--border);
+  padding: 5px 12px; border-radius: 2px;
+  color: var(--green-dim); font-size: 11px; letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.nav a:hover, .pill.live {
+  border-color: var(--green);
+  color: var(--green);
+  box-shadow: 0 0 10px var(--green-glow);
+}
+.pill.offline { border-color: var(--rose); color: var(--rose); }
+.nav a.active {
+  border-color: var(--gold);
+  color: var(--gold);
+  box-shadow: 0 0 10px rgba(167,139,250,0.25);
+}
+.meta { color: var(--muted); font-size: 11px; }
+
+.wrap { max-width: 1180px; margin: 0 auto; padding: 18px 18px 48px; }
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px; margin-bottom: 16px;
+}
+.kpi {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  padding: 12px 14px;
+  box-shadow: inset 0 0 20px rgba(167,139,250,0.04);
+}
+.kpi .lbl {
+  color: var(--muted); font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase;
+}
+.kpi .val {
+  margin-top: 6px; font-size: 20px; color: var(--green);
+  text-shadow: 0 0 8px rgba(0,255,106,0.35);
+}
+.kpi .val.rose { color: var(--rose); text-shadow: 0 0 8px rgba(255,77,109,0.35); }
+.kpi .val.cyan { color: var(--cyan); text-shadow: 0 0 8px rgba(126,203,255,0.35); }
+.kpi .val.amber { color: var(--amber); text-shadow: 0 0 8px rgba(255,200,87,0.3); }
+.kpi .val.gold { color: var(--gold); text-shadow: 0 0 8px rgba(167,139,250,0.35); }
+
+.grid2 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+@media (max-width: 1100px) { .grid2 { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 800px) { .grid2 { grid-template-columns: 1fr; } }
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  margin-bottom: 14px;
+  box-shadow: 0 0 24px rgba(0,255,106,0.05);
+}
+.panel-h {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(167,139,250,0.04);
+  flex-wrap: wrap; gap: 8px;
+}
+.panel-h h2 {
+  font-size: 12px; letter-spacing: 2px; text-transform: uppercase;
+  color: var(--gold); font-weight: 600;
+}
+.panel-h .sub { color: var(--muted); font-size: 11px; }
+.panel-b { padding: 16px 14px; }
+
+.btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--green-dim);
+  font-family: var(--font);
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 12px 18px;
+  cursor: pointer;
+  border-radius: 2px;
+  min-width: 90px;
+}
+.btn:hover:not(:disabled) {
+  box-shadow: 0 0 12px var(--green-glow);
+  color: var(--green);
+  border-color: var(--green);
+}
+.btn:disabled { opacity: 0.45; cursor: wait; }
+.btn.long { border-color: var(--cyan); color: var(--cyan); }
+.btn.long:hover:not(:disabled) { background: rgba(126,203,255,0.1); box-shadow: 0 0 12px rgba(126,203,255,0.3); color: #fff; }
+.btn.short { border-color: var(--rose); color: var(--rose); }
+.btn.short:hover:not(:disabled) { background: var(--rose-dim); box-shadow: 0 0 12px rgba(255,77,109,0.35); color: #fff; }
+.btn.flat { border-color: var(--amber); color: var(--amber); }
+.btn.flat:hover:not(:disabled) { background: rgba(255,200,87,0.1); color: #fff; }
+.btn.close { border-color: var(--rose); color: var(--rose); }
+.btn.scale { border-color: var(--gold); color: var(--gold); }
+.btn.scale:hover:not(:disabled) { background: rgba(167,139,250,0.12); box-shadow: 0 0 12px rgba(167,139,250,0.3); color: #fff; }
+.btn.active-long { background: rgba(126,203,255,0.15); box-shadow: 0 0 14px rgba(126,203,255,0.35); }
+.btn.active-short { background: rgba(255,77,109,0.15); box-shadow: 0 0 14px rgba(255,77,109,0.35); }
+.btn.active-flat { background: rgba(255,200,87,0.12); box-shadow: 0 0 14px rgba(255,200,87,0.3); }
+.btn.size { border-color: var(--gold); color: var(--gold); min-width: 72px; }
+.btn.size:hover:not(:disabled) { background: rgba(167,139,250,0.12); color: #fff; box-shadow: 0 0 12px rgba(167,139,250,0.3); }
+
+.controls {
+  display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;
+  margin: 18px 0 8px;
+}
+.hint {
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  line-height: 1.55;
+  margin-top: 14px;
+  text-align: center;
+}
+.side-long { color: var(--cyan); font-weight: 600; }
+.side-short { color: var(--rose); font-weight: 600; }
+
+.toast {
+  position: fixed; bottom: 22px; right: 22px; z-index: 100;
+  background: var(--panel);
+  border: 1px solid var(--green);
+  color: var(--green);
+  padding: 10px 16px;
+  font-size: 12px;
+  letter-spacing: 1px;
+  box-shadow: 0 0 20px var(--green-glow);
+  display: none;
+  max-width: 360px;
+}
+.toast.err { border-color: var(--rose); color: var(--rose); }
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 8px;
+}
+@media (max-width: 700px) {
+  .row { grid-template-columns: 1fr; }
+}
+.kv {
+  border: 1px solid rgba(13,59,31,0.7);
+  padding: 10px 12px;
+}
+.kv .k { color: var(--muted); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; }
+.kv .v { margin-top: 4px; font-size: 14px; }
+
+.feed-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+@media (max-width: 860px) { .feed-layout { grid-template-columns: 1fr; } }
+
+.pnl-panel .panel-b { padding: 18px 16px 16px; }
+.pnl-big {
+  font-size: 28px; font-weight: 600; letter-spacing: 0.5px;
+  color: var(--green); text-shadow: 0 0 12px rgba(0,255,106,0.35);
+}
+.pnl-big.neg { color: var(--rose); text-shadow: 0 0 12px rgba(255,77,109,0.35); }
+.pnl-caption {
+  color: var(--muted); font-size: 10px; letter-spacing: 1.5px;
+  text-transform: uppercase; margin-top: 2px; margin-bottom: 14px;
+}
+.pnl-row {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: 8px 0; border-top: 1px solid rgba(13,59,31,0.7);
+  font-size: 13px;
+}
+.pnl-row .k { color: var(--muted); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; }
+.pnl-row .v { color: var(--text); }
+.pnl-row .v.pos { color: var(--cyan); }
+.pnl-row .v.neg { color: var(--rose); }
+
+.log-feed {
+  max-height: 320px; overflow-y: auto;
+  padding: 8px 8px 10px !important;
+}
+.log-empty { color: var(--muted); text-align: center; padding: 28px 10px; font-size: 12px; }
+.log-item {
+  display: grid;
+  grid-template-columns: 5px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 10px;
+  margin-bottom: 6px;
+  border: 1px solid rgba(13,59,31,0.7);
+  background: rgba(0,0,0,0.18);
+}
+.log-item.open { border-color: rgba(126,203,255,0.35); }
+.log-item.close-win { border-color: rgba(0,255,106,0.35); }
+.log-item.close-loss { border-color: rgba(255,77,109,0.4); }
+.log-bar { width: 5px; height: 100%; min-height: 36px; background: var(--gold); }
+.log-item.open .log-bar { background: var(--cyan); box-shadow: 0 0 8px rgba(126,203,255,0.45); }
+.log-item.close-win .log-bar { background: var(--green); box-shadow: 0 0 8px rgba(0,255,106,0.4); }
+.log-item.close-loss .log-bar { background: var(--rose); box-shadow: 0 0 8px rgba(255,77,109,0.4); }
+.log-top { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.tag {
+  font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase;
+  border: 1px solid var(--border); padding: 2px 7px;
+}
+.tag.open { color: var(--cyan); border-color: var(--cyan); }
+.tag.close { color: var(--gold); border-color: var(--gold); }
+.log-coin { font-weight: 600; letter-spacing: 1px; }
+.log-meta { color: var(--muted); font-size: 11px; margin-top: 3px; }
+.log-right { text-align: right; min-width: 90px; }
+.log-pnl { font-size: 14px; font-weight: 600; }
+.log-roe { font-size: 11px; color: var(--muted); margin-top: 2px; }
+</style>
+</head>
+<body>
+
+{% include '_nav.html' %}
+
+<div class="wrap">
+  <div class="kpis">
+    <div class="kpi"><div class="lbl">Container</div><div class="val" id="kRun">—</div></div>
+    <div class="kpi"><div class="lbl">BTC bias</div><div class="val amber" id="kBiasBtc">—</div></div>
+    <div class="kpi"><div class="lbl">ETH bias</div><div class="val amber" id="kBiasEth">—</div></div>
+    <div class="kpi"><div class="lbl">LTC bias</div><div class="val amber" id="kBiasLtc">—</div></div>
+    <div class="kpi"><div class="lbl">Perp / Spot USDC</div><div class="val cyan" id="kFree">—</div></div>
+    <div class="kpi"><div class="lbl">Realized PnL</div><div class="val" id="kRealized">—</div></div>
+    <div class="kpi"><div class="lbl">Open uPnL</div><div class="val" id="kUpnl">—</div></div>
+    <div class="kpi"><div class="lbl">TP / SL</div><div class="val gold" id="kTpsl">+2% / −20</div></div>
+  </div>
+
+  <div class="feed-layout">
+    <div class="panel pnl-panel">
+      <div class="panel-h"><h2>⧉ PnL</h2><span class="sub">dman maker</span></div>
+      <div class="panel-b">
+        <div class="pnl-big" id="pnlRealized">$0.00</div>
+        <div class="pnl-caption">realized (closed trades)</div>
+        <div class="pnl-row"><span class="k">Open uPnL</span><span class="v" id="pnlOpen">—</span></div>
+        <div class="pnl-row"><span class="k">Wins / Losses</span><span class="v" id="pnlWl">—</span></div>
+        <div class="pnl-row"><span class="k">Opens / Closes</span><span class="v" id="pnlOc">—</span></div>
+      </div>
+    </div>
+    <div class="panel log-panel">
+      <div class="panel-h">
+        <h2>⧉ Position log</h2>
+        <span class="sub">graphical open / close feed</span>
+      </div>
+      <div class="panel-b log-feed" id="tradeLog">
+        <div class="log-empty">no dman maker opens or closes yet</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="panel" data-coin="BTC">
+      <div class="panel-h">
+        <h2>⧉ BTC-USD</h2>
+        <span class="sub" id="btcPosSub">up-only market long</span>
+      </div>
+      <div class="panel-b">
+        <div class="controls">
+          <button type="button" class="btn long" id="btnBtcLong" onclick="setBias('BTC','LONG')">LONG</button>
+          <button type="button" class="btn short" id="btnBtcShort" onclick="setBias('BTC','SHORT')">SHORT</button>
+          <button type="button" class="btn flat" id="btnBtcFlat" onclick="setBias('BTC','FLAT')">FLAT</button>
+          <button type="button" class="btn size" id="btnBtc100" onclick="forceOpen('BTC', 100)">100%</button>
+          <button type="button" class="btn close" onclick="forceClose('BTC')">CLOSE</button>
+          <button type="button" class="btn scale" id="btnBtcScale" onclick="fullScale('BTC')">FULL SCALE</button>
+        </div>
+        <div class="row">
+          <div class="kv"><div class="k">Position</div><div class="v" id="btcSide">—</div></div>
+          <div class="kv"><div class="k">ROE</div><div class="v" id="btcRoe">—</div></div>
+          <div class="kv"><div class="k">Entry</div><div class="v" id="btcEntry">—</div></div>
+          <div class="kv"><div class="k">Mark</div><div class="v" id="btcMid">—</div></div>
+          <div class="kv"><div class="k">Amount</div><div class="v" id="btcAmt">—</div></div>
+          <div class="kv"><div class="k">Leverage</div><div class="v" id="btcLev">—</div></div>
+          <div class="kv"><div class="k">Trail</div><div class="v" id="btcTrail">—</div></div>
+          <div class="kv"><div class="k">Quotes</div><div class="v" id="btcQuotes">—</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" data-coin="ETH">
+      <div class="panel-h">
+        <h2>⧉ ETH-USD</h2>
+        <span class="sub" id="ethPosSub">up-only market long</span>
+      </div>
+      <div class="panel-b">
+        <div class="controls">
+          <button type="button" class="btn long" id="btnEthLong" onclick="setBias('ETH','LONG')">LONG</button>
+          <button type="button" class="btn short" id="btnEthShort" onclick="setBias('ETH','SHORT')">SHORT</button>
+          <button type="button" class="btn flat" id="btnEthFlat" onclick="setBias('ETH','FLAT')">FLAT</button>
+          <button type="button" class="btn size" id="btnEth100" onclick="forceOpen('ETH', 100)">100%</button>
+          <button type="button" class="btn close" onclick="forceClose('ETH')">CLOSE</button>
+          <button type="button" class="btn scale" id="btnEthScale" onclick="fullScale('ETH')">FULL SCALE</button>
+        </div>
+        <div class="row">
+          <div class="kv"><div class="k">Position</div><div class="v" id="ethSide">—</div></div>
+          <div class="kv"><div class="k">ROE</div><div class="v" id="ethRoe">—</div></div>
+          <div class="kv"><div class="k">Entry</div><div class="v" id="ethEntry">—</div></div>
+          <div class="kv"><div class="k">Mark</div><div class="v" id="ethMid">—</div></div>
+          <div class="kv"><div class="k">Amount</div><div class="v" id="ethAmt">—</div></div>
+          <div class="kv"><div class="k">Leverage</div><div class="v" id="ethLev">—</div></div>
+          <div class="kv"><div class="k">Trail</div><div class="v" id="ethTrail">—</div></div>
+          <div class="kv"><div class="k">Quotes</div><div class="v" id="ethQuotes">—</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" data-coin="LTC">
+      <div class="panel-h">
+        <h2>⧉ LTC-USD</h2>
+        <span class="sub" id="ltcPosSub">up-only market long</span>
+      </div>
+      <div class="panel-b">
+        <div class="controls">
+          <button type="button" class="btn long" id="btnLtcLong" onclick="setBias('LTC','LONG')">LONG</button>
+          <button type="button" class="btn short" id="btnLtcShort" onclick="setBias('LTC','SHORT')">SHORT</button>
+          <button type="button" class="btn flat" id="btnLtcFlat" onclick="setBias('LTC','FLAT')">FLAT</button>
+          <button type="button" class="btn size" id="btnLtc100" onclick="forceOpen('LTC', 100)">100%</button>
+          <button type="button" class="btn close" onclick="forceClose('LTC')">CLOSE</button>
+          <button type="button" class="btn scale" id="btnLtcScale" onclick="fullScale('LTC')">FULL SCALE</button>
+        </div>
+        <div class="row">
+          <div class="kv"><div class="k">Position</div><div class="v" id="ltcSide">—</div></div>
+          <div class="kv"><div class="k">ROE</div><div class="v" id="ltcRoe">—</div></div>
+          <div class="kv"><div class="k">Entry</div><div class="v" id="ltcEntry">—</div></div>
+          <div class="kv"><div class="k">Mark</div><div class="v" id="ltcMid">—</div></div>
+          <div class="kv"><div class="k">Amount</div><div class="v" id="ltcAmt">—</div></div>
+          <div class="kv"><div class="k">Leverage</div><div class="v" id="ltcLev">—</div></div>
+          <div class="kv"><div class="k">Trail</div><div class="v" id="ltcTrail">—</div></div>
+          <div class="kv"><div class="k">Quotes</div><div class="v" id="ltcQuotes">—</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" data-coin="TAO">
+      <div class="panel-h">
+        <h2>⧉ TAO-USD</h2>
+        <span class="sub" id="taoPosSub">up-only market long</span>
+      </div>
+      <div class="panel-b">
+        <div class="controls">
+          <button type="button" class="btn long" id="btnTaoLong" onclick="setBias('TAO','LONG')">LONG</button>
+          <button type="button" class="btn short" id="btnTaoShort" onclick="setBias('TAO','SHORT')">SHORT</button>
+          <button type="button" class="btn flat" id="btnTaoFlat" onclick="setBias('TAO','FLAT')">FLAT</button>
+          <button type="button" class="btn size" id="btnTao100" onclick="forceOpen('TAO', 100)">100%</button>
+          <button type="button" class="btn close" onclick="forceClose('TAO')">CLOSE</button>
+          <button type="button" class="btn scale" id="btnTaoScale" onclick="fullScale('TAO')">FULL SCALE</button>
+        </div>
+        <div class="row">
+          <div class="kv"><div class="k">Position</div><div class="v" id="taoSide">—</div></div>
+          <div class="kv"><div class="k">ROE</div><div class="v" id="taoRoe">—</div></div>
+          <div class="kv"><div class="k">Entry</div><div class="v" id="taoEntry">—</div></div>
+          <div class="kv"><div class="k">Mark</div><div class="v" id="taoMid">—</div></div>
+          <div class="kv"><div class="k">Amount</div><div class="v" id="taoAmt">—</div></div>
+          <div class="kv"><div class="k">Leverage</div><div class="v" id="taoLev">—</div></div>
+          <div class="kv"><div class="k">Trail</div><div class="v" id="taoTrail">—</div></div>
+          <div class="kv"><div class="k">Quotes</div><div class="v" id="taoQuotes">—</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-h">
+      <h2>⧉ Notes</h2>
+      <span class="sub" id="statusSub">set unique subaccount in Confiig</span>
+    </div>
+    <div class="panel-b">
+      <p class="hint">
+        Auto market-opens leftover on current BIAS (LONG or SHORT), then recycles after TP / trail / SL. Never flips an open clip. FLAT stays idle.<br>
+        Exits: Home SL ROE · take-profit % of price · trail after arm. Wired coin on the canvas is the one that can enter.<br>
+        Max leverage: <strong>BTC 40x</strong> · <strong>ETH 25x</strong> · <strong>LTC 10x</strong> · <strong>TAO 5x</strong>. Unique Hyperliquid subaccount via Confiig.<br>
+        Container: <code>hummingbot-dman-maker</code> · pairs <code>BTC-USD</code> + <code>ETH-USD</code> + <code>LTC-USD</code> + <code>TAO-USD</code>
+      </p>
+      <div class="controls">
+        <button type="button" class="btn close" onclick="forceClose('ALL')">CLOSE ALL</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% include '_hunter_desk.html' %}
+<div class="toast" id="toast"></div>
+
+<script>
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function showToast(msg, isErr) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast' + (isErr ? ' err' : '');
+  el.style.display = 'block';
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => { el.style.display = 'none'; }, 4000);
+}
+
+function coinPrefix(coin) {
+  return coin.charAt(0) + coin.slice(1).toLowerCase();
+}
+
+function setActiveBiasBtn(coin, bias) {
+  const prefix = coinPrefix(coin);
+  ['Long','Short','Flat'].forEach(x => {
+    const b = document.getElementById('btn' + prefix + x);
+    if (!b) return;
+    b.classList.remove('active-long', 'active-short', 'active-flat');
+  });
+  if (bias === 'LONG') document.getElementById('btn' + prefix + 'Long')?.classList.add('active-long');
+  if (bias === 'SHORT') document.getElementById('btn' + prefix + 'Short')?.classList.add('active-short');
+  if (bias === 'FLAT') document.getElementById('btn' + prefix + 'Flat')?.classList.add('active-flat');
+}
+
+function paintBiasKpi(id, bias) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = bias || 'FLAT';
+  el.className = 'val ' + (bias === 'LONG' ? 'cyan' : bias === 'SHORT' ? 'rose' : 'amber');
+}
+
+let lastBias = { BTC: 'FLAT', ETH: 'FLAT', LTC: 'FLAT', TAO: 'FLAT' };
+
+function setSizeButtonsEnabled(coin, enabled) {
+  const prefix = coinPrefix(coin);
+  const b = document.getElementById('btn' + prefix + '100');
+  if (b) b.disabled = !enabled;
+}
+
+async function forceOpen(coin, pct) {
+  const side = lastBias[coin] || 'FLAT';
+  if (side !== 'LONG' && side !== 'SHORT') {
+    showToast('Set ' + coin + ' to LONG or SHORT first', true);
+    return;
+  }
+  if (!confirm('Open ' + side + ' ' + coin + ' now at ' + pct + '% of leftover free USD?')) return;
+  try {
+    const r = await fetch('/api/dman_maker/open', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ coin, pct, side }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    showToast(d.message || ('Opening ' + coin + ' ' + pct + '%'));
+    setTimeout(refresh, 2000);
+  } catch (e) {
+    showToast('Open failed: ' + e.message, true);
+  }
+}
+
+function fmtUsd(n, digits) {
+  if (n == null || Number.isNaN(Number(n))) return '—';
+  const x = Number(n);
+  const sign = x > 0 ? '+' : '';
+  return sign + '$' + x.toFixed(digits == null ? 2 : digits);
+}
+
+function paintPnl(st, summary) {
+  const realized = summary.realized_pnl_usd != null ? Number(summary.realized_pnl_usd)
+    : (st.realized_pnl_usd != null ? Number(st.realized_pnl_usd) : 0);
+  const upnl = st.open_upnl_usd != null ? Number(st.open_upnl_usd) : 0;
+  const elR = document.getElementById('pnlRealized');
+  elR.textContent = fmtUsd(realized);
+  elR.className = 'pnl-big' + (realized < 0 ? ' neg' : '');
+  const kR = document.getElementById('kRealized');
+  kR.textContent = fmtUsd(realized);
+  kR.className = 'val ' + (realized < 0 ? 'rose' : realized > 0 ? 'cyan' : '');
+  const kU = document.getElementById('kUpnl');
+  kU.textContent = fmtUsd(upnl);
+  kU.className = 'val ' + (upnl < 0 ? 'rose' : upnl > 0 ? 'cyan' : '');
+  const o = document.getElementById('pnlOpen');
+  o.textContent = fmtUsd(upnl);
+  o.className = 'v ' + (upnl < 0 ? 'neg' : upnl > 0 ? 'pos' : '');
+  document.getElementById('pnlWl').textContent =
+    (summary.n_wins ?? st.n_wins ?? 0) + ' / ' + (summary.n_losses ?? st.n_losses ?? 0);
+  document.getElementById('pnlOc').textContent =
+    (summary.n_opens ?? st.n_opens ?? 0) + ' / ' + (summary.n_closes ?? st.n_closes ?? 0);
+}
+
+function paintTradeLog(trades) {
+  const box = document.getElementById('tradeLog');
+  if (!trades.length) {
+    box.innerHTML = '<div class="log-empty">no dman maker opens or closes yet</div>';
+    return;
+  }
+  box.innerHTML = trades.map(t => {
+    const action = String(t.action || '').toUpperCase();
+    const isOpen = action === 'OPEN' || action === 'ADD';
+    const pnl = t.pnl_usd == null ? null : Number(t.pnl_usd);
+    const roe = t.roe_pct == null ? null : Number(t.roe_pct);
+    let cls = isOpen ? 'open' : (pnl != null && pnl >= 0 ? 'close-win' : 'close-loss');
+    if (!isOpen && pnl == null) cls = 'open';
+    const side = t.side || '';
+    const coin = t.coin || '';
+    const amt = t.amount != null ? Number(t.amount).toFixed(5) : '—';
+    const px = t.price != null ? Number(t.price).toFixed(4) : '—';
+    const lev = t.leverage != null ? (t.leverage + 'x') : '';
+    const why = t.reason ? esc(t.reason) : '';
+    const ts = t.ts ? esc(String(t.ts).replace(' UTC','')) : '';
+    const tag = isOpen ? (action === 'ADD' ? 'ADD' : 'OPEN') : 'CLOSE';
+    const pnlHtml = isOpen
+      ? '<div class="log-pnl" style="color:var(--muted)">—</div>'
+      : `<div class="log-pnl ${pnl != null && pnl < 0 ? 'neg' : 'pos'}" style="color:${pnl != null && pnl < 0 ? 'var(--rose)' : 'var(--cyan)'}">${fmtUsd(pnl, 3)}</div>
+         <div class="log-roe">${roe == null ? '' : ((roe >= 0 ? '+' : '') + roe.toFixed(2) + '% ROE')}</div>`;
+    return `<div class="log-item ${cls}">
+      <div class="log-bar"></div>
+      <div>
+        <div class="log-top">
+          <span class="tag ${isOpen ? 'open' : 'close'}">${tag}</span>
+          <span class="log-coin">${esc(coin)}</span>
+          <span class="${side === 'LONG' ? 'side-long' : 'side-short'}">${esc(side)}</span>
+        </div>
+        <div class="log-meta">${ts} · ${amt} @ ${px} ${lev} ${why ? '· ' + why : ''}</div>
+      </div>
+      <div class="log-right">${pnlHtml}</div>
+    </div>`;
+  }).join('');
+}
+
+function paintPos(prefix, pos) {
+  const side = pos && pos.position_side;
+  const sideEl = document.getElementById(prefix + 'Side');
+  if (side) {
+    sideEl.innerHTML = `<span class="${side === 'LONG' ? 'side-long' : 'side-short'}">${esc(side)}</span>`;
+  } else {
+    sideEl.textContent = 'FLAT';
+  }
+  const roe = pos && pos.roe_pct;
+  const roeEl = document.getElementById(prefix + 'Roe');
+  if (roe == null) {
+    roeEl.textContent = '—';
+    roeEl.style.color = '';
+  } else {
+    roeEl.textContent = (roe >= 0 ? '+' : '') + Number(roe).toFixed(2) + '%';
+    roeEl.style.color = roe >= 0 ? 'var(--cyan)' : 'var(--rose)';
+  }
+  document.getElementById(prefix + 'Entry').textContent =
+    pos && pos.entry_price != null ? Number(pos.entry_price).toFixed(4) : '—';
+  document.getElementById(prefix + 'Mid').textContent =
+    pos && pos.mid_price != null ? Number(pos.mid_price).toFixed(4) : '—';
+  document.getElementById(prefix + 'Amt').textContent =
+    pos && pos.amount != null ? Number(pos.amount).toFixed(6) : '—';
+  const levEl = document.getElementById(prefix + 'Lev');
+  if (levEl) {
+    const lev = pos && pos.leverage;
+    levEl.textContent = lev != null ? (lev + 'x') : '—';
+  }
+  const trailEl = document.getElementById(prefix + 'Trail');
+  if (trailEl) {
+    if (pos && pos.trail_active && pos.trail_extreme != null) {
+      trailEl.textContent = 'LIVE @ ' + Number(pos.trail_extreme).toFixed(4);
+      trailEl.style.color = 'var(--gold)';
+    } else if (pos && pos.position_side) {
+      trailEl.textContent = 'armed after TP';
+      trailEl.style.color = '';
+    } else {
+      trailEl.textContent = '—';
+      trailEl.style.color = '';
+    }
+  }
+  const qEl = document.getElementById(prefix + 'Quotes');
+  if (qEl) qEl.textContent = pos && pos.n_quotes != null ? String(pos.n_quotes) : '0';
+  const scaleBtn = document.getElementById('btn' + prefix.charAt(0).toUpperCase() + prefix.slice(1) + 'Scale');
+  if (scaleBtn) scaleBtn.disabled = !(side && String(side).toUpperCase() === 'LONG');
+}
+
+async function setBias(coin, bias) {
+  try {
+    const r = await fetch('/api/dman_maker/bias', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bias, coin }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    showToast(d.message || (coin + ' bias ' + bias));
+    refresh();
+  } catch (e) {
+    showToast('Bias failed: ' + e.message, true);
+  }
+}
+
+async function fullScale(coin) {
+  if (!confirm(
+    'FULL SCALE ' + coin + '?\n\n' +
+    'Adds ALL leftover perp USD to this open LONG (after RISK park).\n' +
+    'Does NOT close the position.'
+  )) return;
+  try {
+    const r = await fetch('/api/dman_maker/scale', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ coin }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    if (d.closes) throw new Error('refusing a result that reported a close');
+    showToast(d.message || ('Full scale ' + coin));
+    setTimeout(refresh, 2000);
+    setTimeout(refresh, 6000);
+  } catch (e) {
+    showToast('Full scale failed: ' + e.message, true);
+  }
+}
+
+async function forceClose(coin) {
+  const label = coin === 'ALL' ? 'BTC, ETH, LTC and TAO' : coin;
+  if (!confirm('Force-close ' + label + ' on Hyperliquid now?')) return;
+  try {
+    const body = coin === 'ALL' ? {} : { coin };
+    const r = await fetch('/api/dman_maker/close', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    showToast(d.message || 'Close signal sent');
+    setTimeout(refresh, 2000);
+  } catch (e) {
+    showToast('Close failed: ' + e.message, true);
+  }
+}
+
+function shortAddr(addr) {
+  const a = String(addr || '');
+  if (a.length < 12) return a || 'unset';
+  return a.slice(0, 8) + '…' + a.slice(-4);
+}
+
+async function refresh() {
+  try {
+    const r = await fetch('/api/dman_maker');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    const st = d.status || {};
+    const bias = d.bias || {};
+    const live = !!d.running;
+    const positions = st.positions || {};
+
+    const pill = document.getElementById('botState');
+    pill.textContent = live ? 'LIVE' : 'OFFLINE';
+    pill.className = 'pill ' + (live ? 'live' : 'offline');
+
+    document.getElementById('kRun').textContent = live ? 'LIVE' : 'OFF';
+    document.getElementById('kRun').className = 'val' + (live ? '' : ' rose');
+
+    const btcBias = bias.BTC || (positions.BTC && positions.BTC.bias) || 'FLAT';
+    const ethBias = bias.ETH || (positions.ETH && positions.ETH.bias) || 'FLAT';
+    const ltcBias = bias.LTC || (positions.LTC && positions.LTC.bias) || 'FLAT';
+    const taoBias = bias.TAO || (positions.TAO && positions.TAO.bias) || 'FLAT';
+    lastBias = { BTC: btcBias, ETH: ethBias, LTC: ltcBias, TAO: taoBias };
+    paintBiasKpi('kBiasBtc', btcBias);
+    paintBiasKpi('kBiasEth', ethBias);
+    paintBiasKpi('kBiasLtc', ltcBias);
+    if (document.getElementById('kBiasTao')) paintBiasKpi('kBiasTao', taoBias);
+    setActiveBiasBtn('BTC', btcBias);
+    setActiveBiasBtn('ETH', ethBias);
+    setActiveBiasBtn('LTC', ltcBias);
+    setActiveBiasBtn('TAO', taoBias);
+    const btcOpen = !!(positions.BTC && positions.BTC.position_side);
+    const ethOpen = !!(positions.ETH && positions.ETH.position_side);
+    const ltcOpen = !!(positions.LTC && positions.LTC.position_side);
+    const taoOpen = !!(positions.TAO && positions.TAO.position_side);
+    setSizeButtonsEnabled('BTC', live && !btcOpen && (btcBias === 'LONG' || btcBias === 'SHORT'));
+    setSizeButtonsEnabled('ETH', live && !ethOpen && (ethBias === 'LONG' || ethBias === 'SHORT'));
+    setSizeButtonsEnabled('LTC', live && !ltcOpen && (ltcBias === 'LONG' || ltcBias === 'SHORT'));
+    setSizeButtonsEnabled('TAO', live && !taoOpen && (taoBias === 'LONG' || taoBias === 'SHORT'));
+
+    const perp = st.free_usd != null ? Number(st.free_usd) : null;
+    const spot = st.spot_free_usd != null ? Number(st.spot_free_usd) : (st.spot_usd != null ? Number(st.spot_usd) : null);
+    if (perp != null && spot != null) {
+      document.getElementById('kFree').textContent = '$' + perp.toFixed(2) + ' / $' + spot.toFixed(2);
+    } else if (perp != null) {
+      document.getElementById('kFree').textContent = '$' + perp.toFixed(2);
+    } else {
+      document.getElementById('kFree').textContent = '—';
+    }
+    const slShow = d.sl_roe_pct != null ? d.sl_roe_pct : (st.sl_roe_pct ?? 20);
+    let tpPct = st.take_profit;
+    if (tpPct != null) {
+      tpPct = Number(tpPct);
+      if (tpPct <= 1) tpPct = tpPct * 100;
+    }
+    document.getElementById('kTpsl').textContent =
+      `+${tpPct != null ? tpPct : 2}% / −${slShow}`;
+
+    paintPos('btc', positions.BTC || {});
+    paintPos('eth', positions.ETH || {});
+    paintPos('ltc', positions.LTC || {});
+    paintPos('tao', positions.TAO || {});
+    paintPnl(st, d.trade_summary || {});
+    paintTradeLog(d.trades || []);
+
+    const skip = st.quote_skip ? (' · ' + st.quote_skip) : '';
+    const wired = st.wired_coin ? (' · wired ' + st.wired_coin) : '';
+    const wallet = d.subaccount || st.subaccount;
+    document.getElementById('statusSub').textContent = live
+      ? ('bot online · ' + shortAddr(wallet) + wired + skip)
+      : 'container offline — start hummingbot-dman-maker';
+  } catch (e) {
+    console.error(e);
+    document.getElementById('botState').textContent = 'API ERR';
+    document.getElementById('botState').className = 'pill offline';
+  }
+}
+
+refresh();
+setInterval(refresh, 8000);
+</script>
+</body>
+</html>

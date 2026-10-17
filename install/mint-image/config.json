@@ -1,0 +1,25 @@
+{
+  "brand": "rimBaud",
+  "not_a_mint_fork": true,
+  "note": "Internal appliance on official Linux Mint Cinnamon LTS. Do not brand as Linux Mint.",
+  "mint_version": "22.3",
+  "mint_codename": "zara",
+  "ubuntu_codename": "noble",
+  "edition": "cinnamon",
+  "arch": "64bit",
+  "iso_name": "linuxmint-22.3-cinnamon-64bit.iso",
+  "iso_url": "https://mirrors.kernel.org/linuxmint/stable/22.3/linuxmint-22.3-cinnamon-64bit.iso",
+  "sha256_url": "https://mirrors.kernel.org/linuxmint/stable/22.3/sha256sum.txt",
+  "sha256": "a081ab202cfda17f6924128dbd2de8b63518ac0531bcfe3f1a1b88097c459bd4",
+  "package": "rimbaud",
+  "package_section": "misc",
+  "install_to": "/opt/rimbaud",
+  "apt_repo": "",
+  "apt_repo_comment": "Empty = ISO ships a local file:// repo of the rimbaud .deb. Set a https:// URL here when your package server exists; apt upgrade then pulls rimBaud too.",
+  "default_user": "forklifter",
+  "default_fullname": "rimBaud",
+  "install_password_note": "Set the install password on the machine. First boot forces a change. Not a live HL key."
+  "volume_label": "RIMBAUD",
+  "min_usb_gb": 8,
+  "closes": false
+}

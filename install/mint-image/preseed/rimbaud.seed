@@ -1,0 +1,79 @@
+# Copyright 2026 rimbaud.io
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# rimBaud appliance preseed for official Linux Mint Cinnamon (ubiquity).
+# Not a distro fork. Official Mint/Ubuntu repos stay on.
+# User password below is the install default — first-boot forces a change.
+# Does not CLOSE/OPEN Hyperliquid. Does not copy wallets.
+
+d-i debian-installer/locale string de_DE.UTF-8
+d-i debian-installer/language string de
+d-i debian-installer/country string DE
+d-i keyboard-configuration/xkb-keymap select de
+d-i console-setup/ask_detect boolean false
+d-i console-setup/layoutcode string de
+
+d-i netcfg/choose_interface select auto
+d-i netcfg/get_hostname string rimbaud
+d-i netcfg/get_domain string local
+d-i netcfg/hostname string rimbaud
+
+d-i clock-setup/utc boolean true
+d-i time/zone string Europe/Berlin
+d-i clock-setup/ntp boolean true
+
+d-i partman-auto/method string lvm
+d-i partman-auto-lvm/guided_size string max
+d-i partman-lvm/device_remove_lvm boolean true
+d-i partman-md/device_remove_md boolean true
+d-i partman-lvm/confirm boolean true
+d-i partman-lvm/confirm_nooverwrite boolean true
+d-i partman-auto/choose_recipe select atomic
+d-i partman-partitioning/confirm_write_new_label boolean true
+d-i partman/choose_partition select finish
+d-i partman/confirm boolean true
+d-i partman/confirm_nooverwrite boolean true
+
+d-i passwd/root-login boolean false
+d-i passwd/make-user boolean true
+d-i passwd/user-fullname string rimBaud
+d-i passwd/username string forklifter
+# Put the crypted install password here on the machine. First boot expires it.
+d-i passwd/user-password-crypted password CHANGE_ME
+d-i user-setup/allow-password-weak boolean true
+d-i user-setup/encrypt-home boolean false
+
+d-i apt-setup/use_mirror boolean true
+d-i apt-setup/non-free boolean true
+d-i apt-setup/contrib boolean true
+d-i apt-setup/services-select multiselect security
+d-i apt-setup/security_host string packages.linuxmint.com
+
+tasksel tasksel/first multiselect standard
+d-i pkgsel/include string openssh-server wireguard wireguard-tools curl rsync
+d-i pkgsel/upgrade select safe-upgrade
+d-i pkgsel/update-policy select unattended-upgrades
+popularity-contest popularity-contest/participate boolean false
+
+d-i grub-installer/only_debian boolean true
+d-i grub-installer/with_other_os boolean true
+d-i grub-installer/bootdev string default
+
+ubiquity ubiquity/use_nonfree boolean false
+ubiquity ubiquity/reboot boolean true
+ubiquity ubiquity/summary note
+ubiquity-frontend ubiquity-frontend/debconf_helper note
+
+d-i finish-install/reboot_in_progress note
+d-i debian-installer/splash boolean false

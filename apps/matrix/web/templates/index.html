@@ -1,0 +1,2402 @@
+<!--
+Copyright 2026 rimbaud.io
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>rimBaud // COPY</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --bg: #020804;
+  --panel: #041208;
+  --border: #0d3b1f;
+  --green: #00ff6a;
+  --green-dim: #00b347;
+  --green-glow: rgba(0, 255, 106, 0.15);
+  --text: #9dffc0;
+  --muted: #3d7a55;
+  --rose: #ff4d6d;
+  --rose-dim: rgba(255, 77, 109, 0.12);
+  --cyan: #7ecbff;
+  --cyan-dim: rgba(126, 203, 255, 0.12);
+  --amber: #ffc857;
+  --font: 'IBM Plex Mono', 'Share Tech Mono', ui-monospace, monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { min-height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13px;
+  line-height: 1.45;
+  background-image:
+    linear-gradient(rgba(0,255,106,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,255,106,0.03) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+a { color: var(--green); text-decoration: none; }
+a:hover { color: #fff; text-shadow: 0 0 8px var(--green); }
+
+/* scanline */
+body::after {
+  content: "";
+  pointer-events: none;
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.12) 2px,
+    rgba(0,0,0,0.12) 4px
+  );
+  z-index: 9999;
+  opacity: 0.35;
+}
+
+header {
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, #03160a 0%, #020804 100%);
+  padding: 14px 22px;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 12px;
+  position: sticky; top: 0; z-index: 50;
+  box-shadow: 0 0 30px rgba(0,255,106,0.08);
+}
+.brand {
+  font-size: 15px; font-weight: 600; letter-spacing: 2px;
+  color: #2A9FD6; text-shadow: 0 0 12px rgba(42, 159, 214, 0.55);
+}
+.brand span { color: var(--muted); font-weight: 400; letter-spacing: 1px; }
+.nav { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.nav a, .pill {
+  border: 1px solid var(--border);
+  padding: 5px 12px; border-radius: 2px;
+  color: var(--green-dim); font-size: 11px; letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.nav a:hover, .pill.live {
+  border-color: var(--green);
+  color: var(--green);
+  box-shadow: 0 0 10px var(--green-glow);
+}
+.nav a.active {
+  border-color: var(--gold, #f0b90b);
+  color: var(--gold, #f0b90b);
+  box-shadow: 0 0 10px rgba(240,185,11,0.25);
+}
+.pill.offline { border-color: var(--rose); color: var(--rose); }
+.meta { color: var(--muted); font-size: 11px; }
+
+.wrap { max-width: 1280px; margin: 0 auto; padding: 18px 18px 48px; }
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px; margin-bottom: 16px;
+}
+.kpi {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  padding: 12px 14px;
+  box-shadow: inset 0 0 20px rgba(0,255,106,0.04);
+}
+.kpi .lbl { color: var(--muted); font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; }
+.kpi .val { margin-top: 6px; font-size: 20px; color: var(--green); text-shadow: 0 0 8px rgba(0,255,106,0.35); }
+.kpi .val.rose { color: var(--rose); text-shadow: 0 0 8px rgba(255,77,109,0.35); }
+.kpi .val.cyan { color: var(--cyan); text-shadow: 0 0 8px rgba(126,203,255,0.35); }
+.kpi .val.amber { color: var(--amber); }
+
+/* Per-trader pot row (under main KPIs) */
+.trader-pots {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.tpot {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  padding: 12px 14px;
+  box-shadow: inset 0 0 20px rgba(0,255,106,0.04);
+}
+.tpot-h {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+.tpot-num {
+  color: var(--cyan);
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.lamp {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 8px currentColor;
+}
+.lamp.on {
+  background: var(--green);
+  color: var(--green);
+  animation: lamp-pulse 1.8s ease-in-out infinite;
+}
+.lamp.off {
+  background: var(--rose);
+  color: var(--rose);
+}
+@keyframes lamp-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+.lamp-lbl {
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.tpot-addr {
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 55%;
+}
+.tpot-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 12px;
+}
+.tpot-grid .k {
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.tpot-grid .v {
+  color: var(--green);
+  font-size: 14px;
+  font-weight: 600;
+  margin-top: 2px;
+}
+.tpot-grid .v.amber { color: var(--amber); }
+.tpot-grid .v.cyan { color: var(--cyan); }
+.tpot-grid .v.rose { color: var(--rose); }
+.tpot-grid .v.muted { color: var(--muted); font-weight: 500; }
+.tpot-foot {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(13,59,31,0.55);
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  line-height: 1.4;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.tpot.unfollowed, .tpot.muted {
+  border-color: rgba(255,77,109,0.45);
+  box-shadow: inset 0 0 20px rgba(255,77,109,0.06);
+  opacity: 0.92;
+}
+.tpot.unfollowed .tpot-num, .tpot.muted .tpot-num { color: var(--rose); }
+.tpot-badge {
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border: 1px solid var(--rose);
+  color: var(--rose);
+  border-radius: 2px;
+  white-space: nowrap;
+}
+.btn-unfollow {
+  background: transparent;
+  border: 1px solid var(--rose);
+  color: var(--rose);
+  font-family: var(--font);
+  font-size: 10px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  padding: 5px 10px;
+  cursor: pointer;
+  border-radius: 2px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.btn-unfollow:hover:not(:disabled) {
+  background: rgba(255,77,109,0.12);
+  box-shadow: 0 0 10px rgba(255,77,109,0.25);
+  color: #fff;
+}
+.btn-unfollow.follow {
+  border-color: var(--green);
+  color: var(--green);
+}
+.btn-unfollow.follow:hover:not(:disabled) {
+  background: var(--green-glow);
+  box-shadow: 0 0 10px var(--green-glow);
+  color: #fff;
+}
+.btn-unfollow:disabled {
+  opacity: 0.45;
+  cursor: wait;
+}
+.tpot-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.slot-lbl {
+  color: var(--muted);
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.btn-slot {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-family: var(--font);
+  font-size: 10px;
+  letter-spacing: 0.8px;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 2px;
+}
+.btn-slot:hover:not(:disabled) { border-color: var(--gold); color: var(--gold); }
+.btn-slot.on {
+  border-color: var(--gold);
+  color: var(--gold);
+  box-shadow: 0 0 8px rgba(240,185,11,0.25);
+}
+.btn-slot:disabled { opacity: 0.45; cursor: wait; }
+
+/* Risk stop meter — vertical box; fill grows toward 100% = force close */
+.risk-cell {
+  min-width: 52px;
+  text-align: center;
+  vertical-align: middle;
+}
+.risk-meter {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.risk-vbox {
+  width: 18px;
+  height: 40px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.35);
+  position: relative;
+  overflow: hidden;
+  border-radius: 2px;
+  box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.4);
+}
+/* Fill from bottom (0% safe) to top (100% close trigger) */
+.risk-vfill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 0%;
+  transition: height 0.45s ease, background 0.3s ease;
+  background: var(--green);
+  box-shadow: 0 0 8px rgba(0, 255, 106, 0.35);
+}
+.risk-vfill.warn {
+  background: var(--amber);
+  box-shadow: 0 0 8px rgba(255, 200, 87, 0.4);
+}
+.risk-vfill.hot {
+  background: var(--rose);
+  box-shadow: 0 0 10px rgba(255, 77, 109, 0.55);
+  animation: risk-pulse 1.2s ease-in-out infinite;
+}
+@keyframes risk-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.72; }
+}
+.risk-pct {
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  color: var(--muted);
+  line-height: 1;
+}
+.risk-pct.warn { color: var(--amber); }
+.risk-pct.hot { color: var(--rose); }
+.risk-pct.safe { color: var(--green); }
+/* Horizontal RTL track under the vertical meter (fills right → left) */
+.risk-hbar {
+  width: 44px;
+  height: 4px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(13, 59, 31, 0.7);
+  border-radius: 1px;
+  overflow: hidden;
+  display: flex;
+  justify-content: flex-end; /* fill from the right */
+  direction: rtl;
+}
+.risk-hfill {
+  height: 100%;
+  width: 0%;
+  transition: width 0.45s ease, background 0.3s ease;
+  background: var(--green);
+}
+.risk-hfill.warn { background: var(--amber); }
+.risk-hfill.hot { background: var(--rose); }
+.risk-vbox.off {
+  border-color: rgba(126, 203, 255, 0.45);
+  opacity: 0.55;
+}
+.risk-vfill.off,
+.risk-hfill.off {
+  background: var(--cyan) !important;
+  box-shadow: none !important;
+  animation: none !important;
+}
+.risk-pct.off { color: var(--cyan); }
+.btn-risk {
+  background: transparent;
+  border: 1px solid var(--cyan);
+  color: var(--cyan);
+  font-family: var(--font);
+  font-size: 10px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 2px;
+  margin-right: 6px;
+  white-space: nowrap;
+}
+.btn-risk:hover:not(:disabled) {
+  background: rgba(126, 203, 255, 0.12);
+  box-shadow: 0 0 8px rgba(126, 203, 255, 0.25);
+  color: #fff;
+}
+.btn-risk.off {
+  border-color: var(--muted);
+  color: var(--muted);
+}
+.btn-risk.off:hover:not(:disabled) {
+  border-color: var(--cyan);
+  color: var(--cyan);
+  background: rgba(126, 203, 255, 0.08);
+}
+.btn-risk:disabled {
+  opacity: 0.45;
+  cursor: wait;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  margin-bottom: 14px;
+  box-shadow: 0 0 24px rgba(0,255,106,0.05);
+}
+.panel-h {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0,255,106,0.04);
+}
+.panel-h h2 {
+  font-size: 12px; letter-spacing: 2px; text-transform: uppercase;
+  color: var(--green); font-weight: 600;
+}
+.panel-h .sub { color: var(--muted); font-size: 11px; }
+.panel-b { padding: 12px 14px; }
+
+.stack-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px;
+}
+.stack-cell {
+  border: 1px solid rgba(13,59,31,0.7);
+  padding: 10px 12px;
+  background: rgba(0,0,0,0.18);
+}
+.stack-cell .sk {
+  color: var(--muted); font-size: 10px; letter-spacing: 1.2px; text-transform: uppercase;
+}
+.stack-cell .sv {
+  margin-top: 5px; font-size: 15px; font-weight: 600; color: var(--green);
+}
+.stack-cell .ss { margin-top: 4px; font-size: 11px; color: var(--muted); line-height: 1.35; }
+.stack-cell.warn .sv { color: var(--amber); }
+.stack-cell.bad .sv { color: var(--rose); }
+.stack-bots { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.stack-bot {
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  font-size: 11px; letter-spacing: 0.4px;
+}
+.stack-bot.on { border-color: var(--green); color: var(--green); }
+.stack-bot.off { border-color: var(--rose); color: var(--rose); }
+.stack-bot.behind { border-color: var(--amber); color: var(--amber); }
+
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th {
+  text-align: left; color: var(--muted); font-weight: 500;
+  font-size: 10px; letter-spacing: 1.2px; text-transform: uppercase;
+  padding: 8px 10px; border-bottom: 1px solid var(--border);
+}
+td {
+  padding: 9px 10px;
+  border-bottom: 1px solid rgba(13,59,31,0.55);
+  vertical-align: top;
+}
+tr:hover td { background: rgba(0,255,106,0.04); }
+
+.side-long  { color: var(--cyan); font-weight: 600; }
+.side-short { color: var(--rose); font-weight: 600; }
+.pnl-pos { color: var(--cyan); font-weight: 600; text-shadow: 0 0 6px rgba(126,203,255,0.35); }
+.pnl-neg { color: var(--rose); font-weight: 600; text-shadow: 0 0 6px rgba(255,77,109,0.35); }
+.coin {
+  color: var(--green);
+  border: 1px solid var(--border);
+  padding: 1px 7px;
+  letter-spacing: 1px;
+}
+.badge {
+  display: inline-block;
+  padding: 1px 7px;
+  border: 1px solid var(--border);
+  font-size: 10px;
+  letter-spacing: 1px;
+}
+.badge.miss { border-color: var(--rose); color: var(--rose); background: var(--rose-dim); }
+.badge.skip { border-color: var(--amber); color: var(--amber); }
+.badge.fail { border-color: var(--rose); color: var(--rose); background: var(--rose-dim); }
+.badge.ok { border-color: var(--green); color: var(--green); }
+
+.btn-close {
+  background: transparent;
+  border: 1px solid var(--rose);
+  color: var(--rose);
+  font-family: var(--font);
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  cursor: pointer;
+  border-radius: 2px;
+}
+.btn-close:hover:not(:disabled) {
+  background: var(--rose-dim);
+  box-shadow: 0 0 10px rgba(255,77,109,0.35);
+  color: #fff;
+}
+.btn-close:disabled {
+  opacity: 0.45;
+  cursor: wait;
+}
+.btn-close-all {
+  border-color: var(--amber);
+  color: var(--amber);
+  margin-left: 8px;
+}
+.btn-close-all:hover:not(:disabled) {
+  background: rgba(255,200,87,0.12);
+  box-shadow: 0 0 10px rgba(255,200,87,0.25);
+  color: #fff;
+}
+.btn-follow {
+  background: transparent;
+  border: 1px solid var(--green);
+  color: var(--green);
+  font-family: var(--font);
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  cursor: pointer;
+  border-radius: 2px;
+}
+.btn-follow:hover:not(:disabled) {
+  background: var(--green-glow);
+  box-shadow: 0 0 10px var(--green-glow);
+  color: #fff;
+}
+.btn-follow:disabled {
+  opacity: 0.45;
+  cursor: wait;
+}
+.btn-scale {
+  background: transparent;
+  border: 1px solid var(--amber);
+  color: var(--amber);
+  font-family: var(--font);
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  cursor: pointer;
+  border-radius: 2px;
+  margin-right: 6px;
+}
+.btn-scale:hover:not(:disabled) {
+  background: rgba(255,200,87,0.12);
+  box-shadow: 0 0 10px rgba(255,200,87,0.25);
+  color: #fff;
+}
+.btn-scale:disabled {
+  opacity: 0.45;
+  cursor: wait;
+}
+.btn-mode {
+  background: transparent;
+  border: 1px solid var(--cyan);
+  color: var(--cyan);
+  font-family: var(--font);
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-radius: 2px;
+  width: 100%;
+  margin-top: 6px;
+}
+.btn-mode:hover:not(:disabled) {
+  background: var(--cyan-dim);
+  box-shadow: 0 0 10px rgba(126,203,255,0.25);
+  color: #fff;
+}
+.btn-mode.on {
+  border-color: var(--amber);
+  color: var(--amber);
+  background: rgba(255,200,87,0.1);
+  box-shadow: 0 0 12px rgba(255,200,87,0.2);
+}
+.btn-mode:disabled {
+  opacity: 0.45;
+  cursor: wait;
+}
+.kpi .zec-row { display: flex; gap: 6px; margin-top: 6px; }
+.kpi .zec-in {
+  flex: 1; min-width: 0;
+  background: #020804; border: 1px solid var(--border); color: var(--text);
+  font-family: inherit; font-size: 13px; padding: 8px 8px;
+}
+.kpi .zec-in:focus { outline: none; border-color: var(--gold, #f0b90b); }
+.btn-full-btc {
+  background: transparent;
+  border: 1px solid var(--amber);
+  color: var(--amber);
+  font-family: var(--font);
+  font-size: 10px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  padding: 8px 10px;
+  cursor: pointer;
+  border-radius: 2px;
+  width: 100%;
+  margin-top: 6px;
+  line-height: 1.3;
+}
+.btn-full-btc:hover:not(:disabled) {
+  background: rgba(255,200,87,0.14);
+  box-shadow: 0 0 12px rgba(255,200,87,0.3);
+  color: #fff;
+}
+.btn-full-btc:disabled {
+  opacity: 0.45;
+  cursor: wait;
+}
+.actions-cell {
+  white-space: nowrap;
+  text-align: right;
+}
+.toast {
+  position: fixed; bottom: 22px; right: 22px; z-index: 100;
+  background: var(--panel);
+  border: 1px solid var(--green);
+  color: var(--green);
+  padding: 10px 16px;
+  font-size: 12px;
+  letter-spacing: 1px;
+  box-shadow: 0 0 20px var(--green-glow);
+  display: none;
+}
+.toast.err { border-color: var(--rose); color: var(--rose); }
+
+.empty {
+  color: var(--muted);
+  padding: 18px 8px;
+  text-align: center;
+  letter-spacing: 1px;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 14px;
+}
+@media (max-width: 900px) {
+  .grid-2 { grid-template-columns: 1fr; }
+}
+
+.err-line {
+  font-size: 11px;
+  color: var(--rose);
+  border-left: 2px solid var(--rose);
+  padding: 6px 10px;
+  margin-bottom: 6px;
+  background: var(--rose-dim);
+  word-break: break-word;
+}
+.fail-line {
+  font-size: 11px;
+  border-left: 2px solid var(--amber);
+  padding: 6px 10px;
+  margin-bottom: 6px;
+  background: rgba(255,200,87,0.06);
+  color: var(--text);
+}
+.fail-line .t { color: var(--muted); margin-right: 8px; }
+.fail-line .k { color: var(--amber); margin-right: 8px; font-weight: 600; }
+
+.leader-card {
+  border: 1px solid var(--border);
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: rgba(0,0,0,0.25);
+}
+.leader-card h3 {
+  font-size: 11px;
+  color: var(--green-dim);
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.leader-pos {
+  display: flex; flex-wrap: wrap; gap: 6px;
+}
+.chip {
+  border: 1px solid var(--border);
+  padding: 3px 8px;
+  font-size: 11px;
+}
+.chip.long { border-color: rgba(126,203,255,0.4); color: var(--cyan); }
+.chip.short { border-color: rgba(255,77,109,0.4); color: var(--rose); }
+.chip.mirrored { box-shadow: 0 0 8px var(--green-glow); border-color: var(--green); }
+
+.footer {
+  margin-top: 20px;
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-align: center;
+}
+.blink { animation: blink 1.4s step-end infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* Per-trader fold for unfollowed positions */
+.trader-fold {
+  border: 1px solid var(--border);
+  margin-bottom: 8px;
+  background: rgba(0,0,0,0.2);
+}
+.trader-fold-h {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  user-select: none;
+  letter-spacing: 1px;
+  font-size: 12px;
+  color: var(--green);
+  transition: background 0.15s;
+}
+.trader-fold-h:hover {
+  background: rgba(0,255,106,0.06);
+  box-shadow: inset 0 0 20px rgba(0,255,106,0.04);
+}
+.trader-fold-h .tf-left {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+}
+.trader-fold-h .tf-num {
+  color: var(--cyan);
+  font-weight: 600;
+  font-size: 13px;
+}
+.trader-fold-h .tf-count {
+  color: var(--muted);
+  font-size: 11px;
+}
+.trader-fold-h .tf-chev {
+  color: var(--amber);
+  font-size: 11px;
+  min-width: 1.2em;
+  text-align: center;
+}
+.trader-fold-b {
+  display: none;
+  border-top: 1px solid var(--border);
+  padding: 0;
+}
+.trader-fold.open .trader-fold-b { display: block; }
+.trader-fold.open .trader-fold-h {
+  background: rgba(0,255,106,0.05);
+  border-bottom: 1px solid transparent;
+}
+.trader-fold-b table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.trader-fold-b th {
+  text-align: left; color: var(--muted); font-weight: 500;
+  font-size: 10px; letter-spacing: 1px; text-transform: uppercase;
+  padding: 8px 10px; border-bottom: 1px solid var(--border);
+}
+.trader-fold-b td {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(13,59,31,0.45);
+}
+.trader-fold-b tr:hover td { background: rgba(0,255,106,0.04); }
+</style>
+</head>
+<body>
+
+{% include '_nav.html' %}
+
+<div class="wrap">
+  <div class="kpis">
+    <div class="kpi"><div class="lbl">Status</div><div class="val" id="kStatus">—</div></div>
+    <div class="kpi" title="Equity = full HL account value · Free = withdrawable (not in positions)">
+      <div class="lbl">Equity / Free</div>
+      <div class="val cyan" id="kBal">—</div>
+      <div class="sub" id="kBalSub" style="margin-top:4px;font-size:10px;color:var(--muted);letter-spacing:0.5px">—</div>
+    </div>
+    <div class="kpi"><div class="lbl">Active positions</div><div class="val" id="kActive">—</div></div>
+    <div class="kpi"><div class="lbl">Open uPnL</div><div class="val" id="kPnl">—</div></div>
+    <div class="kpi"><div class="lbl">Follow fails</div><div class="val rose" id="kFails">—</div></div>
+    <div class="kpi"><div class="lbl">Markets</div><div class="val" id="kMkts">—</div></div>
+    <div class="kpi" id="kpiNet" title="Network loss / recovery from bot logs">
+      <div class="lbl">Network</div>
+      <div class="val" id="kNet">—</div>
+      <div class="sub" id="kNetSub" style="margin-top:4px;font-size:10px;color:var(--muted);letter-spacing:0.5px;line-height:1.35">—</div>
+    </div>
+    <div class="kpi" id="kpiNext" title="Margin reserved for the next open — shared pool for all traders (free ÷ slots × allocation)">
+      <div class="lbl">Next open margin</div>
+      <div class="val amber" id="kNext">—</div>
+      <div class="sub" id="kNextSub" style="margin-top:4px;font-size:10px;color:var(--muted);letter-spacing:0.5px;line-height:1.35">—</div>
+    </div>
+    <div class="kpi" id="kpiMode" title="When ON: no new SHORT mirrors from any trader. Existing shorts stay open until closed manually or by leader.">
+      <div class="lbl">Copy mode</div>
+      <div class="val" id="kMode" style="font-size:15px">—</div>
+      <div class="sub" id="kModeSub" style="margin-top:4px;font-size:10px;color:var(--muted);letter-spacing:0.5px;line-height:1.35">—</div>
+      <button type="button" class="btn-mode" id="btnLongsOnly"
+              onclick="toggleLongsOnly(this)"
+              title="Toggle: only accept LONGs (block all new shorts)">Only accept longs</button>
+    </div>
+    <div class="kpi" id="kpiZecShort" title="Cap notional USD of a new ZEC SHORT. 0 = no extra cap (normal pot). Does not close an existing ZEC short.">
+      <div class="lbl">Max short ZEC</div>
+      <div class="val" id="kZecShort" style="font-size:15px">—</div>
+      <div class="sub" id="kZecShortSub" style="margin-top:4px;font-size:10px;color:var(--muted);letter-spacing:0.5px;line-height:1.35">notional $ · new ZEC shorts only</div>
+      <div class="zec-row">
+        <input class="zec-in" id="inZecShort" type="number" min="0" max="500000" step="10" placeholder="0 = no cap">
+        <button type="button" class="btn-mode" id="btnZecShort" style="width:auto;margin-top:0;padding:8px 10px"
+                onclick="setMaxZecShort(this)"
+                title="Save max ZEC SHORT notional in USD. 0 = unlimited extra cap.">Set</button>
+      </div>
+    </div>
+    <div class="kpi" id="kpiFullBtc" title="Copy wallet only. Close Copy mirrors, then LONG BTC with this bot's funds. Swing/DMan/Only Up and other bots are not used.">
+      <div class="lbl">Emergency BTC</div>
+      <div class="val amber" id="kFullBtc" style="font-size:14px">COPY → BTC</div>
+      <div class="sub" id="kFullBtcSub" style="margin-top:4px;font-size:10px;color:var(--muted);letter-spacing:0.5px;line-height:1.35">Copy wallet only · 100% of HL max</div>
+      <button type="button" class="btn-full-btc" id="btnFullBtc"
+              onclick="fullScaleBtc(this)"
+              title="Copy wallet only: close Copy mirrors, then LONG BTC with Copy funds at 100% of Hyperliquid BTC max leverage">Full scale BTC</button>
+    </div>
+    <div class="kpi" id="kpiFullEth" title="Copy wallet only. Close Copy mirrors, then LONG ETH with this bot's funds. Other bots are not used.">
+      <div class="lbl">Emergency ETH</div>
+      <div class="val cyan" id="kFullEth" style="font-size:14px">COPY → ETH</div>
+      <div class="sub" id="kFullEthSub" style="margin-top:4px;font-size:10px;color:var(--muted);letter-spacing:0.5px;line-height:1.35">Copy wallet only · 100% HL maxi</div>
+      <button type="button" class="btn-full-btc" id="btnFullEth" style="border-color:var(--cyan);color:var(--cyan)"
+              onclick="fullScaleEth(this)"
+              title="Close all, then LONG ETH maxi with all traders' funds at full Hyperliquid ETH max leverage">Full scale ETH</button>
+    </div>
+    <div class="kpi" id="kpiFullLtc" title="Copy wallet only. Close Copy mirrors, then LONG LTC with this bot's funds. Other bots are not used.">
+      <div class="lbl">Emergency LTC</div>
+      <div class="val" id="kFullLtc" style="font-size:14px;color:#9ecbff">COPY → LTC</div>
+      <div class="sub" id="kFullLtcSub" style="margin-top:4px;font-size:10px;color:var(--muted);letter-spacing:0.5px;line-height:1.35">Copy wallet only · 100% of HL max</div>
+      <button type="button" class="btn-full-btc" id="btnFullLtc" style="border-color:#9ecbff;color:#9ecbff"
+              onclick="fullScaleLtc(this)"
+              title="Copy wallet only: close Copy mirrors, then LONG LTC with Copy funds at 100% of Hyperliquid LTC max leverage">Full scale LTC</button>
+    </div>
+    <div class="kpi" id="kpiFullZec" title="Copy wallet only. Close Copy mirrors, then SHORT ZEC with this bot's funds. Other bots are not used. Ignores longs-only.">
+      <div class="lbl">Emergency ZEC short</div>
+      <div class="val rose" id="kFullZec" style="font-size:14px">COPY → SHORT ZEC</div>
+      <div class="sub" id="kFullZecSub" style="margin-top:4px;font-size:10px;color:var(--muted);letter-spacing:0.5px;line-height:1.35">Copy wallet only · 100% of HL max</div>
+      <button type="button" class="btn-full-btc" id="btnFullZec" style="border-color:var(--rose);color:var(--rose)"
+              onclick="fullScaleZecShort(this)"
+              title="Copy wallet only: close Copy mirrors, then SHORT ZEC with Copy funds at 100% of Hyperliquid ZEC max leverage">Full scale ZEC short</button>
+    </div>
+    <div class="kpi" id="kpiAddEth" title="Add LONG ETH using free margin only — does NOT close BTC or other positions. Manual close only.">
+      <div class="lbl">Add ETH</div>
+      <div class="val cyan" id="kAddEth" style="font-size:14px">+ ETH</div>
+      <div class="sub" id="kAddEthSub" style="margin-top:4px;font-size:10px;color:var(--muted);letter-spacing:0.5px;line-height:1.35">free only · keep others</div>
+      <div style="display:flex;gap:6px;margin-top:6px">
+        <button type="button" class="btn-full-btc" id="btnAddEth50" style="border-color:var(--cyan);color:var(--cyan);flex:1;margin-top:0"
+                onclick="addEthPosition(50, this)"
+                title="Open/add LONG ETH with 50% of free margin (manual close only)">50%</button>
+        <button type="button" class="btn-full-btc" id="btnAddEth100" style="border-color:var(--cyan);color:var(--cyan);flex:1;margin-top:0"
+                onclick="addEthPosition(100, this)"
+                title="Open/add LONG ETH with 100% of free margin (manual close only)">100%</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-h">
+      <h2>◆ Stack / HL track</h2>
+      <span class="sub"><a href="/update" style="color:var(--cyan)">Update Hummingbot</a> · refresh 60s</span>
+    </div>
+    <div class="panel-b">
+      <div class="stack-grid">
+        <div class="stack-cell" id="stVerCell">
+          <div class="sk">Hummingbot vs GitHub</div>
+          <div class="sv" id="stVer">—</div>
+          <div class="ss" id="stVerSub">local · online release</div>
+        </div>
+        <div class="stack-cell" id="stDigCell">
+          <div class="sk">Docker vs Hub latest</div>
+          <div class="sv" id="stDig">—</div>
+          <div class="ss" id="stDigSub">image digest</div>
+        </div>
+        <div class="stack-cell" id="stHlCell">
+          <div class="sk">Copy ↔ Hyperliquid</div>
+          <div class="sv" id="stHl">—</div>
+          <div class="ss" id="stHlSub">connector · network</div>
+        </div>
+        <div class="stack-cell" id="stOvCell">
+          <div class="sk">Local HL overlays</div>
+          <div class="sv" id="stOv">—</div>
+          <div class="ss" id="stOvSub">patches on official image</div>
+        </div>
+      </div>
+      <div class="stack-bots" id="stBots"></div>
+    </div>
+  </div>
+
+  <!-- PER-TRADER FUNDS (pot / used / remaining + open uPnL) -->
+  <div class="trader-pots" id="traderPotsRow">
+    <div class="tpot"><div class="tpot-h"><span class="tpot-num">…</span></div>
+      <div style="color:var(--muted);font-size:11px">loading trader pots…</div>
+    </div>
+  </div>
+
+  <!-- ACTIVE POSITIONS -->
+  <div class="panel">
+    <div class="panel-h">
+      <h2>◆ Active positions (our mirrors)</h2>
+      <span class="sub">
+        <span id="activeSub">session-scoped · live mids</span>
+        <button type="button" class="btn-close btn-close-all" id="btnCloseAll"
+                onclick="closeAllPositions()" title="Market-close every open mirror">Close all</button>
+      </span>
+    </div>
+    <div class="panel-b table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Trader</th>
+            <th>Coin</th><th>Side</th><th>Size</th><th>USD size</th>
+            <th>Entry</th><th>Mark</th>
+            <th>Lev</th><th>Margin</th><th>uPnL $</th><th>uPnL %</th>
+            <th title="Distance to risk force-close (loss ÷ max loss = 1/3 equity). 100% = auto-close.">Risk stop</th>
+            <th>Opened</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="activeBody">
+          <tr><td colspan="14" class="empty">loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+
+  <!-- LEADER OPENS (with time for manual miss-check) -->
+  <div class="panel">
+    <div class="panel-h">
+      <h2>◆ Leader opens (this session)</h2>
+      <span class="sub">open time · did we copy? · manual check</span>
+    </div>
+    <div class="panel-b table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Leader open time (UTC)</th>
+            <th>Trader</th>
+            <th>Side</th>
+            <th>Coin</th>
+            <th>Size</th>
+            <th>Entry</th>
+            <th>Status</th>
+            <th>Our copy time</th>
+            <th>Note</th>
+          </tr>
+        </thead>
+        <tbody id="leaderOpensBody">
+          <tr><td colspan="9" class="empty">loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <!-- FOLLOW FAILURES -->
+    <div class="panel">
+      <div class="panel-h">
+        <h2>◆ Failed / missed follows</h2>
+        <span class="sub">leader open time listed first</span>
+      </div>
+      <div class="panel-b" id="failBox">
+        <div class="empty">loading…</div>
+      </div>
+    </div>
+
+    <!-- ERRORS -->
+    <div class="panel">
+      <div class="panel-h">
+        <h2>◆ Strategy errors</h2>
+        <span class="sub">recent ERROR / stall / orphan</span>
+      </div>
+      <div class="panel-b" id="errBox">
+        <div class="empty">loading…</div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-h">
+        <h2>◆ Copy log</h2>
+        <span class="sub" id="copyLogSub">strategy tail</span>
+      </div>
+      <div class="panel-b" id="copyLogBox">
+        <div class="empty">loading…</div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-h">
+        <h2>◆ Leader audits</h2>
+        <span class="sub" id="auditSub">T1 01:00 · T2 06:00 · T3 11:00 Berlin</span>
+      </div>
+      <div class="panel-b" id="auditBox">
+        <div class="empty">loading…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- UNFOLLOWED LEADER POSITIONS (per-trader fold) -->
+  <div class="panel">
+    <div class="panel-h">
+      <h2>◆ Leaders open · we are not in</h2>
+      <span class="sub">click trader to show / hide · open time for new session opens only</span>
+    </div>
+    <div class="panel-b" id="unfollowedBox">
+      <div class="empty">loading…</div>
+    </div>
+  </div>
+
+  <!-- LEADERS SNAPSHOT -->
+  <div class="panel">
+    <div class="panel-h">
+      <h2>◆ Leader books</h2>
+      <span class="sub" id="leaderSub">tracked wallets</span>
+    </div>
+    <div class="panel-b" id="leaderBox">
+      <div class="empty">loading…</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    AUTO_REFRESH 8s · DATA:/api/hl_live · STACK:/api/update 60s · <span class="blink">█</span>
+  </div>
+</div>
+
+<script>
+function esc(s) {
+  return String(s ?? '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+function fmtPx(v) {
+  if (v == null || isNaN(v)) return '—';
+  const n = Number(v);
+  if (n >= 1000) return n.toLocaleString(undefined,{maximumFractionDigits:2});
+  if (n >= 1) return n.toFixed(4);
+  return n.toFixed(6);
+}
+function fmtNum(v, d=2) {
+  if (v == null || isNaN(v)) return '—';
+  return Number(v).toLocaleString(undefined,{maximumFractionDigits:d});
+}
+function pnlClass(v) {
+  if (v == null || isNaN(v)) return '';
+  return v >= 0 ? 'pnl-pos' : 'pnl-neg';
+}
+function sideClass(s) {
+  return (s === 'LONG') ? 'side-long' : 'side-short';
+}
+
+function showToast(msg, isErr) {
+  const el = document.getElementById('toast');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'toast' + (isErr ? ' err' : '');
+  el.style.display = 'block';
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => { el.style.display = 'none'; }, 4000);
+}
+
+async function closePosition(coin, btn) {
+  if (!coin) return;
+  if (!confirm(`Market-close ${coin} now?\n\nThis sends a force-close to the HL copy bot (next poll ~2s).`)) {
+    return;
+  }
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '…';
+  }
+  try {
+    const r = await fetch('/api/hl_close', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ coin }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) {
+      throw new Error(d.error || ('HTTP ' + r.status));
+    }
+    showToast(d.message || `Close signal: ${coin}`);
+    if (btn) btn.textContent = 'SENT';
+    setTimeout(refresh, 2500);
+  } catch (e) {
+    showToast('Close failed: ' + e.message, true);
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Close';
+    }
+  }
+}
+
+/**
+ * Toggle longs-only mode for all traders (blocks new SHORT mirrors).
+ * Persists via conf/hl_copy_runtime.json; bot applies within ~2s.
+ */
+async function toggleLongsOnly(btn) {
+  const currentlyOn = !!(window._longsOnly);
+  const next = !currentlyOn;
+  const msg = next
+    ? 'ONLY ACCEPT LONGS?\n\nNo new SHORT mirrors from any trader.\nExisting shorts stay open (close them manually if needed).'
+    : 'Allow LONGS + SHORTS again?\n\nNew short opens from leaders will be mirrored again.';
+  if (!confirm(msg)) return;
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '…';
+  }
+  try {
+    const r = await fetch('/api/hl_copy_mode', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ longs_only: next }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    window._longsOnly = !!d.longs_only;
+    showToast(d.message || (next ? 'Longs only ON' : 'Shorts allowed'));
+    applyCopyModeUI(!!d.longs_only);
+    setTimeout(refresh, 2000);
+  } catch (e) {
+    showToast('Mode change failed: ' + e.message, true);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function setMaxZecShort(btn) {
+  const raw = document.getElementById('inZecShort');
+  const v = Number(raw && raw.value);
+  if (!Number.isFinite(v) || v < 0) {
+    showToast('Enter a USD notional (0 = no extra cap)', true);
+    return;
+  }
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  try {
+    const r = await fetch('/api/hl_zec_short', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ max_zec_short_usd: v }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    applyZecShortUI(d.max_zec_short_usd);
+    showToast(d.message || 'ZEC short cap saved');
+  } catch (e) {
+    showToast('ZEC cap failed: ' + e.message, true);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Set'; }
+  }
+}
+
+function applyZecShortUI(usd) {
+  const n = Number(usd);
+  const ok = Number.isFinite(n) && n >= 0;
+  const val = document.getElementById('kZecShort');
+  const sub = document.getElementById('kZecShortSub');
+  const inp = document.getElementById('inZecShort');
+  if (val) {
+    val.textContent = !ok || n <= 0 ? 'OFF' : ('$' + Math.round(n).toLocaleString());
+    val.className = 'val' + (ok && n > 0 ? ' amber' : '');
+  }
+  if (sub) {
+    sub.textContent = !ok || n <= 0
+      ? '0 = no extra cap · normal pot'
+      : 'new ZEC SHORT clipped to this notional';
+  }
+  if (inp && document.activeElement !== inp) inp.value = ok ? String(n) : '0';
+}
+
+function applyCopyModeUI(longsOnly) {
+  window._longsOnly = !!longsOnly;
+  const kMode = document.getElementById('kMode');
+  const kModeSub = document.getElementById('kModeSub');
+  const btn = document.getElementById('btnLongsOnly');
+  if (kMode) {
+    kMode.textContent = longsOnly ? 'LONGS ONLY' : 'L+S';
+    kMode.className = 'val' + (longsOnly ? ' amber' : '');
+    kMode.style.fontSize = '15px';
+  }
+  if (kModeSub) {
+    kModeSub.textContent = longsOnly
+      ? 'no new shorts from any trader'
+      : 'longs + shorts mirrored';
+  }
+  if (btn) {
+    btn.classList.toggle('on', !!longsOnly);
+    btn.textContent = longsOnly ? 'Longs only · ON' : 'Only accept longs';
+  }
+}
+
+/**
+ * Close ALL positions, then LONG BTC with all free margin at 100% of max leverage.
+ */
+async function fullScaleAllin(coin, leveragePct, btn, labelEl, subEl, idleLabel, idleSub) {
+  const coinU = (coin || 'BTC').toUpperCase();
+  const pct = leveragePct != null ? Number(leveragePct) : 100;
+  const hlKey = coinU === 'ETH' ? '_hlEthMax' : (coinU === 'LTC' ? '_hlLtcMax' : '_hlBtcMax');
+  const hlMax = (window[hlKey] != null) ? window[hlKey] : (coinU === 'ETH' ? 25 : (coinU === 'LTC' ? 10 : 40));
+  const eff = Math.max(1, Math.round(hlMax * pct / 100));
+  if (!confirm(
+    `FULL SCALE ${coinU} — COPY WALLET ONLY?\n\n` +
+    `Uses only Copy trader funds (this Hyperliquid wallet).\n` +
+    `Swing, Helliot, DMan, Only Up and other bots are NOT used.\n\n` +
+    `1) Market-close ALL Copy mirrors\n` +
+    `2) LONG ${coinU} with Copy equity (T#1+T#2+T#3 pots on this wallet)\n` +
+    `3) Leverage ≈ ${eff}x\n` +
+    `   = ${pct}% of Hyperliquid ${coinU} max (~${hlMax}x)\n\n` +
+    `Copy opens are blocked while this runs.\n` +
+    `This cannot be undone from the dashboard.`
+  )) {
+    return;
+  }
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'ARMING…';
+  }
+  if (labelEl) { labelEl.textContent = 'ARMED'; labelEl.className = 'val rose'; labelEl.style.fontSize = '14px'; }
+  if (subEl) subEl.textContent = `closing → open ${coinU}…`;
+  try {
+    const path = coinU === 'ETH' ? '/api/hl_full_eth'
+      : (coinU === 'BTC' ? '/api/hl_full_btc'
+        : (coinU === 'LTC' ? '/api/hl_full_ltc' : '/api/hl_full_allin'));
+    const body = (coinU === 'ETH' || coinU === 'BTC' || coinU === 'LTC')
+      ? { leverage_pct: pct }
+      : { coin: coinU, leverage_pct: pct };
+    const r = await fetch(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    showToast(d.message || `FULL ${coinU} armed`);
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'CLOSING…';
+    }
+    setTimeout(refresh, 2000);
+    setTimeout(refresh, 6000);
+    setTimeout(refresh, 12000);
+  } catch (e) {
+    showToast(`Full ${coinU} failed: ` + e.message, true);
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = idleLabel || (`Full scale ${coinU}`);
+    }
+    if (labelEl) {
+      labelEl.textContent = `ALL → ${coinU}`;
+      labelEl.className = coinU === 'ETH' ? 'val cyan' : (coinU === 'LTC' ? 'val' : 'val amber');
+    }
+    if (subEl) subEl.textContent = idleSub || '';
+  }
+}
+
+async function fullScaleZecShort(btn) {
+  const pct = 100;
+  const hlMax = (window._hlZecMax != null) ? window._hlZecMax : 5;
+  const eff = Math.max(1, Math.round(hlMax * pct / 100));
+  if (!confirm(
+    `FULL SCALE SHORT ZEC — COPY WALLET ONLY?\n\n` +
+    `Uses only Copy trader funds (this Hyperliquid wallet).\n` +
+    `Swing, Helliot, DMan, Only Up and other bots are NOT used.\n\n` +
+    `1) Market-close ALL Copy mirrors\n` +
+    `2) SHORT ZEC with Copy equity (T#1+T#2+T#3 pots on this wallet)\n` +
+    `3) Leverage ≈ ${eff}x\n` +
+    `   = ${pct}% of Hyperliquid ZEC max (~${hlMax}x)\n\n` +
+    `Ignores longs-only. Copy opens are blocked while this runs.\n` +
+    `This cannot be undone from the dashboard.`
+  )) {
+    return;
+  }
+  if (btn) { btn.disabled = true; btn.textContent = 'ARMING…'; }
+  const labelEl = document.getElementById('kFullZec');
+  const subEl = document.getElementById('kFullZecSub');
+  if (labelEl) { labelEl.textContent = 'ARMED'; labelEl.className = 'val rose'; }
+  if (subEl) subEl.textContent = 'closing → SHORT ZEC…';
+  try {
+    const r = await fetch('/api/hl_full_zec_short', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ leverage_pct: pct }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    showToast(d.message || 'FULL ZEC SHORT armed');
+    if (btn) { btn.disabled = true; btn.textContent = 'CLOSING…'; }
+    setTimeout(refresh, 2000);
+    setTimeout(refresh, 6000);
+    setTimeout(refresh, 12000);
+  } catch (e) {
+    showToast('Full ZEC short failed: ' + e.message, true);
+    if (btn) { btn.disabled = false; btn.textContent = 'Full scale ZEC short'; }
+    if (labelEl) { labelEl.textContent = 'COPY → SHORT ZEC'; labelEl.className = 'val rose'; }
+    if (subEl) subEl.textContent = 'Copy wallet only · 100% of HL max';
+  }
+}
+
+async function fullScaleBtc(btn) {
+  await fullScaleAllin(
+    'BTC', 100, btn,
+    document.getElementById('kFullBtc'),
+    document.getElementById('kFullBtcSub'),
+    'Full scale BTC',
+    'Copy wallet only · 100% of HL max'
+  );
+}
+
+async function fullScaleEth(btn) {
+  await fullScaleAllin(
+    'ETH', 100, btn,
+    document.getElementById('kFullEth'),
+    document.getElementById('kFullEthSub'),
+    'Full scale ETH',
+    'all traders · 100% HL maxi'
+  );
+}
+
+async function fullScaleLtc(btn) {
+  await fullScaleAllin(
+    'LTC', 100, btn,
+    document.getElementById('kFullLtc'),
+    document.getElementById('kFullLtcSub'),
+    'Full scale LTC',
+    'Copy wallet only · 100% of HL max'
+  );
+}
+
+/**
+ * Add LONG ETH using fundsPct% of free margin — does NOT close other positions.
+ * Manual close only (orphan/leader will not exit it).
+ */
+async function addEthPosition(fundsPct, btn) {
+  const pct = Number(fundsPct) >= 75 ? 100 : 50;
+  if (!confirm(
+    `ADD ETH LONG (${pct}% of free funds)?\n\n` +
+    `• Does NOT close BTC or other positions\n` +
+    `• Uses ${pct}% of current free margin at HL max ETH leverage\n` +
+    `• Manual close only (not closed by leaders / orphan)\n\n` +
+    `If free margin is ~$0 (e.g. full-scale BTC), this will skip.`
+  )) {
+    return;
+  }
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '…';
+  }
+  const k = document.getElementById('kAddEth');
+  const sub = document.getElementById('kAddEthSub');
+  if (k) { k.textContent = 'ARMED'; k.className = 'val amber'; }
+  if (sub) sub.textContent = `adding ETH ${pct}% free…`;
+  try {
+    const r = await fetch('/api/hl_add_eth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ funds_pct: pct }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    showToast(d.message || `ADD ETH ${pct}% armed`);
+    if (btn) btn.textContent = 'SENT';
+    setTimeout(refresh, 2500);
+    setTimeout(refresh, 7000);
+    setTimeout(() => {
+      if (btn) { btn.disabled = false; btn.textContent = pct + '%'; }
+      if (k) { k.textContent = '+ ETH'; k.className = 'val cyan'; }
+      if (sub) sub.textContent = 'free only · keep others';
+    }, 12000);
+  } catch (e) {
+    showToast('Add ETH failed: ' + e.message, true);
+    if (btn) { btn.disabled = false; btn.textContent = pct + '%'; }
+    if (k) { k.textContent = '+ ETH'; k.className = 'val cyan'; }
+    if (sub) sub.textContent = 'free only · keep others';
+  }
+}
+
+async function closeAllPositions() {
+  if (!confirm('Market-close ALL open mirrors now?\n\nThis cannot be undone from the dashboard.')) {
+    return;
+  }
+  const btn = document.getElementById('btnCloseAll');
+  if (btn) btn.disabled = true;
+  try {
+    const r = await fetch('/api/hl_close', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ all: true }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) {
+      throw new Error(d.error || ('HTTP ' + r.status));
+    }
+    showToast(d.message || 'CLOSE ALL sent');
+    setTimeout(refresh, 2500);
+  } catch (e) {
+    showToast('Close all failed: ' + e.message, true);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+/**
+ * Full scale: dump the rest of this trader's pot into the open mirror
+ * (extra margin → same-side market add). Bot handles sizing on next poll.
+ */
+async function fullScalePosition(coin, trader, btn) {
+  if (!coin) return;
+  const tLabel = (trader != null && trader !== '') ? ('T#' + trader) : 'this trader';
+  if (!confirm(
+    `FULL SCALE ${coin}?\n\n` +
+    `Adds ALL tradable wallet free to this open ${tLabel} mirror (same side).\n` +
+    `Muted traders do not keep a reserved pot. Does not close anything.\n\n` +
+    `This cannot be undone from the dashboard.`
+  )) {
+    return;
+  }
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '…';
+  }
+  try {
+    const body = { coin };
+    if (trader != null && trader !== '') body.trader = Number(trader);
+    const r = await fetch('/api/hl_scale', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) {
+      throw new Error(d.error || ('HTTP ' + r.status));
+    }
+    showToast(d.message || `Full scale signal: ${coin}`);
+    if (btn) btn.textContent = 'SENT';
+    setTimeout(refresh, 2500);
+    setTimeout(refresh, 6000);
+  } catch (e) {
+    showToast('Full scale failed: ' + e.message, true);
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Full scale';
+    }
+  }
+}
+
+/**
+ * Manually follow a leader position we are not in.
+ * Bot opens at live HL mid and tags the mirror with that trader so
+ * when the leader closes we auto-close (same as normal copies).
+ */
+async function followPosition(trader, coin, side, btn) {
+  if (!coin || trader == null) return;
+  const tLabel = 'T#' + trader;
+  if (!confirm(
+    `Follow ${tLabel} ${side || ''} ${coin} now?\n\n` +
+    `Opens at current Hyperliquid mid with normal size.\n` +
+    `When ${tLabel} closes, we will close automatically.`
+  )) {
+    return;
+  }
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '…';
+  }
+  try {
+    const r = await fetch('/api/hl_follow', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ trader: Number(trader), coin, side: side || undefined }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) {
+      throw new Error(d.error || ('HTTP ' + r.status));
+    }
+    showToast(d.message || `Follow sent: ${tLabel} ${coin}`);
+    if (btn) btn.textContent = 'SENT';
+    setTimeout(refresh, 3000);
+    setTimeout(refresh, 8000);
+  } catch (e) {
+    showToast('Follow failed: ' + e.message, true);
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Follow';
+    }
+  }
+}
+
+/**
+ * Risk stop meter for a position.
+ * 0% = no loss / in profit; 100% = at force-close (default 1/3 equity loss).
+ * Vertical box fills bottom→top; thin bar fills right→left.
+ */
+function riskStopMeterHtml(m, risk) {
+  let pct = m.risk_stop_pct;
+  const maxLoss = m.risk_max_loss_usd != null
+    ? Number(m.risk_max_loss_usd)
+    : (risk && risk.max_loss_usd != null ? Number(risk.max_loss_usd) : null);
+  const lossUsd = m.risk_loss_usd != null
+    ? Number(m.risk_loss_usd)
+    : (m.pnl_usd != null && m.pnl_usd < 0 ? -Number(m.pnl_usd) : 0);
+  const autoOff = !!(m.risk_auto_close_disabled);
+
+  if (pct == null || isNaN(pct)) {
+    if (maxLoss > 0 && m.pnl_usd != null) {
+      pct = Math.min(100, Math.max(0, (lossUsd / maxLoss) * 100));
+    } else if (m.pnl_usd != null && m.pnl_usd >= 0) {
+      pct = 0;
+    } else {
+      return `<td class="risk-cell"><span style="color:var(--muted)">—</span></td>`;
+    }
+  }
+  pct = Math.max(0, Math.min(100, Number(pct)));
+  let level = pct >= 85 ? 'hot' : (pct >= 50 ? 'warn' : 'safe');
+  let fillCls = pct >= 85 ? 'hot' : (pct >= 50 ? 'warn' : '');
+  if (autoOff) {
+    level = 'off';
+    fillCls = 'off';
+  }
+  const lossPct = (risk && risk.max_position_loss_pct != null)
+    ? Math.round(Number(risk.max_position_loss_pct) * 100)
+    : 33;
+  let title;
+  if (autoOff) {
+    title = `Auto-stop OFF for ${m.coin || '?'}. Risk bar still shows progress but will NOT force-close at 100%.`;
+  } else if (pct <= 0 && (m.pnl_usd == null || m.pnl_usd >= 0)) {
+    title = `Risk stop: safe (in profit or flat). Auto-close at −$${maxLoss != null ? fmtNum(maxLoss, 2) : '?'} (${lossPct}% equity = 100% bar).`;
+  } else {
+    title = `Risk stop ${fmtNum(pct, 0)}% — loss $${fmtNum(lossUsd, 2)} / max $${maxLoss != null ? fmtNum(maxLoss, 2) : '?'} (${lossPct}% equity). 100% bar = force close.`;
+  }
+  return `<td class="risk-cell" title="${title.replace(/"/g, '&quot;')}">
+    <div class="risk-meter">
+      <div class="risk-vbox ${autoOff ? 'off' : ''}" aria-label="Risk stop ${fmtNum(pct, 0)} percent">
+        <div class="risk-vfill ${fillCls}" style="height:${pct.toFixed(1)}%"></div>
+      </div>
+      <div class="risk-hbar">
+        <div class="risk-hfill ${fillCls}" style="width:${pct.toFixed(1)}%"></div>
+      </div>
+      <div class="risk-pct ${level}">${autoOff ? 'OFF' : (fmtNum(pct, 0) + '%')}</div>
+    </div>
+  </td>`;
+}
+
+/**
+ * Toggle risk auto-stop for a position (100% risk bar force-close).
+ * enabled=false → hold through 100%; enabled=true → re-arm auto-close.
+ */
+async function toggleRiskAutoClose(coin, enable, btn) {
+  if (!coin) return;
+  const label = enable ? 're-enable auto-stop' : 'disable auto-stop';
+  if (!confirm(
+    enable
+      ? `Turn AUTO-STOP ON for ${coin}?\n\nAt 100% risk bar (loss ≈ 1/3 equity) the bot will force-close again.`
+      : `Turn AUTO-STOP OFF for ${coin}?\n\nThe risk bar still fills, but the bot will NOT auto-close at 100%.\nManual Close still works.`
+  )) return;
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '…';
+  }
+  try {
+    const r = await fetch('/api/hl_risk_auto_close', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ coin, enabled: !!enable }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    showToast(d.message || `${coin} auto-stop ${enable ? 'ON' : 'OFF'}`);
+    setTimeout(refresh, 800);
+    setTimeout(refresh, 2500);
+  } catch (e) {
+    showToast('Auto-stop toggle failed: ' + e.message, true);
+    if (btn) btn.disabled = false;
+  }
+}
+
+function renderActive(rows, risk) {
+  const tb = document.getElementById('activeBody');
+  if (!rows || !rows.length) {
+    tb.innerHTML = '<tr><td colspan="14" class="empty">NO ACTIVE MIRRORS</td></tr>';
+    return;
+  }
+  risk = risk || window._lastRisk || {};
+  tb.innerHTML = rows.map(m => {
+    const pc = pnlClass(m.pnl_usd ?? m.pnl_pct);
+    const coinJs = JSON.stringify(m.coin || '');
+    const tnum = m.trader != null && m.trader !== '' ? m.trader : null;
+    // Show primary T#; full_btc uses ALL traders; multi-leader hint with +others
+    let traderCell;
+    if (m.all_traders || String(m.source || '').startsWith('full_')) {
+      const all = Array.isArray(m.traders) && m.traders.length
+        ? m.traders.map(n => 'T#' + esc(n)).join('+')
+        : 'ALL';
+      const coinTag = (m.coin || 'all-in').toUpperCase();
+      traderCell = `<span style="color:var(--amber);font-weight:600;letter-spacing:1px" title="Emergency Full ${coinTag} — combined pots · manual close only">${all}</span>`;
+    } else if (m.add_eth || m.source === 'add_eth' || m.manual_close_only) {
+      traderCell = `<span style="color:var(--cyan);font-weight:600;letter-spacing:1px" title="Manual close only (not closed by leaders)">MANUAL</span>`;
+    } else if (tnum != null) {
+      const extras = Array.isArray(m.traders) && m.traders.length > 1
+        ? m.traders.filter(n => Number(n) !== Number(tnum))
+        : [];
+      const extraHint = extras.length
+        ? `<span style="color:var(--muted);font-size:10px;font-weight:400"> (+${extras.map(n => 'T#' + esc(n)).join(',') })</span>`
+        : '';
+      traderCell = `<span style="color:var(--cyan);font-weight:600;letter-spacing:1px">T#${esc(tnum)}</span>${extraHint}`;
+    } else {
+      traderCell = `<span style="color:var(--muted)">${m.source === 'restore' ? 'restored' : '—'}</span>`;
+    }
+    const tArg = tnum != null ? String(tnum) : 'null';
+    const scaleTitle = tnum != null
+      ? `Add remaining T#${tnum} pot funds to ${esc(m.coin)} (full scale)`
+      : `Add remaining trader pot funds to ${esc(m.coin)} (full scale)`;
+    // Live notional USD (size × mark); API sends usd_size; client fallback too
+    let usdSize = m.usd_size;
+    if (usdSize == null || isNaN(usdSize)) {
+      const sz = Number(m.size);
+      const px = Number(m.current_px != null ? m.current_px : m.entry_px);
+      if (sz > 0 && px > 0) usdSize = sz * px;
+    }
+    const usdCell = (usdSize != null && !isNaN(usdSize))
+      ? `<span style="color:var(--amber);font-weight:600">$${fmtNum(usdSize, 2)}</span>`
+      : '—';
+    return `<tr>
+      <td>${traderCell}</td>
+      <td><span class="coin">${esc(m.coin)}</span>${m.scaled ? ' <span style="color:var(--amber);font-size:10px">▲</span>' : ''}</td>
+      <td class="${sideClass(m.side)}">${esc(m.side)}</td>
+      <td>${fmtNum(m.size, 5)}</td>
+      <td title="Notional = size × live mark">${usdCell}</td>
+      <td>$${fmtPx(m.entry_px)}</td>
+      <td>$${fmtPx(m.current_px)}</td>
+      <td>${m.leverage ? m.leverage + 'x' : '—'}</td>
+      <td>${m.margin ? '$' + fmtNum(m.margin) : '—'}</td>
+      <td class="${pc}">${m.pnl_usd == null ? '—' : ((m.pnl_usd>=0?'+':'') + fmtNum(m.pnl_usd))}</td>
+      <td class="${pc}">${m.pnl_pct == null ? '—' : ((m.pnl_pct>=0?'+':'') + fmtNum(m.pnl_pct) + '%')}</td>
+      ${riskStopMeterHtml(m, risk)}
+      <td style="color:var(--muted);font-size:11px">${esc(m.open_time || '')}</td>
+      <td class="actions-cell">
+        <button type="button" class="btn-scale"
+                onclick='fullScalePosition(${coinJs}, ${tArg}, this)'
+                title="${scaleTitle}">Full scale</button>
+        ${(() => {
+          const off = !!m.risk_auto_close_disabled;
+          const btnLabel = off ? 'Auto-stop ON' : 'Auto-stop OFF';
+          const btnCls = off ? 'btn-risk off' : 'btn-risk';
+          const tip = off
+            ? 'Re-enable risk auto-close at 100% risk bar'
+            : 'Disable risk auto-close (hold past 100% bar). Manual Close still works.';
+          return `<button type="button" class="${btnCls}"
+                onclick='toggleRiskAutoClose(${coinJs}, ${off ? 'true' : 'false'}, this)'
+                title="${tip}">${btnLabel}</button>`;
+        })()}
+        <button type="button" class="btn-close"
+                onclick='closePosition(${coinJs}, this)'
+                title="Market close ${esc(m.coin)} now">Close</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function renderFails(fails) {
+  const box = document.getElementById('failBox');
+  if (!fails || !fails.length) {
+    box.innerHTML = '<div class="empty">NO FOLLOW FAILURES THIS SESSION</div>';
+    return;
+  }
+  box.innerHTML = fails.map(f => {
+    const k = (f.kind || 'MISS').toUpperCase();
+    const badge = k === 'SKIP' || k === 'DEFER' ? 'skip' : (k === 'ORPHAN' ? 'skip' : 'miss');
+    const size = f.size != null ? fmtNum(f.size, 4) : '';
+    const px = f.entry_px != null ? (' @ $' + fmtPx(f.entry_px)) : '';
+    const tLabel = (f.trader != null && f.trader !== '')
+      ? `T#${esc(f.trader)}`
+      : 'T#?';
+    return `<div class="fail-line">
+      <div style="color:var(--amber);font-weight:600;letter-spacing:0.5px;margin-bottom:3px">
+        LEADER OPEN: ${esc(f.time || '?')}
+        · <span style="color:var(--cyan)">${tLabel}</span>
+      </div>
+      <span class="badge ${badge}">${esc(k)}</span>
+      <span style="color:var(--cyan);font-weight:600;margin-right:6px">${tLabel}</span>
+      <span class="${sideClass(f.side)}">${esc(f.side || '')}</span>
+      <span class="coin">${esc(f.coin || '?')}</span>
+      ${size ? `<span style="color:var(--muted)"> ${size}${px}</span>` : ''}
+      <div style="margin-top:3px;color:var(--muted)">${esc(f.detail || '')}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderLeaderOpens(rows) {
+  const tb = document.getElementById('leaderOpensBody');
+  if (!tb) return;
+  if (!rows || !rows.length) {
+    tb.innerHTML = '<tr><td colspan="9" class="empty">NO LEADER OPENS LOGGED THIS SESSION</td></tr>';
+    return;
+  }
+  tb.innerHTML = rows.map(e => {
+    const st = (e.status || (e.followed ? 'COPIED' : 'MISS')).toUpperCase();
+    let badge = 'miss';
+    if (st === 'COPIED') badge = 'ok';
+    else if (st === 'SKIP' || st === 'DEFER') badge = 'skip';
+    else if (st === 'FAILED' || st === 'MISS') badge = 'fail';
+    return `<tr>
+      <td style="color:var(--amber);font-weight:600;white-space:nowrap">${esc(e.time || '—')}</td>
+      <td>T#${e.trader ?? '—'}</td>
+      <td class="${sideClass(e.side)}">${esc(e.side || '')}</td>
+      <td><span class="coin">${esc(e.coin || '?')}</span></td>
+      <td>${e.size != null ? fmtNum(e.size, 4) : '—'}</td>
+      <td>${e.entry_px != null ? ('$' + fmtPx(e.entry_px)) : '—'}</td>
+      <td><span class="badge ${badge}">${esc(st)}</span></td>
+      <td style="color:var(--muted);white-space:nowrap">${e.followed ? esc(e.our_time || e.time || '—') : '—'}</td>
+      <td style="color:var(--muted);font-size:11px">${esc(e.detail || '')}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderErrors(errs) {
+  const box = document.getElementById('errBox');
+  if (!errs || !errs.length) {
+    box.innerHTML = '<div class="empty">NO RECENT ERRORS</div>';
+    return;
+  }
+  box.innerHTML = errs.slice().reverse().map(e =>
+    `<div class="err-line">${esc(e)}</div>`
+  ).join('');
+}
+
+function renderCopyLogs(logs, audits) {
+  const box = document.getElementById('copyLogBox');
+  const sub = document.getElementById('copyLogSub');
+  if (box) {
+    if (!logs || !logs.length) {
+      box.innerHTML = '<div class="empty">NO STRATEGY LINES IN TAIL</div>';
+    } else {
+      box.innerHTML = logs.slice(-20).map(function (l) {
+        return '<div class="err-line">' + esc(l) + '</div>';
+      }).join('');
+    }
+  }
+  if (sub) sub.textContent = (logs && logs.length ? logs.length + ' lines' : 'strategy tail');
+  const abox = document.getElementById('auditBox');
+  const asub = document.getElementById('auditSub');
+  const rows = (audits && audits.traders) || [];
+  if (asub) {
+    asub.textContent = (audits && audits.worker ? 'worker live' : 'worker off')
+      + (audits && audits.updated_at ? ' · ' + audits.updated_at : ' · T1 01:00 T2 06:00 T3 11:00 Berlin');
+  }
+  if (abox) {
+    if (!rows.length) {
+      abox.innerHTML = '<div class="empty">NO AUDITS YET — see /audit</div>';
+    } else {
+      abox.innerHTML = rows.map(function (t) {
+        return '<div class="err-line">T#' + esc(t.trader)
+          + ' ' + esc(t.capacity_flag || '') + ' ' + esc(t.sleep_flag || '')
+          + ' pos ' + esc(t.n_positions)
+          + ' free ' + (t.free_margin != null ? '$' + Number(t.free_margin).toFixed(0) : '—')
+          + ' · ' + esc(t.audited_at || '')
+          + '</div>';
+      }).join('');
+    }
+  }
+}
+
+// Which trader folds are open (survive 8s auto-refresh)
+window._ufExpanded = window._ufExpanded || new Set();
+
+function toggleUnfollowed(traderNum) {
+  const n = Number(traderNum);
+  if (window._ufExpanded.has(n)) window._ufExpanded.delete(n);
+  else window._ufExpanded.add(n);
+  const el = document.getElementById('uf-fold-' + n);
+  if (el) el.classList.toggle('open', window._ufExpanded.has(n));
+  const chev = document.getElementById('uf-chev-' + n);
+  if (chev) chev.textContent = window._ufExpanded.has(n) ? '▼' : '▶';
+}
+
+function renderUnfollowed(rows, pots, leaders) {
+  const box = document.getElementById('unfollowedBox');
+  if (!box) return;
+  const byT = {};
+  (rows || []).forEach(r => {
+    const t = r.trader != null ? Number(r.trader) : 0;
+    if (!t) return;
+    if (!byT[t]) byT[t] = [];
+    byT[t].push(r);
+  });
+  const nums = new Set(Object.keys(byT).map(Number));
+  (pots || []).forEach(p => { if (p && p.num != null) nums.add(Number(p.num)); });
+  (leaders || []).forEach(L => { if (L && L.num != null) nums.add(Number(L.num)); });
+  const sorted = Array.from(nums).filter(n => n > 0).sort((a, b) => a - b);
+  if (!sorted.length) {
+    box.innerHTML = '<div class="empty">NO COPY LEADERS CONFIGURED</div>';
+    return;
+  }
+
+  box.innerHTML = sorted.map(n => {
+    const list = byT[n] || [];
+    const open = window._ufExpanded.has(n);
+    const label = 'T#' + n;
+    const lead = (leaders || []).find(L => Number(L.num) === n) || {};
+    const pot = (pots || []).find(p => Number(p.num) === n) || {};
+    const leaderN = lead.n_pos != null ? Number(lead.n_pos) : (pot.leader_n_pos != null ? Number(pot.leader_n_pos) : list.length);
+    const countLbl = list.length
+      ? (list.length + ' position' + (list.length !== 1 ? 's' : '') + ' we are not in')
+      : (leaderN === 0 ? 'FLAT on Hyperliquid · 0 open' : (leaderN + ' leader pos · all mirrored or filtered'));
+    const rowsHtml = list.length ? list.map(r => {
+      const pc = pnlClass(r.upnl);
+      const ot = r.open_time
+        ? `<span style="color:var(--amber);font-weight:600">${esc(r.open_time)}</span>`
+        : `<span style="color:var(--muted)">—</span>`;
+      const coinJs = JSON.stringify(r.coin || '');
+      const sideJs = JSON.stringify(r.side || '');
+      const canFollow = n > 0 && r.coin && !String(r.coin).includes(':');
+      const followBtn = canFollow
+        ? `<button type="button" class="btn-follow"
+              onclick='event.stopPropagation(); followPosition(${n}, ${coinJs}, ${sideJs}, this)'
+              title="Open mirror at live HL mid; auto-close when T#${n} closes">Follow</button>`
+        : `<span style="color:var(--muted)">—</span>`;
+      return `<tr>
+        <td style="white-space:nowrap">${ot}</td>
+        <td><span class="coin">${esc(r.coin)}</span></td>
+        <td class="${sideClass(r.side)}">${esc(r.side)}</td>
+        <td>${fmtNum(r.size, 4)}</td>
+        <td>$${fmtPx(r.entry_px)}</td>
+        <td class="${pc}">${r.upnl == null ? '—' : ((r.upnl>=0?'+':'') + fmtNum(r.upnl))}</td>
+        <td>${followBtn}</td>
+      </tr>`;
+    }).join('') : `<tr><td colspan="7" class="empty">${esc(countLbl)}</td></tr>`;
+
+    return `<div class="trader-fold${open ? ' open' : ''}" id="uf-fold-${n}">
+      <div class="trader-fold-h" onclick="toggleUnfollowed(${n})" title="Click to show / hide">
+        <div class="tf-left">
+          <span class="tf-num">${esc(label)}</span>
+          <span class="tf-count">${esc(countLbl)}</span>
+        </div>
+        <span class="tf-chev" id="uf-chev-${n}">${open ? '▼' : '▶'}</span>
+      </div>
+      <div class="trader-fold-b">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Opened (UTC)</th>
+                <th>Coin</th>
+                <th>Side</th>
+                <th>Size</th>
+                <th>Entry</th>
+                <th>uPnL</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/**
+ * Unfollow / re-follow a copy leader immediately.
+ * Unfollow: stop new copies from that trader (existing mirrors stay until closed).
+ */
+async function setTraderSlots(trader, slots, btn) {
+  if (trader == null || ![1,2,3].includes(Number(slots))) return;
+  if (btn) btn.disabled = true;
+  try {
+    const r = await fetch('/api/hl_trader_slots', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ trader: Number(trader), slots: Number(slots) }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) {
+      showToast(d.error || ('Failed to set T#' + trader + ' slots'), true);
+    } else {
+      showToast(d.message || ('T#' + trader + ' follows ' + slots));
+      await refresh();
+    }
+  } catch (e) {
+    showToast(String(e), true);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function setTraderFollow(trader, follow, btn) {
+  if (trader == null) return;
+  const tLabel = 'T#' + trader;
+  if (!follow) {
+    const ok = confirm(
+      `MUTE ${tLabel}?\n\n` +
+      `• Stop copy trading this leader's NEW opens\n` +
+      `• That trader's pot is split to the remaining unmuted trader(s)\n` +
+      `• Existing mirrors stay open (we still exit when the leader closes)\n` +
+      `• Does NOT close positions. Unmute anytime.`
+    );
+    if (!ok) return;
+  }
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '…';
+  }
+  try {
+    const r = await fetch('/api/hl_trader_follow', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ trader: Number(trader), mute: !follow, follow: !!follow }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) {
+      showToast(d.error || ('Failed to ' + (follow ? 'unmute' : 'mute') + ' ' + tLabel), true);
+    } else {
+      showToast(d.message || (follow ? tLabel + ' unmuted' : tLabel + ' muted'));
+      await refresh();
+    }
+  } catch (e) {
+    showToast(String(e), true);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+/**
+ * Per-trader pot row under KPIs:
+ * pot (funds to use), margin in use, remaining, open uPnL, pot after uPnL.
+ */
+function renderTraderPots(pots) {
+  const box = document.getElementById('traderPotsRow');
+  if (!box) return;
+  if (!pots || !pots.length) {
+    box.innerHTML = '<div class="tpot"><div style="color:var(--muted);font-size:11px">No traders configured</div></div>';
+    return;
+  }
+  box.innerHTML = pots.map(t => {
+    const upnl = t.upnl;
+    const upnlCls = upnl == null ? 'muted' : (upnl >= 0 ? 'cyan' : 'rose');
+    const upnlTxt = upnl == null
+      ? '—'
+      : ((upnl >= 0 ? '+' : '') + '$' + fmtNum(upnl, 2));
+    const after = t.pot_after_upnl;
+    const afterCls = after == null ? 'muted'
+      : (t.upnl != null && t.upnl < 0 ? 'rose' : (t.upnl != null && t.upnl > 0 ? 'cyan' : 'amber'));
+    const afterTxt = after == null ? '—' : ('$' + fmtNum(after, 2));
+    const rem = t.remaining;
+    const remTxt = rem == null ? '—' : ('$' + fmtNum(rem, 2));
+    const tradable = t.remaining_free_capped;
+    const tradableTxt = tradable == null ? '—' : ('$' + fmtNum(tradable, 2));
+    const over = Number(t.over_pot || 0);
+    const potTxt = t.pot == null ? '—' : ('$' + fmtNum(t.pot, 2));
+    const usedTxt = '$' + fmtNum(t.margin_used || 0, 2);
+    const nPos = t.n_positions != null ? t.n_positions : 0;
+    const maxP = t.follow_slots != null ? t.follow_slots : (t.max_positions != null ? t.max_positions : 3);
+    const slotUsd = t.slot_margin != null ? ('$' + fmtNum(t.slot_margin, 2)) : '—';
+    const coins = (t.coins || []).filter(Boolean).join(' · ') || 'flat';
+    const sharedNote = t.full_btc_shared
+      ? ' · full all-in (shared all pots)'
+      : '';
+    const isUnfollowed = !!(t.muted || t.unfollowed || t.followed === false);
+    const cardCls = isUnfollowed ? 'tpot muted' : 'tpot';
+    const badge = isUnfollowed
+      ? '<span class="tpot-badge">muted</span>'
+      : '';
+    const btnLabel = isUnfollowed ? 'Unmute' : 'Mute';
+    const btnCls = isUnfollowed ? 'btn-unfollow follow' : 'btn-unfollow';
+    const btnTitle = isUnfollowed
+      ? 'Unmute — resume copy and take a pot share again'
+      : 'Mute — no new copies; this pot goes to the other unmuted trader(s)';
+    const btnAction = isUnfollowed ? 'true' : 'false';
+    const alive = t.alive !== false && !t.leader_error;
+    const lampTitle = alive
+      ? ('alive on HL' + (t.last_seen ? (' · last signal ' + t.last_seen) : '') + (t.leader_n_pos != null ? (' · ' + t.leader_n_pos + ' pos') : ''))
+      : ('NOT reachable on HL' + (t.last_seen ? (' · last signal ' + t.last_seen) : ''));
+    return `<div class="${cardCls}" title="Equal equity pot · margin in our mirrors · remaining for Full scale / new opens · pot ± open uPnL">
+      <div class="tpot-h">
+        <span class="tpot-num">
+          <span class="lamp ${alive ? 'on' : 'off'}" title="${esc(lampTitle)}"></span>
+          T#${esc(t.num)}
+          <span class="lamp-lbl" style="color:${alive ? 'var(--green)' : 'var(--rose)'}">${alive ? 'live' : 'down'}</span>
+          ${badge}
+        </span>
+        <span class="tpot-addr">${esc(t.short || '')}</span>
+      </div>
+      <div class="tpot-grid">
+        <div>
+          <div class="k">Funds to use</div>
+          <div class="v amber">${potTxt}</div>
+        </div>
+        <div>
+          <div class="k">Still free in pot</div>
+          <div class="v ${rem === 0 ? 'muted' : ''}">${remTxt}</div>
+        </div>
+        <div>
+          <div class="k">Tradable now</div>
+          <div class="v ${Number(tradable||0) === 0 ? 'muted' : 'amber'}">${tradableTxt}</div>
+        </div>
+        <div>
+          <div class="k">In positions</div>
+          <div class="v muted">${usedTxt}</div>
+        </div>
+        <div>
+          <div class="k">Open uPnL</div>
+          <div class="v ${upnlCls}">${upnlTxt}</div>
+        </div>
+        <div style="grid-column:1 / -1">
+          <div class="k">Still have (pot ± uPnL)</div>
+          <div class="v ${afterCls}">${afterTxt}</div>
+        </div>
+      </div>
+      <div class="tpot-foot">
+        <span>${nPos}/${maxP} our mirrors · leader ${t.leader_n_pos != null ? t.leader_n_pos : '?'} open · each 1/${maxP} (${slotUsd}) · ${esc(coins)}${sharedNote}${isUnfollowed ? ' · muted · pot to others' : ''}${over > 0 ? (' · over pot $' + fmtNum(over, 2) + ' (uses muted leftover)') : ''}${!isUnfollowed && t.wallet_free != null ? (' · wallet $' + fmtNum(t.wallet_free, 2)) : ''}</span>
+        <div class="tpot-actions">
+          <span class="slot-lbl">follow</span>
+          ${[1,2,3].map(n => `<button type="button" class="btn-slot${Number(maxP)===n ? ' on' : ''}"
+            onclick="setTraderSlots(${Number(t.num)}, ${n}, this)"
+            title="Follow ${n} trade${n>1?'s':''} — each 1/${n} of this pot"> ${n}</button>`).join('')}
+          <button type="button" class="${btnCls}"
+                  onclick="setTraderFollow(${Number(t.num)}, ${btnAction}, this)"
+                  title="${btnTitle}">${btnLabel}</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderLeaders(leaders) {
+  const box = document.getElementById('leaderBox');
+  if (!leaders || !leaders.length) {
+    box.innerHTML = '<div class="empty">NO TRADERS CONFIGURED</div>';
+    return;
+  }
+  box.innerHTML = leaders.map(L => {
+    const chips = (L.positions || []).map(p => {
+      const cls = p.side === 'LONG' ? 'long' : 'short';
+      const ot = p.open_time
+        ? `<div style="color:var(--amber);font-size:10px;margin-top:2px">opened ${esc(p.open_time)}</div>`
+        : '';
+      return `<span class="chip ${cls}">${esc(p.side)} ${esc(p.coin)} ${fmtNum(p.size,3)} @ ${fmtPx(p.entry_px)}${ot}</span>`;
+    }).join('') || '<span style="color:var(--muted)">flat</span>';
+    const alive = L.alive !== false && !L.error;
+    const lampTitle = alive
+      ? ('alive on HL' + (L.last_seen ? (' · last signal ' + L.last_seen) : ''))
+      : ('NOT reachable on HL' + (L.last_seen ? (' · last signal ' + L.last_seen) : ''));
+    return `<div class="leader-card">
+      <h3>
+        <span class="lamp ${alive ? 'on' : 'off'}" title="${esc(lampTitle)}"></span>
+        TRADER #${L.num} · ${esc(L.short)}
+        ${alive ? ('· ' + L.n_pos + ' pos') : '· DOWN'}
+      </h3>
+      <div class="leader-pos">${chips}</div>
+    </div>`;
+  }).join('');
+}
+
+async function refresh() {
+  try {
+    const r = await fetch('/api/hl_live');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+
+    const live = !!d.running;
+    const st = document.getElementById('botState');
+    st.textContent = live ? 'LIVE' : 'OFFLINE';
+    st.className = 'pill ' + (live ? 'live' : 'offline');
+
+    document.getElementById('kStatus').textContent = (d.heartbeat && d.heartbeat.connector) || (live ? 'UP' : 'DOWN');
+    document.getElementById('kStatus').className = 'val' + (live ? '' : ' rose');
+    paintHlTrack(d);
+
+    const hb = d.heartbeat || {};
+    const equity = hb.equity != null ? hb.equity : hb.balance;
+    const free = hb.free != null ? hb.free : null;
+    const kBal = document.getElementById('kBal');
+    const kBalSub = document.getElementById('kBalSub');
+    if (equity != null) {
+      kBal.textContent = '$' + Number(equity).toFixed(2);
+      if (kBalSub) {
+        kBalSub.textContent = free != null
+          ? ('free $' + Number(free).toFixed(2) + ' · in positions / locked rest')
+          : 'total equity (HL accountValue)';
+      }
+    } else {
+      kBal.textContent = '—';
+      if (kBalSub) kBalSub.textContent = '—';
+    }
+
+    const active = d.active || [];
+    document.getElementById('kActive').textContent = String(active.length);
+    // Show coin tickers under Active KPI so a lone BTC is obvious
+    const kActiveEl = document.getElementById('kActive');
+    if (kActiveEl && active.length) {
+      const names = active.map(m => (m.side === 'SHORT' ? 'S:' : 'L:') + (m.coin || '?')).join(' · ');
+      kActiveEl.title = names;
+      let sub = kActiveEl.parentElement && kActiveEl.parentElement.querySelector('.sub');
+      if (!sub) {
+        sub = document.createElement('div');
+        sub.className = 'sub';
+        sub.style.cssText = 'margin-top:4px;font-size:10px;color:var(--muted);letter-spacing:0.5px;line-height:1.35';
+        kActiveEl.parentElement.appendChild(sub);
+      }
+      sub.textContent = names;
+    } else if (kActiveEl && kActiveEl.parentElement) {
+      const sub = kActiveEl.parentElement.querySelector('.sub');
+      if (sub) sub.textContent = 'flat';
+    }
+
+    // Next open budget (shared by all traders)
+    const np = d.next_position;
+    const kNext = document.getElementById('kNext');
+    const kNextSub = document.getElementById('kNextSub');
+    if (kNext && np && np.margin != null) {
+      kNext.textContent = '$' + Number(np.margin).toFixed(2);
+      if (kNextSub) {
+        const maxN = np.notional_at_max_lev != null ? Number(np.notional_at_max_lev).toFixed(0) : '?';
+        const pot = np.trader_pot != null ? Number(np.trader_pot).toFixed(2) : '?';
+        const nt = np.n_traders != null ? np.n_traders : 3;
+        const mp = np.max_positions_per_trader != null ? np.max_positions_per_trader : 3;
+        kNextSub.textContent =
+          `per pos · pot $${pot}/trader (${nt} pots) ÷ ${mp}`
+          + ` · ~$${maxN} notional @ ${np.max_leverage}x`;
+      }
+    } else if (kNext) {
+      kNext.textContent = '—';
+      if (kNextSub) kNextSub.textContent = 'waiting for balance';
+    }
+
+    let upnl = 0, has = false;
+    active.forEach(m => { if (m.pnl_usd != null) { upnl += m.pnl_usd; has = true; } });
+    const kp = document.getElementById('kPnl');
+    if (has) {
+      kp.textContent = (upnl >= 0 ? '+' : '') + upnl.toFixed(2);
+      kp.className = 'val ' + (upnl >= 0 ? 'cyan' : 'rose');
+    } else {
+      kp.textContent = '—';
+      kp.className = 'val';
+    }
+
+    document.getElementById('kFails').textContent = String((d.failures || []).length);
+    document.getElementById('kMkts').textContent = (d.heartbeat && d.heartbeat.markets != null) ? d.heartbeat.markets : '—';
+
+    // Copy mode (longs only vs longs+shorts)
+    const cfg = d.config || {};
+    window._maxLev = cfg.max_leverage != null ? Number(cfg.max_leverage) : 20;
+    const longsOnly = cfg.longs_only != null
+      ? !!cfg.longs_only
+      : (cfg.copy_shorts === false);
+    applyCopyModeUI(longsOnly);
+    if (cfg.max_zec_short_usd != null) applyZecShortUI(cfg.max_zec_short_usd);
+    // Update Full BTC sub with live max lev
+    const fbSub = document.getElementById('kFullBtcSub');
+    if (cfg.hl_btc_max_leverage != null) {
+      window._hlBtcMax = Number(cfg.hl_btc_max_leverage);
+    }
+    if (cfg.hl_eth_max_leverage != null) {
+      window._hlEthMax = Number(cfg.hl_eth_max_leverage);
+    }
+    if (cfg.hl_ltc_max_leverage != null) {
+      window._hlLtcMax = Number(cfg.hl_ltc_max_leverage);
+    }
+    if (cfg.hl_zec_max_leverage != null) {
+      window._hlZecMax = Number(cfg.hl_zec_max_leverage);
+    }
+    const allinPhase = (d.bot_status || {}).full_allin_phase || (d.bot_status || {}).full_btc_phase;
+    const allinCoin = String((d.bot_status || {}).full_allin_coin || 'BTC').toUpperCase();
+    const fbBtn = document.getElementById('btnFullBtc');
+    const fbVal = document.getElementById('kFullBtc');
+    if (allinPhase && allinCoin === 'BTC') {
+      if (fbBtn) { fbBtn.disabled = true; fbBtn.textContent = allinPhase === 'opening' ? 'OPENING BTC…' : 'CLOSING…'; }
+      if (fbVal) { fbVal.textContent = allinPhase.toUpperCase(); fbVal.className = 'val rose'; }
+      const left = (d.active || []).map(m => m.coin).filter(c => c && String(c).toUpperCase() !== 'BTC');
+      if (fbSub) {
+        fbSub.textContent = allinPhase === 'opening'
+          ? 'Copy wallet only · opening LONG BTC'
+          : (left.length ? ('flattening ' + left.join(', ') + ' then LONG BTC') : 'Copy wallet only · flatten then LONG BTC');
+      }
+    } else if (fbSub && !fbBtn?.disabled) {
+      const hlMax = (window._hlBtcMax != null) ? window._hlBtcMax : 40;
+      const eff = Math.max(1, Math.round(hlMax * 1.0));
+      fbSub.textContent = `Copy wallet only · ~${eff}x (100% of HL ${hlMax}x)`;
+    }
+    const feSub = document.getElementById('kFullEthSub');
+    if (allinPhase && allinCoin === 'ETH') {
+      const feBtn = document.getElementById('btnFullEth');
+      const feVal = document.getElementById('kFullEth');
+      if (feBtn) { feBtn.disabled = true; feBtn.textContent = allinPhase === 'opening' ? 'OPENING ETH…' : 'CLOSING…'; }
+      if (feVal) { feVal.textContent = allinPhase.toUpperCase(); feVal.className = 'val rose'; }
+      if (feSub) {
+        feSub.textContent = allinPhase === 'opening'
+          ? 'Copy wallet only · opening LONG ETH'
+          : 'Copy wallet only · flatten then LONG ETH';
+      }
+    } else if (feSub && !document.getElementById('btnFullEth')?.disabled) {
+      const hlMax = (window._hlEthMax != null) ? window._hlEthMax : 25;
+      const eff = Math.max(1, Math.round(hlMax * 1.0));
+      const nt = (cfg.traders != null) ? cfg.traders : 3;
+      feSub.textContent = `all ${nt} traders · ~${eff}x (100% of HL ${hlMax}x)`;
+    }
+    const flSub = document.getElementById('kFullLtcSub');
+    const flBtn = document.getElementById('btnFullLtc');
+    const flVal = document.getElementById('kFullLtc');
+    if (allinPhase && allinCoin === 'LTC') {
+      if (flBtn) { flBtn.disabled = true; flBtn.textContent = allinPhase === 'opening' ? 'OPENING LTC…' : 'CLOSING…'; }
+      if (flVal) { flVal.textContent = allinPhase.toUpperCase(); flVal.className = 'val rose'; }
+      if (flSub) {
+        flSub.textContent = allinPhase === 'opening'
+          ? 'Copy wallet only · opening LONG LTC'
+          : 'Copy wallet only · flatten then LONG LTC';
+      }
+    } else if (flSub && !flBtn?.disabled) {
+      const hlMax = (window._hlLtcMax != null) ? window._hlLtcMax : 10;
+      const eff = Math.max(1, Math.round(hlMax * 1.0));
+      flSub.textContent = `Copy wallet only · ~${eff}x (100% of HL ${hlMax}x)`;
+    }
+    const fzSub = document.getElementById('kFullZecSub');
+    const fzBtn = document.getElementById('btnFullZec');
+    const fzVal = document.getElementById('kFullZec');
+    const allinSide = String((d.bot_status || {}).full_allin_side || 'LONG').toUpperCase();
+    if (allinPhase && allinCoin === 'ZEC') {
+      if (fzBtn) { fzBtn.disabled = true; fzBtn.textContent = allinPhase === 'opening' ? 'OPENING SHORT…' : 'CLOSING…'; }
+      if (fzVal) { fzVal.textContent = allinPhase.toUpperCase(); fzVal.className = 'val rose'; }
+      if (fzSub) {
+        fzSub.textContent = allinPhase === 'opening'
+          ? 'Copy wallet only · opening SHORT ZEC'
+          : 'Copy wallet only · flatten then SHORT ZEC';
+      }
+    } else if (fzSub && !fzBtn?.disabled) {
+      const hlMax = (window._hlZecMax != null) ? window._hlZecMax : 5;
+      const eff = Math.max(1, Math.round(hlMax * 1.0));
+      fzSub.textContent = `Copy wallet only · SHORT ~${eff}x (100% of HL ${hlMax}x)`;
+    }
+
+    // Network loss KPI
+    const net = d.network || {};
+    const netEl = document.getElementById('kNet');
+    const netSub = document.getElementById('kNetSub');
+    const netSt = (net.status || '?').toUpperCase();
+    const losses = net.loss_count != null ? net.loss_count : 0;
+    if (netSt === 'DOWN') {
+      netEl.textContent = 'DOWN';
+      netEl.className = 'val rose';
+    } else if (netSt === 'UP') {
+      netEl.textContent = losses > 0 ? ('OK · ' + losses) : 'OK';
+      netEl.className = 'val cyan';
+    } else {
+      netEl.textContent = '—';
+      netEl.className = 'val';
+    }
+    if (netSub) {
+      if (net.last_down) {
+        netSub.textContent = 'last loss ' + String(net.last_down).replace('T', ' ')
+          + (net.last_up ? ' · up ' + String(net.last_up).slice(11) : '');
+      } else if (losses === 0) {
+        netSub.textContent = 'no losses recorded';
+      } else {
+        netSub.textContent = losses + ' loss event(s)';
+      }
+    }
+
+    document.getElementById('activeSub').textContent =
+      `${active.length} open · ${(d.heartbeat && d.heartbeat.raw) ? d.heartbeat.raw.slice(0,80) : 'session mirrors'}`;
+    document.getElementById('leaderSub').textContent =
+      `${(d.leaders||[]).length} wallets · config max lev ${(d.config&&d.config.max_leverage)||'?' }x`;
+
+    renderTraderPots(d.trader_pots || []);
+    window._lastRisk = d.risk || {};
+    renderActive(active, window._lastRisk);
+    // Risk stop legend under Active panel title
+    const activeSub = document.getElementById('activeSub');
+    if (activeSub && window._lastRisk) {
+      const r = window._lastRisk;
+      if (r.enabled === false) {
+        activeSub.textContent = 'session-scoped · live mids · risk OFF';
+      } else {
+        const pct = r.max_position_loss_pct != null
+          ? Math.round(Number(r.max_position_loss_pct) * 100)
+          : 33;
+        const maxL = r.max_loss_usd != null ? ('$' + Number(r.max_loss_usd).toFixed(0)) : '?';
+        activeSub.textContent =
+          `session · live mids · risk stop @ ${pct}% equity (max loss ${maxL}/pos)`;
+      }
+    }
+    renderLeaderOpens(d.leader_opens || []);
+    renderFails(d.failures || []);
+    renderErrors(d.errors || []);
+    renderCopyLogs(d.logs || [], d.audits || {});
+    renderUnfollowed(d.unfollowed || [], d.trader_pots || [], d.leaders || []);
+    renderLeaders(d.leaders || []);
+  } catch (e) {
+    console.error(e);
+    document.getElementById('botState').textContent = 'API ERR';
+    document.getElementById('botState').className = 'pill offline';
+  }
+}
+
+function paintHlTrack(d) {
+  const el = document.getElementById('stHl');
+  if (!el) return;
+  const live = !!d.running;
+  const conn = (d.heartbeat && d.heartbeat.connector) || (live ? 'UP' : 'DOWN');
+  const net = (d.network && d.network.status) || '—';
+  const ready = String(conn).toLowerCase().includes('ready') && !String(conn).toUpperCase().includes('NOT');
+  const cell = document.getElementById('stHlCell');
+  el.textContent = conn;
+  if (!live || String(conn).toUpperCase().includes('NOT') || !ready && conn !== 'UP') {
+    cell.className = 'stack-cell ' + (live ? 'warn' : 'bad');
+  } else {
+    cell.className = 'stack-cell';
+  }
+  const sub = document.getElementById('stHlSub');
+  if (sub) {
+    sub.textContent = 'network ' + net + (d.network && d.network.last_up ? ' · last up ' + d.network.last_up : '');
+  }
+}
+
+function shortDig(d) {
+  if (!d) return '—';
+  const x = String(d).replace(/^sha256:/, '');
+  return x.slice(0, 12) + '…';
+}
+
+function paintStack(d) {
+  const c = d.compare || {};
+  const verEl = document.getElementById('stVer');
+  const verCell = document.getElementById('stVerCell');
+  const verSub = document.getElementById('stVerSub');
+  if (verEl) {
+    verEl.textContent = c.version_match ? 'IN SYNC' : 'DIFF';
+    verCell.className = 'stack-cell' + (c.version_match ? '' : ' warn');
+    verSub.textContent = 'local ' + (c.local_version || '—') + ' · GitHub ' + (c.online_version || '—');
+  }
+  const digEl = document.getElementById('stDig');
+  const digCell = document.getElementById('stDigCell');
+  const digSub = document.getElementById('stDigSub');
+  if (digEl) {
+    digEl.textContent = c.digest_match ? 'IN SYNC' : 'DIFF';
+    digCell.className = 'stack-cell' + (c.digest_match ? '' : ' warn');
+    digSub.textContent = 'local ' + shortDig(c.local_digest) + ' · hub ' + shortDig(c.online_digest);
+  }
+  const ovEl = document.getElementById('stOv');
+  const ovSub = document.getElementById('stOvSub');
+  if (ovEl) {
+    const n = (d.overlays || []).length;
+    ovEl.textContent = n ? (n + ' files') : 'none';
+    ovSub.textContent = 'HIP-3 off · 429 retry · tick if not ready';
+  }
+  const track = ['hummingbot-hl', 'hummingbot-bn-swing', 'hummingbot-helliot', 'hummingbot-surfn', 'hummingbot-shortn', 'hummingbot-dman', 'hummingbot-onlyup'];
+  const box = document.getElementById('stBots');
+  if (box) {
+    const byId = {};
+    (d.containers || []).forEach(b => { byId[b.id] = b; });
+    box.innerHTML = track.map(id => {
+      const b = byId[id] || { id, name: id, running: false, status: 'offline' };
+      const cls = !b.running ? 'off' : (b.status === 'behind' ? 'behind' : 'on');
+      const proto = b.protocol ? (' · ' + b.protocol.replace('Hyperliquid Perps REST + WS', 'HL perps').replace('Hyperliquid Perps', 'HL perps')) : '';
+      return `<span class="stack-bot ${cls}" title="${esc(b.notes || b.role || '')}">${esc(b.name || id)}${b.running ? '' : ' OFF'}${b.status === 'behind' ? ' BEHIND' : ''}${esc(proto)}</span>`;
+    }).join('');
+  }
+}
+
+async function refreshStack() {
+  try {
+    const r = await fetch('/api/update');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    paintStack(await r.json());
+  } catch (e) {
+    const verEl = document.getElementById('stVer');
+    if (verEl) {
+      verEl.textContent = 'ERR';
+      document.getElementById('stVerCell').className = 'stack-cell bad';
+    }
+  }
+}
+
+refresh();
+setInterval(refresh, 8000);
+refreshStack();
+setInterval(refreshStack, 60000);
+</script>
+</body>
+</html>

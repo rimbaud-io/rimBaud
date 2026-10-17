@@ -1,0 +1,1895 @@
+<!--
+Copyright 2026 rimbaud.io
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>rimBaud // HOME</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --bg: #020804;
+  --panel: #041208;
+  --border: #0d3b1f;
+  --green: #00ff6a;
+  --green-dim: #00b347;
+  --green-glow: rgba(0, 255, 106, 0.15);
+  --text: #9dffc0;
+  --muted: #3d7a55;
+  --rose: #ff4d6d;
+  --rose-dim: rgba(255, 77, 109, 0.12);
+  --cyan: #7ecbff;
+  --amber: #ffc857;
+  --gold: #f0b90b;
+  --font: 'IBM Plex Mono', 'Share Tech Mono', ui-monospace, monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { min-height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13px;
+  line-height: 1.45;
+  background-image:
+    linear-gradient(rgba(0,255,106,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,255,106,0.03) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+a { color: var(--green); text-decoration: none; }
+a:hover { color: #fff; text-shadow: 0 0 8px var(--green); }
+
+body::after {
+  content: "";
+  pointer-events: none;
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(
+    0deg, transparent, transparent 2px,
+    rgba(0,0,0,0.12) 2px, rgba(0,0,0,0.12) 4px
+  );
+  z-index: 9999;
+  opacity: 0.35;
+}
+
+header {
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, #03160a 0%, #020804 100%);
+  padding: 14px 22px;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 12px;
+  position: sticky; top: 0; z-index: 200; overflow: visible;
+  box-shadow: 0 0 30px rgba(240,185,11,0.08);
+}
+.brand {
+  font-size: 15px; font-weight: 600; letter-spacing: 2px;
+  color: #2A9FD6; text-shadow: 0 0 12px rgba(42, 159, 214, 0.55);
+}
+.brand span { color: var(--muted); font-weight: 400; letter-spacing: 1px; }
+.nav { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.nav a, .pill {
+  border: 1px solid var(--border);
+  padding: 5px 12px; border-radius: 2px;
+  color: var(--green-dim); font-size: 11px; letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.nav a:hover, .pill.live {
+  border-color: var(--green);
+  color: var(--green);
+  box-shadow: 0 0 10px var(--green-glow);
+}
+.pill.offline { border-color: var(--rose); color: var(--rose); }
+.nav a.active {
+  border-color: var(--gold);
+  color: var(--gold);
+  box-shadow: 0 0 10px rgba(240,185,11,0.25);
+}
+.sys-dd { position: relative; z-index: 80; }
+.sys-dd-btn {
+  background: #03160a; border: 1px solid var(--gold); color: var(--gold);
+  font: inherit; font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
+  padding: 5px 12px; cursor: pointer;
+}
+.sys-dd.open .sys-dd-btn { border-color: var(--green); color: var(--green); }
+.sys-dd-menu {
+  display: none; position: absolute; top: calc(100% + 4px); right: 0; min-width: 180px;
+  background: #03160a; border: 1px solid var(--border);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5); padding: 4px;
+  flex-direction: column;
+}
+.sys-dd.open .sys-dd-menu { display: flex; }
+.sys-dd-menu a {
+  display: block; border: 1px solid transparent; padding: 8px 10px;
+  color: var(--green-dim); font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
+}
+.sys-dd-menu a:hover { border-color: var(--green); color: var(--green); }
+.sys-dd-menu a.on { border-color: var(--gold); color: var(--gold); }
+.meta { color: var(--muted); font-size: 11px; }
+
+.wrap { max-width: 1280px; margin: 0 auto; padding: 12px 18px 48px; }
+.home-shell {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 8px 16px 48px;
+}
+.home-top {
+  max-height: calc(8vh + 18vh * var(--home-top-scale, 0.7));
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.home-top .grok-bias {
+  padding: calc(4px + 4px * var(--home-top-scale, 0.7)) 12px;
+  margin-bottom: calc(4px + 4px * var(--home-top-scale, 0.7));
+}
+.home-top .grok-chip .gm { font-size: calc(11px + 3px * var(--home-top-scale, 0.7)); }
+.home-top .btn-bias { padding: calc(3px + 3px * var(--home-top-scale, 0.7)) 10px; }
+.home-mid { min-height: 60vh; padding: 4px 0 16px; }
+.home-bot {
+  border-top: 1px solid var(--border);
+  padding: 8px 0 10px;
+}
+.home-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.home-bots {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 10px;
+}
+.home-health-row { display: flex; flex-wrap: wrap; gap: 10px; }
+.home-health-row .home-health { flex: 1 1 240px; min-width: 200px; }
+.band-lbl {
+  font-size: 10px; letter-spacing: 1.6px; text-transform: uppercase;
+  color: var(--gold); margin: 4px 0 8px;
+}
+.home-bot .band-lbl { color: var(--cyan); }
+.home-mid .band-lbl { color: var(--green-dim); }
+body.home-banded .lead { display: none; }
+.home-bots, .bots {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 10px;
+  min-height: 60vh;
+  margin-bottom: 16px;
+}
+.lead { color: var(--muted); margin-bottom: 16px; max-width: 920px; }
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px; margin-bottom: 16px;
+}
+.kpi {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  padding: 12px 14px;
+  box-shadow: inset 0 0 20px rgba(240,185,11,0.04);
+}
+.kpi .lbl { color: var(--muted); font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; }
+.kpi .val { margin-top: 6px; font-size: 20px; color: var(--green); text-shadow: 0 0 8px rgba(0,255,106,0.35); }
+.kpi .val.rose { color: var(--rose); text-shadow: 0 0 8px rgba(255,77,109,0.35); }
+.kpi .val.cyan { color: var(--cyan); text-shadow: 0 0 8px rgba(126,203,255,0.35); }
+.kpi .val.gold { color: var(--gold); text-shadow: 0 0 8px rgba(240,185,11,0.35); }
+
+.rate-panel { margin-bottom: 16px; }
+.rate-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap; padding: 12px 14px 8px;
+}
+.rate-title {
+  font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--gold);
+}
+.rate-nums { font-size: 18px; color: var(--green); text-shadow: 0 0 8px rgba(0,255,106,0.35); }
+.rate-nums.warn { color: var(--amber); text-shadow: 0 0 8px rgba(255,200,87,0.35); }
+.rate-nums.hot { color: var(--rose); text-shadow: 0 0 8px rgba(255,77,109,0.35); }
+.rate-bar {
+  height: 10px; margin: 0 14px 10px; border: 1px solid var(--border);
+  background: #020804; overflow: hidden;
+}
+.rate-bar > span {
+  display: block; height: 100%; width: 0%;
+  background: var(--green); box-shadow: 0 0 10px rgba(0,255,106,0.45);
+  transition: width 0.4s ease;
+}
+.rate-bar.warn > span { background: var(--amber); box-shadow: 0 0 10px rgba(255,200,87,0.4); }
+.rate-bar.hot > span { background: var(--rose); box-shadow: 0 0 10px rgba(255,77,109,0.45); }
+.rate-meta {
+  color: var(--muted); font-size: 11px; padding: 0 14px 12px;
+  letter-spacing: 0.3px; line-height: 1.5;
+}
+.rate-meta b { color: var(--text); font-weight: 600; }
+
+.bots {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.bots.stage {
+  display: block;
+  position: relative;
+  min-height: 420px;
+  margin-bottom: 16px;
+}
+.bot.abs {
+  position: absolute;
+  width: 320px;
+  height: 520px;
+  overflow: auto;
+  box-sizing: border-box;
+}
+.abs-tile {
+  position: absolute;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.abs-tile .kpi, .abs-tile .rate-panel, .abs-tile .panel {
+  margin-bottom: 0;
+  height: 100%;
+  box-sizing: border-box;
+}
+.abs-tile .panel { overflow: auto; }
+.wrap.staged { max-width: none; }
+.home-health {
+  width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  padding: 10px 12px;
+}
+.home-health .hh-h { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--gold); margin-bottom: 6px; }
+.home-health .hh-row { font-size: 12px; color: var(--text); margin: 3px 0; }
+.home-health.hot { border-color: var(--rose); }
+.bot {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  padding: 12px 14px;
+  display: block;
+}
+.bot:hover { border-color: var(--gold); }
+.bot.issue { border-color: var(--rose); }
+.bot-h {
+  display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  margin-bottom: 8px;
+}
+.bot-name {
+  font-weight: 600; letter-spacing: 1px; font-size: 13px;
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.lamp {
+  display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+  flex-shrink: 0; box-shadow: 0 0 8px currentColor;
+}
+.lamp.on { background: var(--green); color: var(--green); animation: lamp-pulse 1.8s ease-in-out infinite; }
+.lamp.off { background: var(--rose); color: var(--rose); }
+@keyframes lamp-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+.bot-run { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; }
+.bot-run.on { color: var(--green); }
+.bot-run.off { color: var(--rose); }
+.bot-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.btn-restart {
+  background: transparent;
+  border: 1px solid var(--amber, #ffc857);
+  color: var(--amber, #ffc857);
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  cursor: pointer;
+  border-radius: 2px;
+}
+.btn-restart:hover:not(:disabled) { background: rgba(255,200,87,0.12); color: #fff; }
+.btn-restart:disabled { opacity: 0.45; cursor: wait; }
+.sl-row {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.sl-h {
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.sl-now { color: var(--rose); font-weight: 600; }
+.sl-btns { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.btn-sl {
+  background: transparent;
+  border: 1px solid var(--rose);
+  color: var(--rose);
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  cursor: pointer;
+  border-radius: 2px;
+}
+.btn-sl:hover:not(:disabled) { background: var(--rose-dim); color: #fff; }
+.btn-sl.on { background: var(--rose-dim); color: #fff; box-shadow: 0 0 8px rgba(255,77,109,0.28); }
+.btn-sl:disabled { opacity: 0.45; cursor: wait; }
+.sl-custom {
+  width: 58px;
+  background: #020804;
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 11px;
+  padding: 3px 6px;
+  border-radius: 2px;
+}
+.sl-custom:focus { outline: none; border-color: var(--rose); }
+.crazy-row {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.crazy-row label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 12px;
+  letter-spacing: 0.5px;
+}
+.crazy-row input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--gold);
+  cursor: pointer;
+}
+.crazy-row .hint { color: var(--muted); font-size: 10px; letter-spacing: 0.5px; }
+.bot-logs {
+  margin-top: 10px;
+  padding: 8px 8px 6px;
+  background: rgba(0,0,0,0.28);
+  border: 1px solid rgba(13,59,31,0.7);
+  max-height: 108px;
+  overflow: auto;
+  font-size: 10px;
+  line-height: 1.35;
+  color: var(--muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.bot-logs .ll { margin: 0 0 3px; }
+.bot-logs .ll.bad { color: var(--rose); }
+.bot-addr { color: var(--muted); font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 8px; }
+.bot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; }
+.bot-grid .k { color: var(--muted); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; }
+.bot-grid .v { color: var(--green); font-size: 14px; font-weight: 600; margin-top: 2px; }
+.bot-grid .v.rose { color: var(--rose); }
+.bot-grid .v.cyan { color: var(--cyan); }
+.bot-grid .v.muted { color: var(--muted); font-weight: 500; }
+.mk-row {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.mk-h {
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.mk-list { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.mk-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  border: 1px solid var(--border);
+  color: var(--green);
+  padding: 2px 6px 2px 7px;
+  font-size: 10px;
+  letter-spacing: 1px;
+}
+.mk-chip.idle { border-color: var(--amber); color: var(--amber); }
+.mk-chip.live { border-color: var(--cyan); color: var(--cyan); }
+.btn-del {
+  background: transparent;
+  border: 1px solid var(--rose);
+  color: var(--rose);
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  cursor: pointer;
+  border-radius: 2px;
+  line-height: 1.3;
+}
+.btn-del:hover:not(:disabled) { background: var(--rose-dim); color: #fff; }
+.btn-del:disabled { opacity: 0.35; cursor: not-allowed; }
+.next-row {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.next-row .nx { margin-bottom: 6px; }
+.next-row .nx:last-child { margin-bottom: 0; }
+.next-row .nk {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+.next-row .nk.sell { color: var(--rose); }
+.next-row .nk.buy { color: var(--cyan); }
+.next-row .nk.buy.ready { color: var(--green); }
+.next-row .nv.ready {
+  color: var(--green);
+  font-weight: 600;
+}
+.next-row .nv {
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--muted);
+  word-break: break-word;
+  white-space: normal;
+}
+.next-row .nv .px-sell {
+  color: var(--rose);
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: 0.3px;
+  text-shadow: 0 0 8px rgba(255, 77, 109, 0.4);
+  background: var(--rose-dim);
+  padding: 0 5px;
+  border-radius: 2px;
+}
+.next-row .nv .px-buy {
+  color: var(--amber);
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: 0.3px;
+  text-shadow: 0 0 8px rgba(255, 200, 87, 0.4);
+  background: rgba(255, 200, 87, 0.12);
+  padding: 0 5px;
+  border-radius: 2px;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  margin-bottom: 14px;
+  box-shadow: 0 0 24px rgba(0,255,106,0.05);
+}
+.panel-h {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0,255,106,0.04);
+}
+.panel-h h2 {
+  font-size: 12px; letter-spacing: 2px; text-transform: uppercase;
+  color: var(--gold); font-weight: 600;
+}
+.panel-h .sub { color: var(--muted); font-size: 11px; }
+.panel-b { padding: 0; }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th {
+  text-align: left; color: var(--muted); font-weight: 500;
+  font-size: 10px; letter-spacing: 1.2px; text-transform: uppercase;
+  padding: 8px 10px; border-bottom: 1px solid var(--border);
+}
+td {
+  padding: 9px 10px;
+  border-bottom: 1px solid rgba(13,59,31,0.55);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+tr:hover td { background: rgba(0,255,106,0.04); }
+.side-long  { color: var(--cyan); font-weight: 600; }
+.side-short { color: var(--rose); font-weight: 600; }
+.pnl-pos { color: var(--cyan); font-weight: 600; }
+.pnl-neg { color: var(--rose); font-weight: 600; }
+.coin {
+  color: var(--green);
+  border: 1px solid var(--border);
+  padding: 1px 7px;
+  letter-spacing: 1px;
+}
+.empty {
+  padding: 28px 14px;
+  text-align: center;
+  color: var(--muted);
+  letter-spacing: 1px;
+}
+.grok-bias { margin-bottom: 8px; padding: 8px 12px; }
+.grok-bias .rate-row { gap: 16px; align-items: center; flex-wrap: wrap; }
+.bias-split { display: flex; gap: 14px; flex-wrap: nowrap; align-items: stretch; width: 100%; }
+.bias-split .col { min-width: 0; flex: 1 1 0; }
+.bias-split .col.tokens { flex: 1.15 1 220px; }
+.bias-split .col.desk { flex: 0 1 260px; }
+.bias-split .col.tokens .rate-nums { font-size: 14px; }
+.bias-split .col.tokens .rate-bar { margin: 6px 0 4px; height: 8px; }
+.bias-split .col.tokens .rate-meta { padding: 0; font-size: 10px; max-height: 2.6em; overflow: hidden; }
+.grok-chips { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.grok-chip {
+  display: flex; align-items: baseline; gap: 6px;
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+  min-width: 0;
+}
+.grok-chip .gc { font-size: 10px; letter-spacing: 1.2px; color: var(--muted); }
+.grok-chip .gm { font-size: 13px; letter-spacing: 1px; font-weight: 600; }
+.grok-chip.long { border-color: var(--cyan); }
+.grok-chip.long .gm { color: var(--cyan); }
+.grok-chip.short { border-color: var(--rose); }
+.grok-chip.short .gm { color: var(--rose); }
+.grok-chip.flat { border-color: var(--gold); }
+.grok-chip.flat .gm { color: var(--gold); }
+.grok-chip.on { box-shadow: 0 0 12px rgba(240,185,11,0.35); background: rgba(240,185,11,0.14); }
+.grok-chip.on.long { box-shadow: 0 0 12px rgba(126,203,255,0.4); background: rgba(126,203,255,0.16); }
+.grok-chip.on.short { box-shadow: 0 0 12px rgba(255,77,109,0.4); background: var(--rose-dim); }
+.grok-chip.on .gm { font-size: 15px; }
+
+.risk-badge {
+  border: 1px solid var(--rose);
+  color: var(--rose);
+  font-size: 9px;
+  letter-spacing: 1.2px;
+  padding: 2px 6px;
+  text-transform: uppercase;
+}
+.risk-report { margin: 8px 0 12px; }
+.risk-report .rate-row { align-items: center; gap: 12px; }
+.risk-report .val { min-width: 7.5em; text-align: right; }
+.btn-bias.risk-send { border-color: var(--rose); color: var(--rose); }
+.btn-bias.risk-send:hover:not(:disabled) { color: #fff; background: var(--rose-dim); }
+.risk-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 10px 0 8px;
+}
+.risk-stat {
+  border: 1px solid var(--border);
+  padding: 8px 10px;
+  background: #03160a;
+}
+.risk-stat .lbl {
+  font-size: 10px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.risk-stat .num { font-size: 16px; font-weight: 600; margin-top: 2px; }
+.risk-stat.ready { border-color: var(--green-dim); }
+.risk-stat.ready .num { color: var(--green); }
+.risk-stat.locked { border-color: var(--amber); }
+.risk-stat.locked .num { color: var(--amber); }
+.risk-stat.wallet .num { color: var(--cyan); }
+.risk-tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+.risk-tbl th {
+  text-align: left; color: var(--muted); font-weight: 500;
+  letter-spacing: 1px; text-transform: uppercase; font-size: 10px;
+  padding: 6px 8px; border-bottom: 1px solid var(--border);
+}
+.risk-tbl td { padding: 7px 8px; border-bottom: 1px solid #0a2816; }
+.risk-tbl td.r, .risk-tbl th.r { text-align: right; font-variant-numeric: tabular-nums; }
+.risk-tbl .ready { color: var(--green); }
+.risk-tbl .locked { color: var(--amber); }
+.risk-tbl .st { color: var(--muted); font-size: 11px; }
+.desk-bias {
+  margin-bottom: 16px;
+}
+.desk-bias .rate-row { align-items: center; }
+.bias-btns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.btn-bias {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 6px 14px;
+  cursor: pointer;
+  border-radius: 2px;
+}
+.btn-bias.long { border-color: var(--cyan); color: var(--cyan); }
+.btn-bias.short { border-color: var(--rose); color: var(--rose); }
+.btn-bias.flat { border-color: var(--gold); color: var(--gold); }
+.btn-bias:hover:not(:disabled) { color: #fff; }
+.btn-bias.on.long { background: rgba(126,203,255,0.14); box-shadow: 0 0 10px rgba(126,203,255,0.28); }
+.btn-bias.on.short { background: var(--rose-dim); box-shadow: 0 0 10px rgba(255,77,109,0.28); }
+.btn-bias.on.flat { background: rgba(240,185,11,0.14); box-shadow: 0 0 10px rgba(240,185,11,0.28); }
+.btn-bias:disabled { opacity: 0.45; cursor: wait; }
+.btn-bias.off-mode { opacity: 0.28; cursor: not-allowed; }
+.desk-bias .warn { color: var(--amber); }
+.coin-bias {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin: 6px 0 2px;
+}
+.coin-bias .cb-coin {
+  width: 36px; color: var(--gold); font-size: 11px; letter-spacing: 1px;
+}
+.coin-bias .cb-btns { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.coin-bias .btn-bias { padding: 3px 8px; font-size: 10px; }
+.btn-close, .btn-100 {
+  background: transparent;
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  cursor: pointer;
+  border-radius: 2px;
+}
+.btn-close { border: 1px solid var(--rose); color: var(--rose); }
+.btn-close:hover:not(:disabled) { background: var(--rose-dim); color: #fff; }
+.btn-100 { border: 1px solid var(--cyan); color: var(--cyan); }
+.btn-100:hover:not(:disabled) { background: rgba(126,203,255,0.14); color: #fff; }
+.btn-close:disabled, .btn-100:disabled { opacity: 0.45; cursor: wait; }
+.lev-row { display: flex; align-items: center; gap: 8px; margin: 8px 0 4px; }
+.lev-h { color: var(--gold); font-size: 11px; letter-spacing: 1px; }
+.lev-btns { display: flex; gap: 6px; }
+.btn-lev {
+  background: transparent; font-family: inherit; font-size: 10px; letter-spacing: 1px;
+  padding: 3px 10px; cursor: pointer; border-radius: 2px; border: 1px solid var(--green); color: var(--green);
+}
+.btn-lev.mid { border-color: var(--amber); color: var(--amber); }
+.btn-lev.low { border-color: var(--cyan); color: var(--cyan); }
+.btn-lev.on.max { background: var(--green); color: #041208; }
+.btn-lev.on.mid { background: var(--amber); color: #041208; }
+.btn-lev.on.low { background: var(--cyan); color: #041208; }
+.btn-lev:disabled { opacity: 0.45; cursor: wait; }
+.lev-fx { font-size: 10px; letter-spacing: 0.4px; }
+.lev-fx.max { color: var(--green); }
+.lev-fx.mid { color: var(--amber); }
+.lev-fx.low { color: var(--cyan); }
+.clip-bit { color: var(--muted); font-size: 10px; }
+.btn-gate {
+  background: transparent; font-family: inherit; font-size: 10px; letter-spacing: 1px;
+  padding: 3px 8px; cursor: pointer; border-radius: 2px; border: 1px solid var(--muted); color: var(--muted);
+}
+.btn-gate.act { border-color: var(--green); color: var(--green); background: rgba(0,255,106,0.12); }
+.btn-gate.deact { border-color: var(--rose); color: #fff; background: var(--rose); }
+.btn-gate.off { border-color: var(--rose); color: var(--rose); }
+.deact-note { color: var(--rose); font-size: 12px; margin: 0 0 8px; }
+.bot.deact { outline: 1px solid var(--rose); }
+.gate-note { color: var(--rose); font-size: 11px; margin: 4px 0 0; }
+
+.toast {
+  position: fixed; bottom: 22px; right: 22px;
+  background: var(--panel); border: 1px solid var(--rose);
+  color: var(--rose); padding: 10px 16px; display: none; z-index: 100;
+}
+.fq-ctl {
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, #06180c 0%, #03100a 100%);
+  padding: 8px 22px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
+}
+.fq-ctl .ttl {
+  font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--gold);
+}
+.fq-ctl .sep { color: var(--muted); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
+.fq-ctl .lamp {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--rose); box-shadow: 0 0 6px currentColor;
+}
+.fq-ctl .lamp.on { background: var(--green); color: var(--green); }
+.fq-ctl .lamp.warn { background: var(--amber); color: var(--amber); }
+.fq-ctl button {
+  background: #03160a; border: 1px solid var(--border);
+  color: var(--green-dim); font: inherit; font-size: 11px;
+  letter-spacing: 1px; text-transform: uppercase; padding: 5px 12px; cursor: pointer;
+}
+.fq-ctl button.on { border-color: var(--green); color: var(--green); }
+.fq-ctl button.off { border-color: var(--amber); color: var(--amber); }
+.fq-ctl button.stop { border-color: var(--rose); color: var(--rose); }
+.fq-ctl button.stop:hover { color: #fff; background: var(--rose-dim); }
+.fq-ctl button:disabled { opacity: 0.45; cursor: wait; }
+.fq-ctl .warn { color: var(--amber); font-size: 11px; }
+.fq-ctl .oknote { color: var(--muted); font-size: 11px; }
+body.flask-writes-off .btn-bias,
+body.flask-writes-off .btn-sl,
+body.flask-writes-off .btn-restart,
+body.flask-writes-off .btn-close,
+body.flask-writes-off .btn-100,
+body.flask-writes-off .btn-lev,
+body.flask-writes-off .crazy-row input { pointer-events: none; opacity: 0.4; }
+</style>
+</head>
+<body>
+{% include '_nav.html' %}
+
+<div class="fq-ctl" id="fqCtl">
+  <span class="ttl">CTL</span>
+  <span class="sep">Flask</span>
+  <span class="lamp on" id="ctlFlaskLamp"></span>
+  <button type="button" class="on" id="ctlFlaskWrites" onclick="ctlToggleFlaskWrites()">WRITE MODE ON</button>
+  <span class="sep">Spring :5004</span>
+  <span class="lamp" id="ctlSpringLamp"></span>
+  <span class="oknote" id="ctlSpringMeta">…</span>
+  <button type="button" class="stop" id="ctlSpringStop" onclick="ctlStopSpring()">STOP SPRING</button>
+  <span class="warn" id="ctlWarn"></span>
+</div>
+
+<div class="wrap home-shell" id="homeShell">
+  <p class="lead">
+    Freiquell — live Hyperliquid positions across Copy, Swing, Helliot, Surfn, Shorty, Dman, Only Up and DMan Maker.
+    Equity is per-wallet; open uPnL is marked to the current mid.
+    Stop-loss buttons set the ROE close for that bot (20 / 40 / 60% or a custom value).
+  </p>
+  <div class="home-top" id="bandTop">
+  <div class="band-lbl">TOP · stats</div>
+  <div class="panel grok-bias" id="fixedGrok">
+    <div class="bias-split">
+      <div class="col">
+        <div class="rate-title">GROK BIAS</div>
+        <div class="rate-meta" id="grokBiasMeta">report only · BIAS BOT · never writes hunters</div>
+        <div class="grok-chips" id="grokChips" style="margin-top:6px"></div>
+      </div>
+      <div class="col tokens" id="fixedRate">
+        <div class="rate-title">HL IP tokens</div>
+        <div class="rate-nums" id="kRateNums">— / 1200</div>
+        <div class="rate-bar" id="kRateBar"><span id="kRateFill"></span></div>
+        <div class="rate-meta" id="kRateMeta">shared public IP · 1200 weight / rolling 60s</div>
+      </div>
+      <div class="col desk">
+        <div class="rate-title">Desk BIAS</div>
+        <div class="rate-meta">After autoclose only. Does not close.</div>
+        <div class="bias-btns" style="margin-top:6px">
+          <button type="button" class="btn-bias long" id="deskBiasLONG" onclick="setDeskBias('LONG')">LONG</button>
+          <button type="button" class="btn-bias flat" id="deskBiasFLAT" onclick="setDeskBias('FLAT')">FLAT</button>
+          <button type="button" class="btn-bias short" id="deskBiasSHORT" onclick="setDeskBias('SHORT')">SHORT</button>
+        </div>
+        <div class="rate-meta" id="deskBiasMeta" style="padding-top:4px">no desk BIAS set — hunters keep their own files</div>
+      </div>
+    </div>
+  </div>
+  </div>
+  <div class="home-mid" id="bandMid">
+    <div class="panel risk-report" id="fixedRisk">
+      <div class="rate-row">
+        <div>
+          <div class="rate-title">RISK WALLET FUNDS</div>
+          <div class="rate-meta" id="riskReportMeta">no RISK wallet wired</div>
+        </div>
+        <div class="bias-btns">
+          <button type="button" class="btn-bias risk-send" id="riskSendBtn" onclick="sendRiskFunds()">Send ready</button>
+        </div>
+      </div>
+      <div id="riskReportRows"></div>
+    </div>
+    <div class="band-lbl">MIDDLE · hunters</div>
+    <div id="deactNote" class="deact-note" hidden></div>
+  <div id="homeTop">
+  <div class="kpis" id="fixedKpis">
+    <div class="kpi" id="kpiLive"><div class="lbl">Bots live</div><div class="val gold" id="kLive">—</div></div>
+    <div class="kpi" id="kpiPos"><div class="lbl">Open positions</div><div class="val cyan" id="kPos">—</div></div>
+    <div class="kpi" id="kpiEq"><div class="lbl">Total equity</div><div class="val" id="kEq">—</div></div>
+    <div class="kpi" id="kpiPnl"><div class="lbl">Open uPnL</div><div class="val" id="kPnl">—</div></div>
+  </div>
+  <div id="homeTopCanvas"></div>
+  </div>
+    <div id="homeMid"></div>
+    <div class="bots" id="bots"></div>
+    <div class="panel" id="fixedPos">
+      <div class="panel-h">
+        <h2>Active positions</h2>
+        <span class="sub" id="posSub">live HL overlay</span>
+      </div>
+      <div class="panel-b">
+        <div class="table-wrap" id="posWrap">
+          <div class="empty">loading…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="home-bot" id="bandBot">
+    <div class="band-lbl">BOTTOM · health</div>
+    <div class="home-health-row" id="homeBot"></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+function money(n, d) {
+  if (n === null || n === undefined || n === "" || isNaN(Number(n))) return "—";
+  const x = Number(n);
+  const sign = x < 0 ? "-" : "";
+  return sign + "$" + Math.abs(x).toLocaleString(undefined, {
+    minimumFractionDigits: d == null ? 2 : d,
+    maximumFractionDigits: d == null ? 2 : d
+  });
+}
+function px(n) {
+  if (n === null || n === undefined || isNaN(Number(n))) return "—";
+  const x = Number(n);
+  const d = x >= 100 ? 2 : x >= 1 ? 4 : 6;
+  return x.toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d });
+}
+function pct(n) {
+  if (n === null || n === undefined || isNaN(Number(n))) return "—";
+  const x = Number(n);
+  const sign = x > 0 ? "+" : "";
+  return sign + x.toFixed(2) + "%";
+}
+function clsPnl(n) {
+  if (n === null || n === undefined || isNaN(Number(n))) return "";
+  return Number(n) >= 0 ? "pnl-pos" : "pnl-neg";
+}
+function fmtSecs(s) {
+  if (s == null || isNaN(Number(s))) return "—";
+  const n = Math.max(0, Number(s));
+  if (n < 60) return n + "s";
+  const m = Math.floor(n / 60);
+  const r = n % 60;
+  if (m < 60) return m + "m " + r + "s";
+  return Math.floor(m / 60) + "h " + (m % 60) + "m";
+}
+function renderRate(rt) {
+  const nums = document.getElementById("kRateNums");
+  if (!nums) return;
+  const cap = Number(rt.cap || 1200);
+  const used = Number(rt.used || 0);
+  const left = rt.left != null ? Number(rt.left) : Math.max(0, cap - used);
+  const pct = Math.max(0, Math.min(100, Number(rt.pct != null ? rt.pct : (cap ? used / cap * 100 : 0))));
+  const hot = pct >= 90 || (rt.last_429_s != null && rt.last_429_s < 45);
+  const warn = !hot && pct >= 70;
+  nums.textContent = used + " / " + cap + "  ·  " + left + " left";
+  nums.className = "rate-nums" + (hot ? " hot" : warn ? " warn" : "");
+  const bar = document.getElementById("kRateBar");
+  bar.className = "rate-bar" + (hot ? " hot" : warn ? " warn" : "");
+  document.getElementById("kRateFill").style.width = pct.toFixed(1) + "%";
+  const refill = fmtSecs(rt.refill_in_s);
+  const nextW = rt.refill_weight ? (" +" + rt.refill_weight) : "";
+  let hit = "no 429 in this window";
+  if (rt.last_429_s != null) hit = "last 429 " + fmtSecs(rt.last_429_s) + " ago";
+  const src = rt.by_src && Object.keys(rt.by_src).length
+    ? (" · " + Object.entries(rt.by_src).map(([k,v]) => k + " " + v).join(" · "))
+    : "";
+  const compact = !!(nums.closest && nums.closest(".col.tokens"));
+  document.getElementById("kRateMeta").innerHTML = compact
+    ? ("<b>" + left + "</b> free · refill <b>" + refill + "</b>" + nextW + " · " + hit)
+    : ("<b>" + left + "</b> tokens free · next refill in <b>" + refill + "</b>" + nextW
+      + " (rolling 60s) · " + hit
+      + " · WS cap " + (rt.ws_cap || 10) + " sockets / " + (rt.ws_new_per_min || 30) + " new per min"
+      + src);
+}
+function shortAddr(a) {
+  if (!a) return "—";
+  const s = String(a);
+  if (s.length < 14) return s;
+  return s.slice(0, 8) + "…" + s.slice(-6);
+}
+function toast(msg) {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.style.display = "block";
+  setTimeout(() => { el.style.display = "none"; }, 4000);
+}
+function springBlock() {
+  if (window.fqBrain && fqBrain() === "spring" && window.fqSpringUp && !window.fqSpringWrites) {
+    toast("Spring writes are OFF — enable WRITE MODE in springctl. Positions untouched.");
+    return true;
+  }
+  return false;
+}
+function flaskBlock() {
+  if (window.fqBrain && fqBrain() === "spring" && window.fqSpringUp) return false;
+  if (window.fqFlaskWrites === false) {
+    toast("Flask WRITE MODE is off — hunter files not written. Positions untouched.");
+    return true;
+  }
+  return false;
+}
+function writeBlock() {
+  return springBlock() || flaskBlock();
+}
+function ctlApplyFlaskWrites(on) {
+  window.fqFlaskWrites = !!on;
+  if (document.body) document.body.classList.toggle("flask-writes-off", !on);
+  const btn = document.getElementById("ctlFlaskWrites");
+  const lamp = document.getElementById("ctlFlaskLamp");
+  if (btn) {
+    btn.textContent = on ? "WRITE MODE ON" : "WRITE MODE OFF";
+    btn.className = on ? "on" : "off";
+  }
+  if (lamp) lamp.className = on ? "lamp on" : "lamp warn";
+}
+async function ctlRefresh() {
+  const warn = document.getElementById("ctlWarn");
+  const meta = document.getElementById("ctlSpringMeta");
+  const lamp = document.getElementById("ctlSpringLamp");
+  const stop = document.getElementById("ctlSpringStop");
+  let flaskOn = window.fqFlaskWrites !== false;
+  let springUp = false;
+  let springWrites = false;
+  try {
+    const r = await (window.__fqNativeFetch || fetch)("/api/ctl", { cache: "no-store" });
+    const d = await r.json();
+    if (d && d.flask_writes != null) flaskOn = !!d.flask_writes;
+  } catch (e) {}
+  ctlApplyFlaskWrites(flaskOn);
+  try {
+    const r = await (window.__fqNativeFetch || fetch)("http://127.0.0.1:5004/api/health", { cache: "no-store" });
+    const d = await r.json();
+    springUp = !!(r.ok && d && d.service === "spring");
+    springWrites = !!(springUp && d.writes);
+    window.fqSpringWrites = springWrites;
+    if (typeof fqApplyBrainUi === "function") fqApplyBrainUi();
+    if (meta) {
+      meta.textContent = springUp
+        ? (springWrites ? "live · writes ON" : "live · read-only")
+        : "down";
+      meta.className = springUp ? "oknote" : "warn";
+    }
+  } catch (e) {
+    springUp = false;
+    if (meta) { meta.textContent = "down"; meta.className = "warn"; }
+  }
+  if (lamp) lamp.className = springUp ? "lamp on" : "lamp";
+  if (stop) stop.disabled = !springUp;
+  if (warn) {
+    if (flaskOn && springWrites) {
+      warn.textContent = "both WRITE MODE on — last file write wins · hunters keep clips";
+    } else if (!springUp) {
+      warn.textContent = "Spring stopped · Flask :5001 and hummingbots still run";
+    } else {
+      warn.textContent = "";
+    }
+  }
+}
+async function ctlToggleFlaskWrites() {
+  const next = window.fqFlaskWrites === false;
+  try {
+    const r = await (window.__fqNativeFetch || fetch)("/api/flask/writes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled: next }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || ("HTTP " + r.status));
+    ctlApplyFlaskWrites(!!d.flask_writes);
+    toast(d.message || (next ? "Flask WRITE MODE on" : "Flask WRITE MODE off"));
+    ctlRefresh();
+  } catch (e) {
+    toast("Flask WRITE MODE failed: " + e.message);
+  }
+}
+async function ctlStopSpring() {
+  if (!confirm("Stop Spring :5004?\n\nFlask :5001 stays up. Hummingbots keep trading. No Hyperliquid close/open.")) return;
+  const native = window.__fqNativeFetch || fetch;
+  try {
+    const r = await native("http://127.0.0.1:5004/api/spring/stop", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok && !d.stopped) throw new Error(d.error || ("HTTP " + r.status));
+    toast(d.message || "Spring stopping — hunters untouched");
+  } catch (e) {
+    try {
+      const r2 = await native("/api/ctl/spring/stop", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      const d2 = await r2.json().catch(() => ({}));
+      if (!r2.ok && !d2.stopped) throw new Error(d2.error || e.message);
+      toast(d2.message || "Spring stop requested");
+    } catch (e2) {
+      toast("Stop Spring failed: " + e2.message);
+    }
+  }
+  setTimeout(ctlRefresh, 400);
+}
+
+function esc(s) {
+  return String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+const restarting = new Set();
+const slBusy = new Set();
+async function restartBot(ev, id, name) {
+  if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+  if (writeBlock()) return;
+  if (!id || restarting.has(id)) return;
+  if (!confirm("Restart " + name + "?\n\nPositions stay on Hyperliquid. Only this container restarts.")) return;
+  restarting.add(id);
+  load();
+  try {
+    const r = await fetch("/api/home/restart", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || ("HTTP " + r.status));
+    toast(d.message || ("Restarted " + name));
+  } catch (e) {
+    toast("Restart failed: " + e.message);
+  }
+  setTimeout(() => { restarting.delete(id); load(); }, 8000);
+}
+async function setSl(ev, id, name, pct) {
+  if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+  if (writeBlock()) return;
+  if (!id || slBusy.has(id)) return;
+  const sl = Number(pct);
+  if (isNaN(sl) || sl < 1 || sl > 90) {
+    toast("Stop-loss must be 1–90% ROE");
+    return;
+  }
+  slBusy.add(id);
+  load();
+  try {
+    const r = await fetch("/api/home/sl", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, sl_roe_pct: sl }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || ("HTTP " + r.status));
+    toast(d.message || (name + " SL −" + sl + "% ROE"));
+  } catch (e) {
+    toast("SL failed: " + e.message);
+  }
+  slBusy.delete(id);
+  load();
+}
+function setSlCustom(ev, id, name) {
+  if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+  const inp = document.getElementById("sl-in-" + id);
+  setSl(ev, id, name, inp ? inp.value : "");
+}
+let deskBiasBusy = false;
+async function setDeskBias(bias) {
+  if (writeBlock()) return;
+  if (deskBiasBusy) return;
+  const b = String(bias || "").toUpperCase();
+  if (b !== "LONG" && b !== "FLAT" && b !== "SHORT") return;
+  const hold = "Does NOT close any Hyperliquid position. Hunters already in a clip keep holding until their own SL/TP/trail. After they go flat they follow " + b + ".";
+  if (!confirm("Set desk BIAS to " + b + "?\n\n" + hold)) return;
+  deskBiasBusy = true;
+  document.querySelectorAll(".btn-bias").forEach(function (el) { el.disabled = true; });
+  try {
+    const r = await fetch("/api/home/desk_bias", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bias: b }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || ("HTTP " + r.status));
+    if (d.closes) throw new Error("refusing result that reported a close");
+    toast(d.message || ("Desk BIAS " + b));
+    renderDeskBias(d.desk_bias);
+  } catch (e) {
+    toast("Desk BIAS failed: " + e.message);
+  }
+  deskBiasBusy = false;
+  document.querySelectorAll(".btn-bias").forEach(function (el) { el.disabled = false; });
+  load();
+}
+function renderDeskBias(db) {
+  db = db || {};
+  const want = String(db.bias || "");
+  ["LONG", "FLAT", "SHORT"].forEach(function (b) {
+    const el = document.getElementById("deskBias" + b);
+    if (el) el.classList.toggle("on", want === b);
+  });
+  const meta = document.getElementById("deskBiasMeta");
+  if (!meta) return;
+  if (!want) {
+    meta.textContent = "no desk BIAS set — hunters keep their own files";
+    meta.className = "rate-meta";
+    return;
+  }
+  const rows = db.hunters || [];
+  const holding = rows.filter(function (h) { return (h.held || []).length; });
+  const waiting = rows.filter(function (h) { return h.waiting; });
+  const bits = holding.map(function (h) {
+    return (h.name || h.id) + " " + (h.held || []).join("/");
+  });
+  let line = "next BIAS " + want + " · does not close";
+  if (bits.length) line += " · still in clip: " + bits.join(" · ");
+  if (waiting.length) line += " · idle coins wait until that hunter is flat";
+  if (!holding.length) line += " · all BIAS hunters are flat — files updated";
+  meta.textContent = line;
+  meta.className = "rate-meta" + (holding.length ? " warn" : "");
+}
+const crazyBusy = new Set();
+async function setMakerFlag(ev, id, name, key, on) {
+  if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+  if (writeBlock()) return;
+  if (!id || !key || crazyBusy.has(id + key)) return;
+  crazyBusy.add(id + key);
+  load();
+  try {
+    const r = await fetch("/api/wire/controller", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, values: { [key]: !!on } }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || ("HTTP " + r.status));
+    toast(d.message || (name + " " + key + " " + (on ? "on" : "off")));
+  } catch (e) {
+    toast(key + " failed: " + e.message);
+  }
+  crazyBusy.delete(id + key);
+  load();
+}
+function makerFlagRow(b, key, hintOn, hintOff, label) {
+  const ctrl = (b.controller && typeof b.controller === "object") ? b.controller : {};
+  const on = ctrl[key] !== false;
+  const idJs = JSON.stringify(b.id || "");
+  const nameJs = JSON.stringify(b.name || b.id || "DMan Maker");
+  const keyJs = JSON.stringify(key);
+  const busy = crazyBusy.has(b.id + key);
+  return `<div class="crazy-row">
+    <label>
+      <input type="checkbox" ${on ? "checked" : ""} ${busy ? "disabled" : ""}
+        onclick='setMakerFlag(event, ${idJs}, ${nameJs}, ${keyJs}, this.checked)'>
+      ${esc(label || key)}
+    </label>
+    <span class="hint">${on ? hintOn : hintOff}</span>
+  </div>`;
+}
+function dontGoCrazyBlock(b) {
+  if (!b || b.id !== "hummingbot-dman-maker") return "";
+  return makerFlagRow(b, "dontGoCrazy", "two-win pause on", "reopen after TP")
+    + makerFlagRow(b, "afterLossNoRebuy", "no rebuy after SL", "rebuy after SL")
+    + makerFlagRow(b, "sendEvery2Win", "second win parks on the risk wallet", "wins stay on this account", "send every 2 win to risk wallet");
+}
+const LEV_CAPS = { BTC: 40, ETH: 25, LTC: 10, TAO: 5 };
+const levBusy = new Set();
+let homePositions = [];
+function levTierOf(b) {
+  const raw = String((b && b.controller && b.controller.leverage_tier) || "MAX").toUpperCase();
+  return raw === "MID" || raw === "LOW" ? raw : "MAX";
+}
+function levForCoin(coin, tier) {
+  const cap = LEV_CAPS[String(coin || "").toUpperCase()] || 1;
+  if (tier === "LOW") return Math.max(1, Math.floor(cap / 4));
+  if (tier === "MID") return Math.max(1, Math.floor(cap / 2));
+  return Math.max(1, cap);
+}
+function levEffectText(b, coin) {
+  const tier = levTierOf(b);
+  const target = levForCoin(coin, tier);
+  const hit = homePositions.find(function (p) {
+    return p.bot_id === b.id && String(p.coin || "").toUpperCase() === String(coin).toUpperCase();
+  });
+  const live = hit && hit.leverage ? Number(hit.leverage) : 0;
+  if (live > 0 && live !== target) return target + "x now " + live + "x";
+  return target + "x";
+}
+function levStrip(b) {
+  if (!b || b.id === "hummingbot-hl") return "";
+  const tier = levTierOf(b);
+  const idJs = JSON.stringify(b.id || "");
+  const nameJs = JSON.stringify(b.name || b.id || "bot");
+  const wait = levBusy.has(b.id);
+  const btns = ["MAX", "MID", "LOW"].map(function (t) {
+    const on = tier === t ? " on" : "";
+    return '<button type="button" class="btn-lev ' + t.toLowerCase() + on + '" ' + (wait ? "disabled" : "")
+      + ' onclick=\'setLev(event, ' + idJs + ", " + nameJs + ', "' + t + "\")'>" + t + "</button>";
+  }).join("");
+  return '<div class="lev-row"><span class="lev-h">LEV</span><span class="lev-btns">' + btns + "</span></div>";
+}
+async function setLev(ev, id, name, tier) {
+  if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+  if (writeBlock()) return;
+  if (!id || levBusy.has(id)) return;
+  levBusy.add(id);
+  try {
+    const r = await fetch("/api/wire/controller", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: id, key: "leverage_tier", value: tier }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || ("HTTP " + r.status));
+    toast(d.message || (name + " leverage " + tier + " — open coin changes when flat"));
+  } catch (e) {
+    toast("leverage failed: " + e.message);
+  }
+  levBusy.delete(id);
+  load();
+}
+const gateBusy = new Set();
+async function setGate(ev, id, name, active) {
+  if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+  if (!id || gateBusy.has(id)) return;
+  const verb = active ? "Activate" : "Deactivate";
+  if (!confirm(verb + " " + name + "?\n\nDocker " + (active ? "unpause" : "pause") + " only. Positions stay. This does not flatten.")) return;
+  gateBusy.add(id);
+  try {
+    const r = await fetch("/api/hunter_gate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: id, active: !!active }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || d.message || ("HTTP " + r.status));
+    toast(d.message || (name + " " + verb));
+  } catch (e) {
+    toast("gate failed: " + e.message);
+  }
+  gateBusy.delete(id);
+  load();
+}
+const dropBusy = new Set();
+async function dropCopyMarket(ev, coin, allIdle) {
+  if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+  if (writeBlock()) return;
+  const key = allIdle ? "all" : String(coin || "");
+  if (!key || dropBusy.has(key)) return;
+  const label = allIdle ? "all idle Copy books" : (coin + " book");
+  if (!confirm("Drop " + label + "?\n\nDoes not close a Hyperliquid position. Only unsubscribes the Copy order book so it stops using IP tokens.")) return;
+  dropBusy.add(key);
+  load();
+  try {
+    const body = allIdle ? { all_idle: true } : { coin: coin };
+    const r = await fetch("/api/home/copy_drop_market", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || ("HTTP " + r.status));
+    toast(d.message || ("Dropped " + label));
+  } catch (e) {
+    toast("Drop failed: " + e.message);
+  }
+  setTimeout(() => { dropBusy.delete(key); load(); }, 2500);
+}
+function highlightPx(s, kind) {
+  const cls = kind === "sell" ? "px-sell" : "px-buy";
+  return esc(s).replace(/~?\$[0-9][\d,]*(?:\.\d+)?/g, m => `<span class="${cls}">${m}</span>`);
+}
+function nextBlock(b) {
+  const n = b.next || {};
+  const sell = n.sell || "no auto sell until in a trade";
+  const buy = n.rebuy || "no auto rebuy";
+  const isReopen = b.id === "hummingbot-helliot";
+  const buyLbl = isReopen ? "Reopen long" : "Auto rebuy";
+  const ready = n.reopen_ready ? " ready" : "";
+  return `<div class="next-row">
+      <div class="nx"><span class="nk sell">Auto sell</span><span class="nv">${highlightPx(sell, "sell")}</span></div>
+      <div class="nx"><span class="nk buy${ready}">${buyLbl}</span><span class="nv${ready}">${highlightPx(buy, "buy")}</span></div>
+    </div>`;
+}
+function coinBiasRail(b) {
+  if (!b || b.id === "hummingbot-hl") return "";
+  const coins = (b.coins && b.coins.length) ? b.coins : Object.keys(b.bias || {});
+  if (!coins.length) return "";
+  const mode = String(b.bias_mode || "both").toLowerCase();
+  const map = b.bias || {};
+  const idJs = JSON.stringify(b.id || "");
+  const nameJs = JSON.stringify(b.name || b.id || "bot");
+  const rows = coins.map(function (coin) {
+    const cur = String(map[coin] || "FLAT").toUpperCase();
+    const longOk = mode !== "short";
+    const shortOk = mode !== "long";
+    const coinJs = JSON.stringify(String(coin).toUpperCase());
+    function biasBtn(m, cls, ok) {
+      const on = cur === m ? " on" : "";
+      if (!ok) {
+        return '<button type="button" class="btn-bias ' + cls + ' off-mode" disabled title="this hunter does not ' + m + '">' + m + "</button>";
+      }
+      return '<button type="button" class="btn-bias ' + cls + on + '" onclick=\'setCoinBias(event, ' + idJs + ", " + nameJs + ", " + coinJs + ', "' + m + "\")'>" + m + "</button>";
+    }
+    return '<div class="coin-bias"><span class="cb-coin">' + esc(String(coin).toUpperCase()) + "</span>"
+      + '<span class="cb-btns">'
+      + biasBtn("LONG", "long", longOk)
+      + biasBtn("FLAT", "flat", true)
+      + biasBtn("SHORT", "short", shortOk)
+      + '<button type="button" class="btn-close" onclick=\'closeCoin(event, ' + idJs + ", " + nameJs + ", " + coinJs + ")'>Close</button>"
+      + '<button type="button" class="btn-100" onclick=\'open100(event, ' + idJs + ", " + nameJs + ", " + coinJs + ', "' + cur + "\")'>100%</button>"
+      + (b.id === "hummingbot-hl" ? "" : '<span class="lev-fx ' + levTierOf(b).toLowerCase() + '">' + esc(levEffectText(b, coin)) + "</span>")
+      + (function () {
+          const hit = homePositions.find(function (p) {
+            return p.bot_id === b.id && String(p.coin || "").toUpperCase() === String(coin).toUpperCase();
+          });
+          if (!hit) return "";
+          const roe = hit.roe_pct != null ? Number(hit.roe_pct) : null;
+          const roeTxt = roe == null || isNaN(roe) ? "" : " " + (roe >= 0 ? "+" : "") + roe.toFixed(1) + "%";
+          return '<span class="clip-bit">' + esc(String(hit.side || "") + " " + (hit.size != null ? hit.size : "") + roeTxt) + "</span>";
+        })()
+      + "</span></div>";
+  }).join("");
+  return '<div class="sl-row"><div class="sl-h">Bias per coin · Close · 100% leftover</div>' + rows + "</div>";
+}
+async function setCoinBias(ev, id, name, coin, bias) {
+  if (ev) ev.stopPropagation();
+  if (writeBlock()) return;
+  try {
+    const r = await fetch("/api/wire/bias", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: id, coin: coin, bias: bias }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || ("HTTP " + r.status));
+    toast(d.message || (name + " " + coin + " " + bias));
+    load();
+  } catch (e) {
+    toast("BIAS failed: " + e.message);
+  }
+}
+async function closeCoin(ev, id, name, coin) {
+  if (ev) ev.stopPropagation();
+  if (writeBlock()) return;
+  if (!confirm("Close " + coin + " on " + name + "?\n\nQueues a hunter close for that coin only. Other clips stay.")) return;
+  try {
+    const r = await fetch("/api/home/close", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: id, coin: coin }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || ("HTTP " + r.status));
+    toast(d.message || ("Close queued " + coin));
+  } catch (e) {
+    toast("Close failed: " + e.message);
+  }
+}
+async function open100(ev, id, name, coin, side) {
+  if (ev) ev.stopPropagation();
+  if (writeBlock()) return;
+  const bias = String(side || "").toUpperCase();
+  if (bias !== "LONG" && bias !== "SHORT") {
+    toast("Set " + coin + " BIAS to LONG or SHORT before 100%");
+    return;
+  }
+  if (!confirm("Open " + bias + " " + coin + " on " + name + " at 100% leftover?")) return;
+  try {
+    const r = await fetch("/api/home/open", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: id, coin: coin, pct: 1, side: bias }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || ("HTTP " + r.status));
+    toast(d.message || ("100% queued " + coin));
+  } catch (e) {
+    toast("100% open failed: " + e.message);
+  }
+}
+function marketChips(b) {
+  if (b.id !== "hummingbot-hl") return "";
+  const markets = b.markets || [];
+  const idleSet = new Set((b.idle_markets || []).map(x => String(x).toUpperCase()));
+  const heldSet = new Set((b.held_coins || []).map(x => String(x).toUpperCase()));
+  const chips = markets.map(raw => {
+    const pair = String(raw).toUpperCase();
+    const coin = pair.replace(/-USD$/, "");
+    const live = heldSet.has(coin) || heldSet.has(pair);
+    const kind = live ? "live" : "idle";
+    const del = live
+      ? `<button type="button" class="btn-del" disabled title="open Copy trade — book stays">live</button>`
+      : `<button type="button" class="btn-del" ${dropBusy.has(coin) ? "disabled" : ""}
+          title="unsubscribe book"
+          onclick='dropCopyMarket(event, ${JSON.stringify(coin)}, false)'>del</button>`;
+    return `<span class="mk-chip ${kind}">${esc(coin)}${del}</span>`;
+  }).join("");
+  const nIdle = markets.filter(p => {
+    const pair = String(p).toUpperCase();
+    const coin = pair.replace(/-USD$/, "");
+    return !(heldSet.has(coin) || heldSet.has(pair));
+  }).length;
+  const clean = nIdle
+    ? `<button type="button" class="btn-del" ${dropBusy.has("all") ? "disabled" : ""}
+        onclick='dropCopyMarket(event, null, true)'>Clean idle</button>`
+    : "";
+  const body = chips || `<span class="mk-chip">none</span>`;
+  return `<div class="mk-row">
+      <div class="mk-h">Copy books <span>${markets.length} · idle ${nIdle}</span>${clean}</div>
+      <div class="mk-list">${body}</div>
+    </div>`;
+}
+function botCardHtml(b) {
+  if (!b) return "";
+  const ok = b.ok !== false && b.health !== "issue";
+    const busy = restarting.has(b.id);
+    const slWait = slBusy.has(b.id);
+    const de = !!b.deactivated;
+    const run = busy ? "on" : (de ? "off" : (ok ? "on" : "off"));
+    const runLbl = busy ? "restarting" : (de ? "0 HL IP" : (b.running ? "ACTIVE" : (ok ? "ok" : "OFF")));
+    const color = b.color || "#f0b90b";
+    const slRaw = Number(b.sl_roe_pct);
+    const slArmed = b.sl_roe_pct != null && !isNaN(slRaw) && slRaw >= 1;
+    const sl = slArmed ? slRaw : 20;
+    const slOn = (n) => slArmed && Math.abs(sl - n) < 0.01 ? " on" : "";
+    const slLbl = slArmed ? ("−" + sl + "%") : "not set";
+    const logs = (b.logs || []).length
+      ? (b.logs || []).map(l => {
+          const bad = /error|not ready|traceback|blocked/i.test(l);
+          return `<div class="ll${bad ? " bad" : ""}">${esc(l)}</div>`;
+        }).join("")
+      : `<div class="ll">no recent log</div>`;
+    const idJs = JSON.stringify(b.id || "");
+    const nameJs = JSON.stringify(b.name || b.id || "bot");
+    const preset = [20, 40, 60].includes(sl) ? "" : sl;
+    const gateCls = de ? "deact" : (b.running ? "act" : "off");
+    const gateLbl = de ? "DEACTIVATED" : (b.running ? "ACTIVE" : "OFF");
+    const nextActive = !b.running || de;
+    let roeBit = "ROE flat";
+    let worstRoe = null;
+    const mine = homePositions.filter(function (p) { return p.bot_id === b.id && p.roe_pct != null; });
+    if (mine.length) {
+      let worst = mine[0];
+      mine.forEach(function (p) { if (Number(p.roe_pct) < Number(worst.roe_pct)) worst = p; });
+      worstRoe = Number(worst.roe_pct);
+      roeBit = "ROE " + (worstRoe >= 0 ? "+" : "") + worstRoe.toFixed(1) + "%";
+    }
+    const roeCls = worstRoe != null && worstRoe < 0 ? "rose" : "";
+    return `<div class="bot${ok && !de ? "" : " issue"}${de ? " deact" : ""}" style="border-left: 3px solid ${color}">
+      <div class="bot-h">
+        <a class="bot-name" href="${esc(b.href || "#")}" style="color:${color}">
+          <span class="lamp ${de ? "off" : (ok && !busy ? "on" : "off")}" title="${esc(de ? "0 Hyperliquid IP" : (b.health_reason || (ok ? "ok" : "issue")))}"></span>
+          ${esc(b.icon || "")} ${esc(b.name)}
+        </a>
+        <div class="bot-actions">
+          ${b.risk ? '<span class="risk-badge" title="RISK wallet connected">RISK</span>' : ""}
+          <span class="bot-run ${run}">${esc(runLbl)}</span>
+          <button type="button" class="btn-gate ${gateCls}" ${gateBusy.has(b.id) ? "disabled" : ""}
+            onclick='setGate(event, ${idJs}, ${nameJs}, ${nextActive ? "true" : "false"})'>${gateLbl}</button>
+          <button type="button" class="btn-restart" ${busy ? "disabled" : ""}
+            onclick='restartBot(event, ${idJs}, ${nameJs})'>Restart</button>
+        </div>
+      </div>
+      ${de ? '<div class="gate-note">DEACTIVATED — red — 0 Hyperliquid IP tokens. Positions stay. Stops wait until ACTIVE.</div>' : ""}
+      <div class="bot-addr">${shortAddr(b.address)}</div>
+      <div class="bot-grid">
+        <div><div class="k">Equity</div><div class="v cyan">${money(b.equity_usd)}</div></div>
+        <div><div class="k">Leftover</div><div class="v">${money(b.free_usd)}${b.risk && b.risk.parked_usd ? '<span class="k"> after RISK</span>' : ""}</div></div>
+        <div><div class="k">Positions</div><div class="v">${b.n_pos || 0}</div></div>
+        <div><div class="k">uPnL</div><div class="v ${clsPnl(b.upnl_usd)}">${money(b.upnl_usd)}</div></div>
+      </div>
+      ${levStrip(b)}
+      <div class="sl-row">
+        <div class="sl-h">Stop loss <span class="sl-now">${slLbl}</span> · <span class="${roeCls}">${roeBit}</span></div>
+        <div class="sl-btns">
+          <button type="button" class="btn-sl${slOn(20)}" ${slWait ? "disabled" : ""}
+            onclick='setSl(event, ${idJs}, ${nameJs}, 20)'>20%</button>
+          <button type="button" class="btn-sl${slOn(40)}" ${slWait ? "disabled" : ""}
+            onclick='setSl(event, ${idJs}, ${nameJs}, 40)'>40%</button>
+          <button type="button" class="btn-sl${slOn(60)}" ${slWait ? "disabled" : ""}
+            onclick='setSl(event, ${idJs}, ${nameJs}, 60)'>60%</button>
+          <input id="sl-in-${esc(b.id)}" class="sl-custom" type="number" min="1" max="90" step="1"
+            placeholder="other" value="${preset}" ${slWait ? "disabled" : ""}
+            onclick="event.stopPropagation()"
+            onkeydown="if(event.key==='Enter'){setSlCustom(event, ${idJs}, ${nameJs})}">
+          <button type="button" class="btn-sl" ${slWait ? "disabled" : ""}
+            onclick='setSlCustom(event, ${idJs}, ${nameJs})'>set</button>
+        </div>
+      </div>
+      ${coinBiasRail(b)}
+      ${dontGoCrazyBlock(b)}
+      ${nextBlock(b)}
+      ${marketChips(b)}
+      <div class="bot-logs">${logs}</div>
+    </div>`;
+}
+
+function ratePanelHtml(rt, ids) {
+  rt = rt || {};
+  const cap = Number(rt.cap || 1200);
+  const used = Number(rt.used || 0);
+  const left = rt.left != null ? Number(rt.left) : Math.max(0, cap - used);
+  const p = Math.max(0, Math.min(100, Number(rt.pct != null ? rt.pct : (cap ? used / cap * 100 : 0))));
+  const hot = p >= 90 || (rt.last_429_s != null && rt.last_429_s < 45);
+  const warn = !hot && p >= 70;
+  const refill = fmtSecs(rt.refill_in_s);
+  let hit = "no 429 in this window";
+  if (rt.last_429_s != null) hit = "last 429 " + fmtSecs(rt.last_429_s) + " ago";
+  const idNums = ids && ids.nums ? ids.nums : "";
+  return `<div class="panel rate-panel">
+    <div class="rate-row">
+      <div class="rate-title">Hyperliquid IP tokens</div>
+      <div class="rate-nums${hot ? " hot" : warn ? " warn" : ""}">${used} / ${cap}  ·  ${left} left</div>
+    </div>
+    <div class="rate-bar${hot ? " hot" : warn ? " warn" : ""}"><span style="width:${p.toFixed(1)}%"></span></div>
+    <div class="rate-meta"><b>${left}</b> tokens free · next refill in <b>${refill}</b> (rolling 60s) · ${esc(hit)}</div>
+  </div>`;
+}
+
+function kpiBoxHtml(lbl, val, cls) {
+  return `<div class="kpi"><div class="lbl">${esc(lbl)}</div><div class="val ${cls || ""}">${val}</div></div>`;
+}
+
+function positionsTableHtml(rows) {
+  if (!rows || !rows.length) return `<div class="empty">no open positions across bots</div>`;
+  const body = rows.map(p => {
+    const sideCls = String(p.side).toUpperCase() === "SHORT" ? "side-short" : "side-long";
+    const trader = p.trader ? shortAddr(p.trader) : "—";
+    return `<tr>
+      <td><a href="${p.href || "#"}">${esc(p.bot)}</a></td>
+      <td><span class="coin">${esc(p.coin)}</span></td>
+      <td class="${sideCls}">${esc(p.side)}</td>
+      <td>${money(p.usd_size)}</td>
+      <td>${px(p.entry_px)}</td>
+      <td>${px(p.mark_px)}</td>
+      <td>${p.leverage || 1}x</td>
+      <td>${money(p.margin)}</td>
+      <td class="${clsPnl(p.roe_pct)}">${pct(p.roe_pct)}</td>
+      <td class="${clsPnl(p.pnl_usd)}">${money(p.pnl_usd)}</td>
+      <td class="meta">${esc(trader)}</td>
+    </tr>`;
+  }).join("");
+  return `<table>
+    <thead>
+      <tr>
+        <th>Bot</th><th>Coin</th><th>Side</th><th>Size</th>
+        <th>Entry</th><th>Mark</th><th>Lev</th><th>Margin</th>
+        <th>ROE</th><th>uPnL</th><th>Leader</th>
+      </tr>
+    </thead>
+    <tbody>${body}</tbody>
+  </table>`;
+}
+
+function homestatTileHtml(n, snap) {
+  const kind = (n.data && n.data.kind) || "live";
+  const t = (snap && snap.totals) || {};
+  const nOk = t.n_ok != null ? t.n_ok : (t.n_live || 0);
+  const cg = (snap && snap.condor) || {};
+  if (kind === "tokens") return ratePanelHtml(snap && snap.rate);
+  if (kind === "live") return kpiBoxHtml("Bots live", nOk + " / " + (t.n_bots || 0), nOk < (t.n_bots || 0) ? "rose" : "gold");
+  if (kind === "pos") return kpiBoxHtml("Open positions", t.n_pos ?? 0, "cyan");
+  if (kind === "equity") return kpiBoxHtml("Total equity", money(t.equity_usd), "");
+  if (kind === "upnl") return kpiBoxHtml("Open uPnL", money(t.upnl_usd), clsPnl(t.upnl_usd) === "pnl-neg" ? "rose" : "");
+  if (kind === "grok" || kind === "condor") return "";
+  if (kind === "book") {
+    return `<div class="panel"><div class="panel-h"><h2>Active positions</h2>
+      <span class="sub">${esc((snap && snap.ts) || "live")} · ${t.n_pos || 0} open</span></div>
+      <div class="panel-b"><div class="table-wrap">${positionsTableHtml(snap && snap.positions)}</div></div></div>`;
+  }
+  return "";
+}
+
+function grokChipsHtml(cg) {
+  cg = cg || {};
+  const cmd = String(cg.grok_cmd || "").toUpperCase();
+  const post = ["LONG", "FLAT", "SHORT"].map(function (m) {
+    const cls = m === "LONG" ? "long" : m === "SHORT" ? "short" : "flat";
+    const on = cmd === m ? " on" : "";
+    return '<div class="grok-chip ' + cls + on + '"><span class="gc">' + (cmd === m ? "LAST" : "POST") + '</span><span class="gm">' + m + "</span></div>";
+  });
+  const coins = ["BTC", "ETH", "LTC", "TAO"].map(function (c) {
+    const m = String((cg.bias || {})[c] || "FLAT").toUpperCase();
+    const cls = m === "LONG" ? "long" : m === "SHORT" ? "short" : "flat";
+    return '<div class="grok-chip ' + cls + '"><span class="gc">' + c + '</span><span class="gm">' + m + "</span></div>";
+  });
+  return post.join("") + coins.join("");
+}
+function renderRiskReport(risk) {
+  risk = risk || {};
+  const rows = risk.hunters || [];
+  const meta = document.getElementById("riskReportMeta");
+  const box = document.getElementById("riskReportRows");
+  const btn = document.getElementById("riskSendBtn");
+  const ready = Number(risk.available_usd || 0);
+  const locked = Number(risk.locked_usd || 0);
+  const inWallet = Number(risk.onchain_usd || 0);
+  if (btn) {
+    btn.disabled = !!riskSendBusy || !risk.can_send;
+    btn.textContent = risk.can_send ? ("Send " + money(ready)) : "Nothing ready";
+  }
+  if (meta) {
+    if (!rows.length) {
+      meta.textContent = "no RISK wallet wired";
+    } else {
+      const addr = risk.address ? shortAddr(risk.address) : "";
+      meta.textContent = (addr ? addr + " · " : "")
+        + "spot " + money(risk.onchain_spot_usd)
+        + " · perp " + money(risk.onchain_perp_usd)
+        + " · already sent " + money(risk.sent_usd);
+    }
+  }
+  if (!box) return;
+  if (!rows.length) {
+    box.innerHTML = "";
+    return;
+  }
+  const stats = '<div class="risk-stats">'
+    + '<div class="risk-stat wallet"><div class="lbl">In RISK wallet</div><div class="num">' + money(inWallet) + '</div></div>'
+    + '<div class="risk-stat ready"><div class="lbl">Ready to send</div><div class="num">' + money(ready) + '</div></div>'
+    + '<div class="risk-stat locked"><div class="lbl">Locked in positions</div><div class="num">' + money(locked) + '</div></div>'
+    + '</div>';
+  const body = rows.map(function (r) {
+    const mode = r.mode === "two_wins" ? "2nd win" : ((r.skim_pct != null ? r.skim_pct + "%" : "Win%"));
+    const errTxt = String(r.last_send_error || "");
+    const npos = Number(r.n_pos || 0);
+    let st = mode;
+    if (r.force_send) st += " · sending";
+    else if (Number(r.available_usd || 0) >= 1) st += " · ready";
+    else if (Number(r.locked_usd || 0) > 0) st += npos ? (" · " + npos + " open") : " · waiting";
+    else if (errTxt) st += " · send err";
+    else if (r.last_send_ts) st += " · sent";
+    const aCls = Number(r.available_usd || 0) >= 1 ? "ready" : "";
+    const lCls = Number(r.locked_usd || 0) > 0 ? "locked" : "";
+    return "<tr>"
+      + "<td>" + esc(r.name) + "</td>"
+      + '<td class="r">' + money(r.parked_usd) + "</td>"
+      + '<td class="r ' + aCls + '">' + money(r.available_usd) + "</td>"
+      + '<td class="r ' + lCls + '">' + money(r.locked_usd) + "</td>"
+      + '<td class="st">' + esc(st) + "</td>"
+      + "</tr>";
+  }).join("");
+  box.innerHTML = stats
+    + '<table class="risk-tbl"><thead><tr>'
+    + "<th>Hunter</th><th class=\"r\">Parked</th><th class=\"r\">Ready</th><th class=\"r\">Locked</th><th>Status</th>"
+    + "</tr></thead><tbody>" + body + "</tbody></table>";
+}
+let riskSendBusy = false;
+async function sendRiskFunds() {
+  if (writeBlock()) return;
+  if (riskSendBusy) return;
+  const hold = "Does NOT close any Hyperliquid position. Only the Ready amount moves. Locked funds stay as open-position margin.";
+  if (!confirm("Send ready funds to the RISK wallet?\n\n" + hold)) return;
+  riskSendBusy = true;
+  const btn = document.getElementById("riskSendBtn");
+  if (btn) btn.disabled = true;
+  try {
+    const r = await fetch("/api/home/risk_send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (d.risk) renderRiskReport(d.risk);
+    if (!r.ok || !d.ok) throw new Error(d.error || d.message || ("HTTP " + r.status));
+    if (d.closes) throw new Error("refusing result that reported a close");
+    toast(d.message || "Sent to RISK wallet");
+  } catch (e) {
+    toast("RISK send: " + e.message);
+  }
+  riskSendBusy = false;
+  load();
+}
+function renderGrokBias(cg, desk) {
+  const chips = document.getElementById("grokChips");
+  const meta = document.getElementById("grokBiasMeta");
+  if (chips) chips.innerHTML = grokChipsHtml(cg);
+  if (meta) {
+    const src = (cg && cg.source === "grok") ? "GROK" : "heuristic";
+    const regime = String((cg && cg.regime) || "—").toUpperCase();
+    const cmd = String((cg && cg.grok_cmd) || "").toUpperCase();
+    const posted = cmd ? (" · last post " + cmd) : " · no BIAS BOT post yet";
+    const when = cg && cg.grok_cmd_ts ? (" @ " + String(cg.grok_cmd_ts).slice(11, 19)) : "";
+    meta.textContent = src + " · " + regime + posted + when + " · never writes hunters";
+  }
+}
+
+const HOME_TILE = {
+  homebot: { w: 320, h: 520 },
+  grok: { w: 992, h: 128 },
+  tokens: { w: 992, h: 118 },
+  live: { w: 186, h: 88 },
+  pos: { w: 186, h: 88 },
+  equity: { w: 186, h: 88 },
+  upnl: { w: 186, h: 88 },
+  condor: { w: 186, h: 88 },
+  book: { w: 992, h: 380 },
+  health: { w: 320, h: 140 },
+  logs: { w: 320, h: 200 },
+  agent: { w: 320, h: 200 },
+  output: { w: 320, h: 200 },
+};
+function tileSize(n) {
+  const kind = (n.data && n.data.kind) || "";
+  if (n.type === "homestat") return HOME_TILE[kind] || HOME_TILE.live;
+  if (n.type === "health") return HOME_TILE.health;
+  if (n.type === "logs") return HOME_TILE.logs;
+  if (n.type === "agent") return HOME_TILE.agent;
+  if (n.type === "output") return HOME_TILE.output;
+  return HOME_TILE.homebot;
+}
+
+function showEl(id, on) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = on ? "" : "none";
+}
+
+function healthTileHtml(n, health) {
+  const kind = (n.data && n.data.kind) || "host";
+  const h = (health && health.host) || {};
+  const net = (health && health.net) || {};
+  const ip = (health && health.hlip) || {};
+  let body = "";
+  if (kind === "net") body = net.ok ? ("up " + (net.ms || "—") + "ms") : ("DOWN " + (net.error || ""));
+  else if (kind === "hlip") body = (ip.used || 0) + " / " + (ip.cap || 1200) + " · " + Number(ip.pct || 0).toFixed(0) + "%";
+  else body = "CPU " + (h.cpu_pct ?? "—") + "% · RAM " + (h.mem_pct ?? "—") + "% · disk " + (h.disk_pct ?? "—") + "%";
+  const title = (n.data && n.data.name) || kind;
+  return `<div class="home-health"><div class="hh-h">${esc(title)}</div><div class="hh-row">${esc(body)}</div></div>`;
+}
+
+function findBot(bots, n) {
+  const d = n.data || {};
+  const keys = [n.id, d.hunter, d.botId, d.id].filter(Boolean).map(String);
+  return (bots || []).find((b) => keys.includes(String(b.id))) || null;
+}
+
+function feedLinesHtml(rows, empty) {
+  const list = (rows || []).slice(-5);
+  if (!list.length) return `<div class="hh-row">${esc(empty || "idle")}</div>`;
+  return list.map((r) => `<div class="hh-row">${esc(r.text || r)}</div>`).join("");
+}
+
+function streamTileHtml(n, health, condor) {
+  const title = (n.data && n.data.name) || (n.type === "logs" ? "Logs" : "Stream");
+  const feed = (condor && condor.feed) || [];
+  return `<div class="home-health"><div class="hh-h">${esc(title)}</div>${feedLinesHtml(feed, "no feed yet")}</div>`;
+}
+
+function agentTileHtml(n, condor) {
+  const d = n.data || {};
+  const title = d.name || (d.kind === "email" ? "Email" : "Telegram");
+  const feed = ((condor && condor.feed) || []).filter((r) => {
+    const k = String(r.kind || "");
+    return k.startsWith("tg") || k === "xlate";
+  });
+  return `<div class="home-health"><div class="hh-h">${esc(title)}</div>${feedLinesHtml(feed, "output · idle")}</div>`;
+}
+
+function bandOf(n) {
+  const b = n && n.data && n.data.band;
+  if (b === "top" || b === "mid" || b === "bot") return b;
+  const type = (n && n.type) || "";
+  const kind = (n && n.data && n.data.kind) || "";
+  if (type === "homebot" || kind === "homebot") return "mid";
+  if (type === "homestat") return kind === "book" ? "mid" : "top";
+  if (type === "health" || type === "logs" || type === "output" || type === "agent") return "bot";
+  return "mid";
+}
+
+function tileInner(n, bots, health, condor, snap) {
+  if (n.type === "homestat") return homestatTileHtml(n, snap);
+  if (n.type === "health") return healthTileHtml(n, health);
+  if (n.type === "agent") return agentTileHtml(n, condor);
+  if (n.type === "logs" || n.type === "output") return streamTileHtml(n, health, condor);
+  const bot = findBot(bots, n);
+  return bot ? botCardHtml(bot) : `<div class="home-health"><div class="hh-h">${esc((n.data && n.data.name) || n.id)}</div><div class="hh-row">unwired</div></div>`;
+}
+
+function renderBots(bots, layout, health, condor, snap) {
+  const root = document.getElementById("bots");
+  const wrap = document.querySelector(".wrap");
+  const topCanvas = document.getElementById("homeTopCanvas");
+  const midRoot = document.getElementById("homeMid");
+  const botRoot = document.getElementById("homeBot");
+  document.body.classList.add("home-banded");
+  if (wrap) wrap.classList.remove("staged");
+  showEl("fixedGrok", true);
+  showEl("fixedRate", true);
+  showEl("fixedKpis", true);
+  showEl("kpiLive", true);
+  showEl("kpiPos", true);
+  showEl("kpiEq", true);
+  showEl("kpiPnl", true);
+  showEl("fixedPos", true);
+  if (topCanvas) topCanvas.innerHTML = "";
+  const nDe = (bots || []).filter(function (b) { return b && b.deactivated; }).length;
+  const deNote = document.getElementById("deactNote");
+  if (deNote) {
+    if (nDe > 0) {
+      deNote.hidden = false;
+      deNote.textContent = nDe + " deactivated — those hunters spend 0 Hyperliquid IP tokens. Positions stay.";
+    } else {
+      deNote.hidden = true;
+      deNote.textContent = "";
+    }
+  }
+  const cards = (bots || []).map(function (b) { return botCardHtml(b); }).join("");
+  if (root) {
+    root.className = "bots";
+    root.style.display = "grid";
+    root.style.minHeight = "60vh";
+    root.innerHTML = cards || '<div class="empty">no hunters</div>';
+  }
+  if (midRoot) midRoot.innerHTML = "";
+  const healthTiles = ((layout && layout.nodes) || []).filter(function (n) {
+    return n && n.type === "health";
+  });
+  if (botRoot) {
+    botRoot.innerHTML = healthTiles.map(function (n) {
+      return healthTileHtml(n, health);
+    }).join("");
+  }
+}
+
+function renderPositions(rows) {
+  const wrap = document.getElementById("posWrap");
+  if (!wrap) return;
+  wrap.innerHTML = positionsTableHtml(rows);
+}
+
+async function load() {
+  try {
+    const r = await fetch("/api/home");
+    const d = await r.json();
+    if (d && d.flask_writes != null) {
+      window.fqFlaskWrites = !!d.flask_writes;
+      ctlApplyFlaskWrites(!!d.flask_writes);
+    }
+    if (d && d.writes != null && window.fqBrain && fqBrain() === "spring") {
+      window.fqSpringWrites = !!d.writes;
+      if (typeof fqApplyBrainUi === "function") fqApplyBrainUi();
+    }
+    const t = d.totals || {};
+    const nOk = t.n_ok != null ? t.n_ok : (t.n_live || 0);
+    const kLive = document.getElementById("kLive");
+    if (kLive) {
+      kLive.textContent = nOk + " / " + (t.n_bots || 0);
+      kLive.className = nOk < (t.n_bots || 0) ? "val rose" : "val gold";
+    }
+    const kPos = document.getElementById("kPos");
+    if (kPos) kPos.textContent = t.n_pos ?? 0;
+    const kEq = document.getElementById("kEq");
+    if (kEq) kEq.textContent = money(t.equity_usd);
+    const pnlEl = document.getElementById("kPnl");
+    if (pnlEl) {
+      pnlEl.textContent = money(t.upnl_usd);
+      pnlEl.className = "val " + clsPnl(t.upnl_usd);
+    }
+    const posSub = document.getElementById("posSub");
+    if (posSub) posSub.textContent = (d.ts || "live") + " · " + (t.n_pos || 0) + " open";
+    const kinds = new Set(((d.home_board && d.home_board.nodes) || [])
+      .filter((n) => n && n.type === "homestat")
+      .map((n) => (n.data && n.data.kind) || ""));
+    showEl("fixedRate", true);
+    showEl("kpiLive", true);
+    showEl("kpiPos", true);
+    showEl("kpiEq", true);
+    showEl("kpiPnl", true);
+    showEl("fixedGrok", true);
+    showEl("fixedKpis", true);
+    showEl("fixedPos", true);
+    renderRate(d.rate || {});
+    renderGrokBias(d.condor, d.desk_bias);
+    renderDeskBias(d.desk_bias);
+    homePositions = d.positions || [];
+    renderRiskReport(d.risk);
+    (function applyTopScale() {
+      const sc = Number((d.home_board || {}).top_scale);
+      const n = (!sc || sc < 0.4) ? 0.7 : Math.min(1.35, Math.max(0.45, sc));
+      document.documentElement.style.setProperty("--home-top-scale", String(n));
+    })();
+    renderBots(d.bots || [], d.home_board, d.health, d.condor, d);
+    renderPositions(d.positions || []);
+  } catch (e) {
+    toast("home load failed: " + e);
+  }
+}
+
+load();
+ctlRefresh();
+setInterval(load, 6000);
+setInterval(ctlRefresh, 5000);
+</script>
+</body>
+</html>

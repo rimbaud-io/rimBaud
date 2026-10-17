@@ -1,0 +1,500 @@
+#!/usr/bin/env bash
+# Copyright 2026 rimbaud.io
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# rimbaud-vpn — WireGuard hub for meta ↔ matrices.
+#
+# Control plane ONLY: 10.66.80.0/24. Default route stays on each box so
+# hunters keep THAT machine's public IP = a fresh Hyperliquid 1200/60s bucket.
+# AllowedIPs is never 0.0.0.0/0. Spring stays 127.0.0.1; a GET-only proxy
+# listens on the VPN address :5004.
+#
+#   sudo ./rimbaud-vpn init              # this box is the meta hub
+#   sudo ./rimbaud-vpn add mint-2        # print a join file for a matrix below
+#   sudo ./rimbaud-vpn join mint-2.conf  # run on the other matrix
+#   sudo ./rimbaud-vpn listen-install    # LAN hello → auto peer + meta.json
+#        ./rimbaud-vpn status
+#   sudo ./rimbaud-vpn down
+#   sudo ./rimbaud-vpn enroll            # on a NEW matrix: find the hub on the LAN
+set -euo pipefail
+
+HERE="$(cd "$(dirname "$(readlink -f "$0" 2>/dev/null || echo "$0")")" && pwd)"
+ROOT="$(cd "$HERE/.." && pwd)"
+VPN_DIR="${RIMBAUD_VPN_DIR:-$ROOT/conf/vpn}"
+IFACE="wg-rimbaud"
+NET="10.66.80"
+HUB_IP="$NET.1"
+MASK=24
+PORT=51820
+PROXY="$HERE/spring-proxy.py"
+META_JSON="$ROOT/conf/meta.json"
+PEERS_JSON="$VPN_DIR/peers.json"
+HUB_CONF="$VPN_DIR/${IFACE}.conf"
+ETC_CONF="/etc/wireguard/${IFACE}.conf"
+
+log()  { printf '\033[0;32m==>\033[0m %s\n' "$*"; }
+warn() { printf '\033[1;33m!!\033[0m %s\n' "$*" >&2; }
+die()  { printf '\033[0;31mxx\033[0m %s\n' "$*" >&2; exit 1; }
+
+need_root() {
+  [ "$(id -u)" -eq 0 ] || die "run with sudo: sudo $0 $*"
+}
+
+as_root() {
+  if [ "$(id -u)" -eq 0 ]; then "$@"
+  elif command -v sudo >/dev/null 2>&1; then sudo "$@"
+  else die "need root for: $*"; fi
+}
+
+ensure_tools() {
+  if ! command -v wg >/dev/null 2>&1 || ! command -v wg-quick >/dev/null 2>&1; then
+    log "installing wireguard-tools"
+    if command -v apt-get >/dev/null 2>&1; then
+      as_root apt-get update -y
+      as_root DEBIAN_FRONTEND=noninteractive apt-get install -y wireguard wireguard-tools
+    else
+      die "install wireguard-tools, then retry"
+    fi
+  fi
+  command -v python3 >/dev/null 2>&1 || die "python3 required for spring-proxy"
+}
+
+lan_src() {
+  ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src") {print $(i+1); exit}}'
+}
+
+public_ip() {
+  curl -fsS --max-time 4 https://api.ipify.org 2>/dev/null || echo "?"
+}
+
+mkdir_vpn() {
+  mkdir -p "$VPN_DIR/peers"
+  chmod 700 "$VPN_DIR" "$VPN_DIR/peers" 2>/dev/null || true
+}
+
+gen_priv() { wg genkey; }
+pub_of() { printf '%s' "$1" | wg pubkey; }
+
+detect_endpoint() {
+  if [ -n "${RIMBAUD_VPN_ENDPOINT:-}" ]; then
+    echo "$RIMBAUD_VPN_ENDPOINT"
+    return
+  fi
+  local src
+  src="$(lan_src)"
+  [ -n "$src" ] || src="192.168.1.73"
+  echo "${src}:${PORT}"
+}
+
+write_meta_site() {
+  local id="$1" name="$2" host="$3" role="${4:-vpn}"
+  python3 - "$META_JSON" "$id" "$name" "$host" "$role" <<'PY'
+import json, os, sys
+path, sid, name, host, role = sys.argv[1:6]
+os.makedirs(os.path.dirname(path), exist_ok=True)
+try:
+    with open(path) as f:
+        j = json.load(f) or {}
+except Exception:
+    j = {}
+j.setdefault("ok", True)
+j["read_only"] = True
+j["closes"] = False
+j["positions_untouched"] = True
+j["lan"] = j.get("lan") or "192.168.0.0/16"
+j["vpn_net"] = "10.66.80.0/24"
+j["note"] = "GET only. VPN is 10.66.80.0/24 control plane — hunters keep their own public IP (HL tokens)."
+sites = j.get("sites") if isinstance(j.get("sites"), list) else []
+found = False
+for s in sites:
+    if isinstance(s, dict) and s.get("id") == sid:
+        s["name"] = name
+        s["host"] = host
+        s["port"] = 5004
+        s["role"] = role or "vpn"
+        found = True
+        break
+if not found:
+    if sid != "local":
+        sites.append({"id": sid, "name": name, "host": host, "port": 5004, "role": role or "vpn"})
+j["sites"] = sites
+tmp = path + ".tmp"
+with open(tmp, "w") as f:
+    json.dump(j, f, indent=2)
+    f.write("\n")
+os.replace(tmp, path)
+PY
+}
+
+load_peers() {
+  python3 - "$PEERS_JSON" <<'PY'
+import json, sys
+path = sys.argv[1]
+try:
+    with open(path) as f:
+        j = json.load(f)
+except Exception:
+    j = {"next": 2, "peers": []}
+print(json.dumps(j))
+PY
+}
+
+save_peers() {
+  python3 - "$PEERS_JSON" "$1" <<'PY'
+import json, os, sys
+path, raw = sys.argv[1], sys.argv[2]
+os.makedirs(os.path.dirname(path), exist_ok=True)
+tmp = path + ".tmp"
+with open(tmp, "w") as f:
+    f.write(raw if raw.endswith("\n") else raw + "\n")
+os.replace(tmp, path)
+os.chmod(path, 0o600)
+PY
+}
+
+sync_wg() {
+  if [ ! -f "$HUB_CONF" ]; then return 0; fi
+  as_root mkdir -p /etc/wireguard
+  as_root cp "$HUB_CONF" "$ETC_CONF"
+  as_root chmod 600 "$ETC_CONF"
+  if ip link show "$IFACE" >/dev/null 2>&1; then
+    as_root wg-quick down "$IFACE" || true
+  fi
+  as_root wg-quick up "$IFACE"
+  # Survive reboot. wg-quick up alone leaves the unit disabled.
+  as_root systemctl enable "wg-quick@${IFACE}.service"
+}
+
+start_proxy() {
+  local ip="$1"
+  local pidf="$VPN_DIR/proxy.pid"
+  if [ -f "$pidf" ] && kill -0 "$(cat "$pidf")" 2>/dev/null; then
+    log "spring-proxy already pid $(cat "$pidf")"
+    return 0
+  fi
+  [ -f "$PROXY" ] || die "missing $PROXY"
+  nohup python3 "$PROXY" "$ip" 5004 127.0.0.1 5004 >>"$VPN_DIR/proxy.log" 2>&1 &
+  echo $! > "$pidf"
+  log "GET-only proxy $ip:5004 → 127.0.0.1:5004  pid $!"
+}
+
+stop_proxy() {
+  local pidf="$VPN_DIR/proxy.pid"
+  if [ -f "$pidf" ]; then
+    kill "$(cat "$pidf")" 2>/dev/null || true
+    rm -f "$pidf"
+  fi
+  pkill -f "spring-proxy.py" 2>/dev/null || true
+}
+
+cmd_init() {
+  need_root
+  ensure_tools
+  mkdir_vpn
+  if [ -f "$HUB_CONF" ]; then
+    warn "hub already exists ($HUB_CONF) — not overwriting keys"
+    sync_wg
+    start_proxy "$HUB_IP"
+    cmd_status
+    return 0
+  fi
+  local priv pub ep
+  priv="$(gen_priv)"
+  pub="$(pub_of "$priv")"
+  ep="$(detect_endpoint)"
+  cat > "$HUB_CONF" <<EOF
+[Interface]
+# rimBaud meta hub — control plane only. Do NOT set AllowedIPs = 0.0.0.0/0
+Address = ${HUB_IP}/${MASK}
+ListenPort = ${PORT}
+PrivateKey = ${priv}
+# Table default: route 10.66.80.0/24 only.
+
+EOF
+  chmod 600 "$HUB_CONF"
+  printf '%s\n' "{\"role\":\"hub\",\"public_key\":\"$pub\",\"endpoint\":\"$ep\",\"next\":2,\"peers\":[]}" > "$PEERS_JSON"
+  chmod 600 "$PEERS_JSON"
+  echo "$ep" > "$VPN_DIR/endpoint"
+  write_meta_site "local" "this matrix" "127.0.0.1"
+  sync_wg
+  start_proxy "$HUB_IP"
+  log "hub up  $HUB_IP  endpoint $ep  public $pub"
+  echo
+  echo "This box public IP (Hyperliquid tokens for THIS matrix): $(public_ip)"
+  echo "Hunters still use that IP. VPN does not steal their default route."
+  echo
+  echo "Add a matrix below:"
+  echo "  sudo $0 add mint-2"
+}
+
+cmd_add() {
+  need_root
+  ensure_tools
+  mkdir_vpn
+  [ -f "$HUB_CONF" ] || die "run: sudo $0 init"
+  local name="${1:-}"
+  [[ "$name" =~ ^[a-zA-Z0-9._-]+$ ]] || die "peer name: letters, digits, . _ -"
+  local raw next ip priv pub hub_pub ep
+  raw="$(load_peers)"
+  next="$(python3 -c "import json,sys; print(json.loads(sys.argv[1]).get('next',2))" "$raw")"
+  ip="$NET.$next"
+  [ "$next" -lt 254 ] || die "VPN full (10.66.80.254)"
+  if grep -q "\"id\": \"$name\"" "$PEERS_JSON" 2>/dev/null; then
+    die "peer $name already exists"
+  fi
+  priv="$(gen_priv)"
+  pub="$(pub_of "$priv")"
+  hub_pub="$(python3 -c "import json,sys; print(json.loads(sys.argv[1]).get('public_key',''))" "$raw")"
+  if [ -z "$hub_pub" ]; then
+    hub_pub="$(wg show "$IFACE" public-key 2>/dev/null || true)"
+  fi
+  [ -n "$hub_pub" ] || die "hub public key missing — re-run init"
+  ep="$(cat "$VPN_DIR/endpoint" 2>/dev/null || detect_endpoint)"
+
+  cat >> "$HUB_CONF" <<EOF
+[Peer]
+# $name
+PublicKey = ${pub}
+AllowedIPs = ${ip}/32
+
+EOF
+  local join="$VPN_DIR/peers/${name}.conf"
+  cat > "$join" <<EOF
+[Interface]
+# rimBaud matrix '$name' — join the meta hub.
+# AllowedIPs MUST stay 10.66.80.0/24 (control plane). Hunters keep this box's public IP.
+Address = ${ip}/${MASK}
+PrivateKey = ${priv}
+
+[Peer]
+PublicKey = ${hub_pub}
+Endpoint = ${ep}
+AllowedIPs = ${NET}.0/${MASK}
+PersistentKeepalive = 25
+EOF
+  chmod 600 "$join"
+
+  python3 - "$PEERS_JSON" "$name" "$ip" "$pub" "$next" <<'PY'
+import json, os, sys
+path, name, ip, pub, nxt = sys.argv[1:6]
+with open(path) as f:
+    j = json.load(f)
+j.setdefault("peers", [])
+j["peers"].append({"id": name, "name": name, "vpn_ip": ip, "public_key": pub, "port": 5004})
+j["next"] = int(nxt) + 1
+tmp = path + ".tmp"
+with open(tmp, "w") as f:
+    json.dump(j, f, indent=2)
+    f.write("\n")
+os.replace(tmp, path)
+PY
+  write_meta_site "$name" "$name" "$ip" "child"
+  sync_wg
+  log "peer $name  $ip"
+  echo
+  echo "On the OTHER matrix:"
+  echo "  scp $join user@OTHER:/tmp/${name}.conf"
+  echo "  ssh user@OTHER 'sudo /opt/rimbaud/rimbaud_vpn/rimbaud-vpn join /tmp/${name}.conf'"
+  echo
+  echo "That box keeps its own Hyperliquid IP tokens. Meta GETs http://$ip:5004/api/home"
+}
+
+cmd_join() {
+  local file="${1:-}"
+  [ -f "$file" ] || die "join file not found: $file"
+  if grep -Eiq 'AllowedIPs\s*=\s*0\.0\.0\.0/0' "$file"; then
+    die "refusing AllowedIPs=0.0.0.0/0 — that would route hunters through the hub and SHARE one HL IP bucket"
+  fi
+  need_root
+  ensure_tools
+  mkdir_vpn
+  if ! grep -Eq "AllowedIPs\s*=\s*${NET}\.0/${MASK}" "$file"; then
+    die "join file must keep AllowedIPs = ${NET}.0/${MASK}"
+  fi
+  local addr
+  addr="$(awk -F' *= *' '/^Address/{print $2; exit}' "$file")"
+  addr="${addr%%/*}"
+  [[ "$addr" == "$NET".* ]] || die "Address must be in ${NET}.0/${MASK}"
+  as_root mkdir -p /etc/wireguard
+  as_root cp "$file" "$ETC_CONF"
+  as_root chmod 600 "$ETC_CONF"
+  cp "$file" "$HUB_CONF"
+  chmod 600 "$HUB_CONF"
+  if ip link show "$IFACE" >/dev/null 2>&1; then
+    as_root wg-quick down "$IFACE" || true
+  fi
+  as_root wg-quick up "$IFACE"
+  as_root systemctl enable "wg-quick@${IFACE}.service"
+  start_proxy "$addr"
+  if command -v ufw >/dev/null 2>&1; then
+    ufw allow in on "$IFACE" to any port 5004 proto tcp comment 'rimBaud-meta-GET' >/dev/null 2>&1 || true
+    log "ufw: 5004/tcp on $IFACE (META GET)"
+  fi
+  write_meta_site "local" "this matrix" "127.0.0.1"
+  write_meta_site "hub" "meta hub" "$HUB_IP"
+  log "joined VPN as $addr"
+  echo "This box public IP (Hyperliquid tokens): $(public_ip)"
+  echo "Meta can GET http://$addr:5004/api/home  (GET-only proxy)"
+}
+
+cmd_status() {
+  echo "iface     $IFACE"
+  if ip link show "$IFACE" >/dev/null 2>&1; then
+    echo "link      UP"
+    ip -4 -o addr show "$IFACE" | awk '{print "addr     "$4}'
+  else
+    echo "link      down   (sudo $0 init | join)"
+  fi
+  echo "HL IP     $(public_ip)   ← hunters on THIS box use this public IP (1200 w/60s)"
+  echo "vpn net   ${NET}.0/${MASK}  control plane only — not an HL exit"
+  echo
+  if command -v wg >/dev/null 2>&1 && [ "$(id -u)" -eq 0 ]; then
+    wg show "$IFACE" 2>/dev/null || true
+  elif command -v wg >/dev/null 2>&1; then
+    echo "(handshake details need sudo wg show $IFACE)"
+  fi
+  echo
+  if [ -f "$PEERS_JSON" ]; then
+    python3 - "$PEERS_JSON" <<'PY'
+import json, sys, urllib.request
+path = sys.argv[1]
+try:
+    j = json.load(open(path))
+except Exception:
+    j = {}
+print("hub pub   ", j.get("public_key", "-"))
+print("endpoint  ", j.get("endpoint", "-"))
+for p in j.get("peers") or []:
+    ip = p.get("vpn_ip")
+    st = "down"
+    left = "?"
+    try:
+        req = urllib.request.Request("http://%s:5004/api/health" % ip, method="GET")
+        with urllib.request.urlopen(req, timeout=2) as r:
+            st = "GET ok" if r.status == 200 else str(r.status)
+    except Exception:
+        st = "no spring-proxy"
+    try:
+        req = urllib.request.Request("http://%s:5004/api/home" % ip, method="GET")
+        with urllib.request.urlopen(req, timeout=3) as r:
+            import json as J
+            d = J.loads(r.read().decode())
+            rate = d.get("rate") or {}
+            left = "%s/%s" % (int(rate.get("left") or 0), int(rate.get("cap") or 1200))
+    except Exception:
+        pass
+    print("peer %-12s  %-12s  %-16s  IP left %s" % (p.get("id"), ip, st, left))
+PY
+  fi
+}
+
+cmd_down() {
+  need_root
+  stop_proxy
+  if ip link show "$IFACE" >/dev/null 2>&1; then
+    as_root wg-quick down "$IFACE" || true
+  fi
+  log "VPN down. Hunters / Spring / clips were not touched."
+}
+
+cmd_endpoint() {
+  need_root
+  local ep="${1:-}"
+  [[ "$ep" == *:* ]] || die "usage: $0 endpoint 192.168.1.73:51820"
+  mkdir_vpn
+  echo "$ep" > "$VPN_DIR/endpoint"
+  python3 - "$PEERS_JSON" "$ep" <<'PY' 2>/dev/null || true
+import json, os, sys
+path, ep = sys.argv[1], sys.argv[2]
+try:
+    j = json.load(open(path))
+except Exception:
+    raise SystemExit(0)
+j["endpoint"] = ep
+open(path,"w").write(json.dumps(j, indent=2)+"\n")
+PY
+  if [ -d "$VPN_DIR/peers" ]; then
+    for f in "$VPN_DIR/peers"/*.conf; do
+      [ -f "$f" ] || continue
+      sed -i "s|^Endpoint = .*|Endpoint = ${ep}|" "$f"
+    done
+  fi
+  log "endpoint $ep  (re-copy peer .conf files to matrices below)"
+}
+
+usage() {
+  sed -n '2,20p' "$0" | sed 's/^# \?//'
+}
+
+cmd_listen() {
+  need_root
+  ensure_tools
+  [ -f "$PEERS_JSON" ] || die "run: sudo $0 init"
+  exec python3 "$HERE/enroll.py" listen \
+    --peers "$PEERS_JSON" \
+    --meta "$META_JSON" \
+    --hub-conf "$HUB_CONF" \
+    --etc-conf "$ETC_CONF" \
+    --vpn-dir "$VPN_DIR" \
+    --proxy "$PROXY"
+}
+
+cmd_listen_install() {
+  need_root
+  local unit="/etc/systemd/system/rimbaud-vpn-listen.service"
+  cat > "$unit" <<EOF
+[Unit]
+Description=rimBaud LAN enroll — new installs join 10.66.80.0/24
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=$HERE/rimbaud-vpn listen
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  systemctl daemon-reload
+  systemctl enable --now rimbaud-vpn-listen.service
+  log "enroll listener up — UDP $PORT is WireGuard; UDP 51821 is hello; http://<this-lan>:51822/enroll.py"
+}
+
+cmd_enroll() {
+  need_root
+  ensure_tools
+  if ip -4 addr show "$IFACE" 2>/dev/null | grep -q '10\.66\.80\.1/'; then
+    log "this box is the VPN hub — enroll is for the other matrix"
+    return 0
+  fi
+  python3 "$HERE/enroll.py" enroll --retry-bin "$HERE/rimbaud-vpn"
+}
+
+cmd="${1:-status}"
+shift || true
+case "$cmd" in
+  -h|--help|help) usage ;;
+  init)     cmd_init "$@" ;;
+  add)      cmd_add "$@" ;;
+  join)     cmd_join "$@" ;;
+  status)   cmd_status "$@" ;;
+  down)     cmd_down "$@" ;;
+  endpoint) cmd_endpoint "$@" ;;
+  listen)   cmd_listen "$@" ;;
+  listen-install) cmd_listen_install "$@" ;;
+  enroll)   cmd_enroll "$@" ;;
+  *) usage; die "unknown command: $cmd" ;;
+esac

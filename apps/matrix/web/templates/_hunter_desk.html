@@ -1,0 +1,166 @@
+<!--
+Copyright 2026 rimbaud.io
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
+<div class="panel" id="matrixDesk">
+  <div class="panel-h">
+    <h2>MATRIX</h2>
+    <span class="sub" id="matrixDeskSub">same controls as the desk</span>
+  </div>
+  <div class="panel-b">
+    <div id="matrixGate"></div>
+    <div id="matrixLev"></div>
+    <div id="matrixSkim"></div>
+    <p class="hint" id="matrixNote">A knob does not flatten. Close and 100% leftover are the size actions. BIAS flat leaves an open clip in place.</p>
+  </div>
+</div>
+<style>
+#matrixDesk .mx-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+#matrixDesk .mx-lab { color: #f0b90b; letter-spacing: 1px; font-size: 12px; }
+#matrixDesk button.mx {
+  background: transparent; font-family: inherit; font-size: 11px; letter-spacing: 1px;
+  padding: 4px 10px; cursor: pointer; border-radius: 2px;
+}
+#matrixDesk .mx.max { border: 1px solid #00ff6a; color: #00ff6a; }
+#matrixDesk .mx.mid { border: 1px solid #ffc857; color: #ffc857; }
+#matrixDesk .mx.low { border: 1px solid #7ecbff; color: #7ecbff; }
+#matrixDesk .mx.on.max { background: #00ff6a; color: #041208; }
+#matrixDesk .mx.on.mid { background: #ffc857; color: #041208; }
+#matrixDesk .mx.on.low { background: #7ecbff; color: #041208; }
+#matrixDesk .mx.act { border: 1px solid #00ff6a; color: #00ff6a; background: rgba(0,255,106,0.12); }
+#matrixDesk .mx.deact { border: 1px solid #ff4d6d; color: #fff; background: #ff4d6d; }
+#matrixDesk .mx.off { border: 1px solid #ff4d6d; color: #ff4d6d; }
+#matrixDesk .mx-note { color: #ff4d6d; font-size: 12px; }
+#matrixDesk label.skim { display: flex; gap: 8px; align-items: center; color: #f0b90b; }
+#matrixDesk .fx { color: #9dffc0; font-size: 12px; }
+</style>
+<script>
+(function () {
+  const PATHS = {
+    "/bn-swing": ["hummingbot-bn-swing", ["BTC", "ETH", "LTC", "TAO"]],
+    "/pmm-simple": ["hummingbot-bn-swing", ["BTC", "ETH", "LTC", "TAO"]],
+    "/helliot": ["hummingbot-helliot", ["BTC", "ETH", "LTC", "TAO"]],
+    "/surfn": ["hummingbot-surfn", ["BTC", "ETH", "LTC", "TAO"]],
+    "/shorty": ["hummingbot-shortn", ["BTC", "ETH", "LTC", "TAO"]],
+    "/shortn": ["hummingbot-shortn", ["BTC", "ETH", "LTC", "TAO"]],
+    "/dman": ["hummingbot-dman", ["BTC", "ETH", "LTC", "TAO"]],
+    "/onlyup": ["hummingbot-onlyup", ["BTC", "LTC", "TAO"]],
+    "/dman-maker": ["hummingbot-dman-maker", ["BTC", "ETH", "LTC", "TAO"]],
+    "/dman_maker": ["hummingbot-dman-maker", ["BTC", "ETH", "LTC", "TAO"]]
+  };
+  const hit = PATHS[location.pathname];
+  if (!hit) return;
+  const botId = hit[0];
+  const coins = hit[1];
+  const CAPS = { BTC: 40, ETH: 25, LTC: 10, TAO: 5 };
+  function tierName(ctrl) {
+    const raw = String((ctrl && ctrl.leverage_tier) || "MAX").toUpperCase();
+    return raw === "MID" || raw === "LOW" ? raw : "MAX";
+  }
+  function levFor(coin, tier) {
+    const cap = CAPS[coin] || 1;
+    if (tier === "LOW") return Math.max(1, Math.floor(cap / 4));
+    if (tier === "MID") return Math.max(1, Math.floor(cap / 2));
+    return Math.max(1, cap);
+  }
+  function writesOff() {
+    return window.fqFlaskWrites === false;
+  }
+  async function postCtrl(values) {
+    if (writesOff()) {
+      if (typeof showToast === "function") showToast("WRITE MODE is off", true);
+      return;
+    }
+    const r = await fetch("/api/wire/controller", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: botId, values: values })
+    });
+    const d = await r.json().catch(function () { return {}; });
+    if (!r.ok || !d.ok) throw new Error(d.error || ("HTTP " + r.status));
+    if (typeof showToast === "function") showToast(d.message || "saved");
+    loadDesk();
+  }
+  function paint(bot) {
+    const gate = document.getElementById("matrixGate");
+    const lev = document.getElementById("matrixLev");
+    const skim = document.getElementById("matrixSkim");
+    if (!gate || !bot) return;
+    const de = !!bot.deactivated;
+    const cls = de ? "deact" : (bot.running ? "act" : "off");
+    const lbl = de ? "DEACTIVATED" : (bot.running ? "ACTIVE" : "OFF");
+    const next = !bot.running || de;
+    gate.innerHTML = '<div class="mx-row"><button type="button" class="mx ' + cls + '" id="matrixGateBtn">' + lbl + "</button>"
+      + '<span class="mx-note">' + (de
+        ? "red — 0 HL IP. Positions stay. Stops wait until ACTIVE."
+        : (bot.running ? "green — active. Positions stay." : "off — container is down. Activate does not start it."))
+      + "</span></div>";
+    const btn = document.getElementById("matrixGateBtn");
+    if (btn) btn.onclick = function () {
+      const verb = next ? "Activate" : "Deactivate";
+      if (!confirm(verb + " " + (bot.name || botId) + "?\n\nDocker " + (next ? "unpause" : "pause") + " only. Positions stay. This does not flatten.")) return;
+      fetch("/api/hunter_gate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: botId, active: next })
+      }).then(function (r) { return r.json().then(function (d) { return { r: r, d: d }; }); })
+        .then(function (x) {
+          if (!x.r.ok || !x.d.ok) throw new Error(x.d.error || x.d.message || "gate failed");
+          if (typeof showToast === "function") showToast(x.d.message || verb);
+          loadDesk();
+        }).catch(function (e) {
+          if (typeof showToast === "function") showToast(e.message, true);
+        });
+    };
+    const tier = tierName(bot.controller);
+    const bits = coins.map(function (c) { return c + " " + levFor(c, tier) + "x"; }).join(" · ");
+    lev.innerHTML = '<div class="mx-row"><span class="mx-lab">LEV</span>'
+      + ["MAX", "MID", "LOW"].map(function (t) {
+          return '<button type="button" class="mx ' + t.toLowerCase() + (tier === t ? " on" : "") + '" data-tier="' + t + '">' + t + "</button>";
+        }).join("")
+      + '<span class="fx">' + bits + "</span></div>"
+      + '<p class="hint">Open coin keeps its exchange leverage until it is flat. A paused hunter saves the tier and applies it on the next real start.</p>';
+    lev.querySelectorAll("button[data-tier]").forEach(function (el) {
+      el.onclick = function () { postCtrl({ leverage_tier: el.getAttribute("data-tier") }).catch(function (e) {
+        if (typeof showToast === "function") showToast(e.message, true);
+      }); };
+    });
+    if (botId === "hummingbot-dman-maker") {
+      const on = !bot.controller || bot.controller.sendEvery2Win !== false;
+      skim.innerHTML = '<label class="skim"><input type="checkbox" id="matrixSkimBox"' + (on ? " checked" : "") + "> send every 2 win to risk wallet</label>"
+        + '<p class="hint">' + (on ? "Checked, the second win parks on the risk wallet." : "Unchecked, every win stays on this account.") + "</p>";
+      const box = document.getElementById("matrixSkimBox");
+      if (box) box.onchange = function () {
+        postCtrl({ sendEvery2Win: box.checked }).catch(function (e) {
+          box.checked = !box.checked;
+          if (typeof showToast === "function") showToast(e.message, true);
+        });
+      };
+    } else {
+      skim.innerHTML = "";
+    }
+  }
+  async function loadDesk() {
+    try {
+      const r = await fetch("/api/home");
+      const d = await r.json();
+      const bot = (d.bots || []).find(function (b) { return b.id === botId; });
+      paint(bot);
+    } catch (e) { /* home poll stays quiet */ }
+  }
+  loadDesk();
+  setInterval(loadDesk, 6000);
+})();
+</script>

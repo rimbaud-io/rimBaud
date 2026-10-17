@@ -1,0 +1,37 @@
+# Copyright 2026 rimbaud.io
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+rimBaud — one-command install
+=============================
+
+USB or folder with the tarball:
+
+  sudo bash install.sh
+
+That:
+  1. unpacks rimbaud-install-*.tar.gz → /opt/rimbaud
+  2. installs Docker, Copy hunter + dashboard, Spring :5004, desk
+  3. joins the meta VPN if JOIN.conf is next to install.sh; opens 5004 on wg
+  4. opens checkboxes (SPACE = OK, ENTER = finish, s = Copy master 0x)
+
+New Hyperliquid account: Copy only for weeks of volume.
+  Copy MASTER 0x  = the HL account you fund (not the API agent address)
+  API secret      = 0x+64 from app.hyperliquid.xyz/API (agent of that master)
+  vault           = OFF
+  Then transfer USDC Spot → Perps on Hyperliquid or Copy equity stays $0.
+Do not paste hub desk wallets. Subaccounts after $100k volume.
+
+SSH (already extracted):
+
+  cd /opt/rimbaud && sudo bash install.sh

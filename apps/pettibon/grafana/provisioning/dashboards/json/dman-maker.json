@@ -1,0 +1,252 @@
+{
+  "uid": "pettibon-dman-maker",
+  "title": "DMan Maker",
+  "description": "DMan Maker price, entries, exits, profit, controller setup, and an exit-rule replay. Mothership only.",
+  "tags": ["pettibon", "dman-maker"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "editable": false,
+  "time": {"from": "now-30d", "to": "now"},
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "templating": {
+    "list": [
+      {
+        "name": "coin",
+        "label": "Coin",
+        "type": "custom",
+        "query": "LTC,BTC,ETH,TAO,ALL",
+        "current": {"selected": true, "text": "LTC", "value": "LTC"},
+        "options": [
+          {"selected": true, "text": "LTC", "value": "LTC"},
+          {"selected": false, "text": "BTC", "value": "BTC"},
+          {"selected": false, "text": "ETH", "value": "ETH"},
+          {"selected": false, "text": "TAO", "value": "TAO"},
+          {"selected": false, "text": "ALL", "value": "ALL"}
+        ],
+        "includeAll": false,
+        "multi": false,
+        "hide": 0,
+        "skipUrlSync": false
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Price",
+      "gridPos": {"h": 9, "w": 24, "x": 0, "y": 0},
+      "datasource": {"type": "frser-sqlite-datasource", "uid": "pettibon"},
+      "fieldConfig": {
+        "defaults": {
+          "custom": {"drawStyle": "line", "lineWidth": 2, "fillOpacity": 8, "showPoints": "never", "spanNulls": true},
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true},
+        "tooltip": {"mode": "multi", "sort": "desc"}
+      },
+      "transformations": [{"id": "partitionByValues", "options": {"fields": ["coin"], "keepFields": false}}],
+      "targets": [{
+        "refId": "A",
+        "datasource": {"type": "frser-sqlite-datasource", "uid": "pettibon"},
+        "queryType": "table",
+        "timeColumns": ["time"],
+        "rawQueryText": "SELECT unix_s AS time, coin, mid AS price FROM prices WHERE bot_id = 'hummingbot-dman-maker' AND unix_s >= $__from / 1000 AND unix_s < $__to / 1000 AND ('${coin}' = 'ALL' OR coin = '${coin}') ORDER BY unix_s",
+        "queryText": "SELECT unix_s AS time, coin, mid AS price FROM prices WHERE bot_id = 'hummingbot-dman-maker' AND unix_s >= $__from / 1000 AND unix_s < $__to / 1000 AND ('${coin}' = 'ALL' OR coin = '${coin}') ORDER BY unix_s"
+      }]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Closes",
+      "gridPos": {"h": 4, "w": 4, "x": 0, "y": 9},
+      "datasource": {"type": "frser-sqlite-datasource", "uid": "pettibon"},
+      "fieldConfig": {"defaults": {"color": {"mode": "fixed", "fixedColor": "blue"}, "decimals": 0}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "value", "graphMode": "none", "textMode": "value"},
+      "targets": [{
+        "refId": "A",
+        "datasource": {"type": "frser-sqlite-datasource", "uid": "pettibon"},
+        "queryType": "table",
+        "timeColumns": [],
+        "rawQueryText": "SELECT COUNT(*) AS closes FROM setup_replay WHERE bot_id = 'hummingbot-dman-maker' AND actual = 1 AND unix_s >= $__from / 1000 AND unix_s < $__to / 1000 AND ('${coin}' = 'ALL' OR coin = '${coin}')",
+        "queryText": "SELECT COUNT(*) AS closes FROM setup_replay WHERE bot_id = 'hummingbot-dman-maker' AND actual = 1 AND unix_s >= $__from / 1000 AND unix_s < $__to / 1000 AND ('${coin}' = 'ALL' OR coin = '${coin}')"
+      }]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Wins",
+      "gridPos": {"h": 4, "w": 4, "x": 4, "y": 9},
+      "datasource": {"type": "frser-sqlite-datasource", "uid": "pettibon"},
+      "fieldConfig": {"defaults": {"color": {"mode": "fixed", "fixedColor": "green"}, "decimals": 0}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "value", "graphMode": "none", "textMode": "value"},
+      "targets": [{
+        "refId": "A",
+        "datasource": {"type": "frser-sqlite-datasource", "uid": "pettibon"},
+        "queryType": "table",
+        "timeColumns": [],
+        "rawQueryText": "SELECT SUM(pnl_usd > 0) AS wins FROM setup_replay WHERE bot_id = 'hummingbot-dman-maker' AND actual = 1 AND unix_s >= $__from / 1000 AND unix_s < $__to / 1000 AND ('${coin}' = 'ALL' OR coin = '${coin}')",
+        "queryText": "SELECT SUM(pnl_usd > 0) AS wins FROM setup_replay WHERE bot_id = 'hummingbot-dman-maker' AND actual = 1 AND unix_s >= $__from / 1000 AND unix_s < $__to / 1000 AND ('${coin}' = 'ALL' OR coin = '${coin}')"
+      }]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Losses",
+      "gridPos": {"h": 4, "w": 4, "x": 8, "y": 9},
+      "datasource": {"type": "frser-sqlite-datasource", "uid": "pettibon"},
+      "fieldConfig": {"defaults": {"color": {"mode": "fixed", "fixedColor": "red"}, "decimals": 0}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "value", "graphMode": "none", "textMode": "value"},
+      "targets": [{
+        "refId": "A",
+        "datasource": {"type": "frser-sqlite-datasource", "uid": "pettibon"},
+        "queryType": "table",
+        "timeColumns": [],
+        "rawQueryText": "SELECT SUM(pnl_usd < 0) AS losses FROM setup_replay WHERE bot_id = 'hummingbot-dman-maker' AND actual = 1 AND unix_s >= $__from / 1000 AND unix_s < $__to / 1000 AND ('${coin}' = 'ALL' OR coin = '${coin}')",
+        "queryText": "SELECT SUM(pnl_usd < 0) AS losses FROM setup_replay WHERE bot_id = 'hummingbot-dman-maker' AND actual = 1 AND unix_s >= $__from / 1000 AND unix_s < $__to / 1000 AND ('${coin}' = 'ALL' OR coin = '${coin}')"
+      }]
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Recorded pnl",
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 9},
+      "datasource": {"type": "frser-sqlite-datasource", "uid": "pettibon"},
+      "fieldConfig": {"defaults": {"decimals": 2, "unit": "currencyUSD", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 0}]}}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "value", "graphMode": "none", "textMode": "value"},
+      "targets": [{
+        "refId": "A",
+        "datasource": {"type": "frser-sqlite-datasource", "uid": "pettibon"},
+        "queryType": "table",
+        "timeColumns": [],
+        "rawQueryText": "SELECT ROUND(COALESCE(SUM(pnl_usd), 0), 2) AS recorded FROM setup_replay WHERE bot_id = 'hummingbot-dman-maker' AND actual = 1 AND unix_s >= $__from / 1000 AND unix_s < $__to / 1000 AND ('${coin}' = 'ALL' OR coin = '${coin}')",
+        "queryText": "SELECT ROUND(COALESCE(SUM(pnl_usd), 0), 2) AS recorded FROM setup_replay WHERE bot_id = 'hummingbot-dman-maker' AND actual = 1 AND unix_s >= $__from / 1000 AND unix_s < $__to / 1000 AND ('${coin}' = 'ALL' OR coin = '${coin}')"
+      }]
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Best replay minus recorded",
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 9},
+      "datasource": {"type": "frser-sqlite-datasource", "uid": "pettibon"},
+      "fieldConfig": {"defaults": {"decimals": 2, "unit": "currencyUSD", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 0}]}}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "value", "graphMode": "none", "textMode": "value"},
+      "targets": [{
+        "refId": "A",
+        "datasource": {"type": "frser-sqlite-datasource", "uid": "pettibon"},
+        "queryType": "table",
+        "timeColumns": [],
+        "rawQueryText": "WITH s AS (SELECT MAX(actual) AS actual, SUM(pnl_usd) AS pnl FROM setup_replay WHERE bot_id = 'hummingbot-dman-maker' AND unix_s >= $__from / 1000 AND unix_s < $__to / 1000 AND ('${coin}' = 'ALL' OR coin = '${coin}') GROUP BY variant) SELECT ROUND(COALESCE((SELECT pnl FROM s WHERE actual = 0 ORDER BY pnl DESC LIMIT 1), 0) - COALESCE((SELECT pnl FROM s WHERE actual = 1), 0), 2) AS gap",
+        "queryText": "WITH s AS (SELECT MAX(actual) AS actual, SUM(pnl_usd) AS pnl FROM setup_replay WHERE bot_id = 'hummingbot-dman-maker' AND unix_s >= $__from / 1000 AND unix_s < $__to / 1000 AND ('${coin}' = 'ALL' OR coin = '${coin}') GROUP BY variant) SELECT ROUND(COALESCE((SELECT pnl FROM s WHERE actual = 0 ORDER BY pnl DESC LIMIT 1), 0) - COALESCE((SELECT pnl FROM s WHERE actual = 1), 0), 2) AS gap"
+      }]
+    },
+    {
+      "id": 7,
+      "type": "table",
+      "title": "Entries, exits, profit, controller",
+      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 13},
+      "datasource": {"type": "frser-sqlite-datasource", "uid": "pettibon"},
+      "fieldConfig": {
+        "defaults": {"custom": {"align": "auto"}},
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "pnl usd"}, "properties": [{"id": "unit", "value": "currencyUSD"}, {"id": "decimals", "value": 2}, {"id": "custom.cellOptions", "value": {"type": "color-text"}}, {"id": "thresholds", "value": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 0}]}}]}
+        ]
+      },
+      "options": {"showHeader": true, "sortBy": [{"displayName": "entered", "desc": true}]},
+      "targets": [{
+        "refId": "A",
+        "datasource": {"type": "frser-sqlite-datasource", "uid": "pettibon"},
+        "queryType": "table",
+        "timeColumns": [],
+        "rawQueryText": "SELECT entered, exited, side, coin, ROUND(size, 4) AS size, ROUND(entry, 4) AS entry, ROUND(exit_px, 4) AS exit, ROUND(pnl, 2) AS \"pnl usd\", ROUND(roe, 1) AS \"roe %\", lev, reason, setup AS \"controller then\" FROM (SELECT COALESCE((SELECT o.ts FROM trades o WHERE o.matrix_id = c.matrix_id AND o.bot_id = c.bot_id AND o.coin = c.coin AND upper(o.action) = 'OPEN' AND o.ts <= c.ts ORDER BY o.ts DESC LIMIT 1), c.ts) AS entered, c.ts AS exited, c.side AS side, c.coin AS coin, c.amount AS size, c.entry_price AS entry, c.price AS exit_px, c.pnl_usd AS pnl, c.roe_pct AS roe, c.leverage AS lev, c.reason AS reason, COALESCE((SELECT s.leverage_tier || '  TP ' || printf('%.0f%%', s.take_profit * 100) || '  trail ' || printf('%.1f/%.2f', s.trail_activation * 100, s.trail_delta * 100) || '  SL ' || printf('%.0f', s.sl_roe_pct) FROM ctrl_snaps s WHERE s.bot_id = c.bot_id AND s.unix_s <= c.unix_s ORDER BY s.unix_s DESC LIMIT 1), 'not recorded yet') AS setup, COALESCE((SELECT CAST(strftime('%s', replace(o.ts, ' UTC', '')) AS INTEGER) FROM trades o WHERE o.matrix_id = c.matrix_id AND o.bot_id = c.bot_id AND o.coin = c.coin AND upper(o.action) = 'OPEN' AND o.ts <= c.ts ORDER BY o.ts DESC LIMIT 1), c.unix_s) AS entry_unix FROM trade_closes c WHERE c.bot_id = 'hummingbot-dman-maker' AND ('${coin}' = 'ALL' OR c.coin = '${coin}') UNION ALL SELECT o.ts, 'still open', o.side, o.coin, o.amount, o.price, NULL, NULL, NULL, o.leverage, 'open', COALESCE((SELECT s.leverage_tier || '  TP ' || printf('%.0f%%', s.take_profit * 100) || '  trail ' || printf('%.1f/%.2f', s.trail_activation * 100, s.trail_delta * 100) || '  SL ' || printf('%.0f', s.sl_roe_pct) FROM ctrl_snaps s WHERE s.bot_id = o.bot_id AND s.unix_s <= CAST(strftime('%s', replace(o.ts, ' UTC', '')) AS INTEGER) ORDER BY s.unix_s DESC LIMIT 1), 'not recorded yet'), CAST(strftime('%s', replace(o.ts, ' UTC', '')) AS INTEGER) FROM trades o WHERE o.matrix_id = 'localhost' AND o.bot_id = 'hummingbot-dman-maker' AND upper(o.action) = 'OPEN' AND ('${coin}' = 'ALL' OR o.coin = '${coin}') AND o.id = (SELECT x.id FROM trades x WHERE x.matrix_id = o.matrix_id AND x.bot_id = o.bot_id AND x.coin = o.coin AND upper(x.action) = 'OPEN' ORDER BY x.ts DESC, x.id DESC LIMIT 1) AND NOT EXISTS (SELECT 1 FROM trades cl WHERE cl.matrix_id = o.matrix_id AND cl.bot_id = o.bot_id AND cl.coin = o.coin AND upper(cl.action) = 'CLOSE' AND cl.ts >= o.ts)) WHERE entry_unix >= $__from / 1000 AND entry_unix < $__to / 1000 ORDER BY entered DESC LIMIT 100",
+        "queryText": "SELECT entered, exited, side, coin, ROUND(size, 4) AS size, ROUND(entry, 4) AS entry, ROUND(exit_px, 4) AS exit, ROUND(pnl, 2) AS \"pnl usd\", ROUND(roe, 1) AS \"roe %\", lev, reason, setup AS \"controller then\" FROM (SELECT COALESCE((SELECT o.ts FROM trades o WHERE o.matrix_id = c.matrix_id AND o.bot_id = c.bot_id AND o.coin = c.coin AND upper(o.action) = 'OPEN' AND o.ts <= c.ts ORDER BY o.ts DESC LIMIT 1), c.ts) AS entered, c.ts AS exited, c.side AS side, c.coin AS coin, c.amount AS size, c.entry_price AS entry, c.price AS exit_px, c.pnl_usd AS pnl, c.roe_pct AS roe, c.leverage AS lev, c.reason AS reason, COALESCE((SELECT s.leverage_tier || '  TP ' || printf('%.0f%%', s.take_profit * 100) || '  trail ' || printf('%.1f/%.2f', s.trail_activation * 100, s.trail_delta * 100) || '  SL ' || printf('%.0f', s.sl_roe_pct) FROM ctrl_snaps s WHERE s.bot_id = c.bot_id AND s.unix_s <= c.unix_s ORDER BY s.unix_s DESC LIMIT 1), 'not recorded yet') AS setup, COALESCE((SELECT CAST(strftime('%s', replace(o.ts, ' UTC', '')) AS INTEGER) FROM trades o WHERE o.matrix_id = c.matrix_id AND o.bot_id = c.bot_id AND o.coin = c.coin AND upper(o.action) = 'OPEN' AND o.ts <= c.ts ORDER BY o.ts DESC LIMIT 1), c.unix_s) AS entry_unix FROM trade_closes c WHERE c.bot_id = 'hummingbot-dman-maker' AND ('${coin}' = 'ALL' OR c.coin = '${coin}') UNION ALL SELECT o.ts, 'still open', o.side, o.coin, o.amount, o.price, NULL, NULL, NULL, o.leverage, 'open', COALESCE((SELECT s.leverage_tier || '  TP ' || printf('%.0f%%', s.take_profit * 100) || '  trail ' || printf('%.1f/%.2f', s.trail_activation * 100, s.trail_delta * 100) || '  SL ' || printf('%.0f', s.sl_roe_pct) FROM ctrl_snaps s WHERE s.bot_id = o.bot_id AND s.unix_s <= CAST(strftime('%s', replace(o.ts, ' UTC', '')) AS INTEGER) ORDER BY s.unix_s DESC LIMIT 1), 'not recorded yet'), CAST(strftime('%s', replace(o.ts, ' UTC', '')) AS INTEGER) FROM trades o WHERE o.matrix_id = 'localhost' AND o.bot_id = 'hummingbot-dman-maker' AND upper(o.action) = 'OPEN' AND ('${coin}' = 'ALL' OR o.coin = '${coin}') AND o.id = (SELECT x.id FROM trades x WHERE x.matrix_id = o.matrix_id AND x.bot_id = o.bot_id AND x.coin = o.coin AND upper(x.action) = 'OPEN' ORDER BY x.ts DESC, x.id DESC LIMIT 1) AND NOT EXISTS (SELECT 1 FROM trades cl WHERE cl.matrix_id = o.matrix_id AND cl.bot_id = o.bot_id AND cl.coin = o.coin AND upper(cl.action) = 'CLOSE' AND cl.ts >= o.ts)) WHERE entry_unix >= $__from / 1000 AND entry_unix < $__to / 1000 ORDER BY entered DESC LIMIT 100"
+      }]
+    },
+    {
+      "id": 8,
+      "type": "table",
+      "title": "Recorded exits against the best replay",
+      "gridPos": {"h": 8, "w": 10, "x": 0, "y": 23},
+      "datasource": {"type": "frser-sqlite-datasource", "uid": "pettibon"},
+      "fieldConfig": {
+        "defaults": {"custom": {"align": "auto"}},
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "pnl usd"}, "properties": [{"id": "unit", "value": "currencyUSD"}, {"id": "decimals", "value": 2}, {"id": "custom.cellOptions", "value": {"type": "color-text"}}, {"id": "thresholds", "value": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 0}]}}]}
+        ]
+      },
+      "options": {"showHeader": true},
+      "targets": [{
+        "refId": "A",
+        "datasource": {"type": "frser-sqlite-datasource", "uid": "pettibon"},
+        "queryType": "table",
+        "timeColumns": [],
+        "rawQueryText": "WITH s AS (SELECT variant, MAX(actual) AS actual, SUM(pnl_usd) AS pnl, COUNT(*) AS n, SUM(exit_why = 'TP' OR exit_why LIKE 'TP %') AS tp, SUM(exit_why = 'TRAIL' OR exit_why LIKE 'TRAIL%') AS trail, SUM(exit_why = 'SL' OR exit_why LIKE 'SL %') AS sl FROM setup_replay WHERE bot_id = 'hummingbot-dman-maker' AND unix_s >= $__from / 1000 AND unix_s < $__to / 1000 AND ('${coin}' = 'ALL' OR coin = '${coin}') GROUP BY variant), best AS (SELECT * FROM s WHERE actual = 0 ORDER BY pnl DESC LIMIT 1), real AS (SELECT * FROM s WHERE actual = 1) SELECT 'recorded' AS line, variant AS setup, ROUND(pnl, 2) AS \"pnl usd\", n AS trades, tp, trail, sl FROM real UNION ALL SELECT 'best replay', variant, ROUND(pnl, 2), n, tp, trail, sl FROM best",
+        "queryText": "WITH s AS (SELECT variant, MAX(actual) AS actual, SUM(pnl_usd) AS pnl, COUNT(*) AS n, SUM(exit_why = 'TP' OR exit_why LIKE 'TP %') AS tp, SUM(exit_why = 'TRAIL' OR exit_why LIKE 'TRAIL%') AS trail, SUM(exit_why = 'SL' OR exit_why LIKE 'SL %') AS sl FROM setup_replay WHERE bot_id = 'hummingbot-dman-maker' AND unix_s >= $__from / 1000 AND unix_s < $__to / 1000 AND ('${coin}' = 'ALL' OR coin = '${coin}') GROUP BY variant), best AS (SELECT * FROM s WHERE actual = 0 ORDER BY pnl DESC LIMIT 1), real AS (SELECT * FROM s WHERE actual = 1) SELECT 'recorded' AS line, variant AS setup, ROUND(pnl, 2) AS \"pnl usd\", n AS trades, tp, trail, sl FROM real UNION ALL SELECT 'best replay', variant, ROUND(pnl, 2), n, tp, trail, sl FROM best"
+      }]
+    },
+    {
+      "id": 9,
+      "type": "barchart",
+      "title": "Top setups on this window",
+      "gridPos": {"h": 8, "w": 14, "x": 10, "y": 23},
+      "datasource": {"type": "frser-sqlite-datasource", "uid": "pettibon"},
+      "fieldConfig": {
+        "defaults": {"unit": "currencyUSD", "custom": {"fillOpacity": 80, "lineWidth": 1}, "color": {"mode": "continuous-GrYlRd"}, "decimals": 0},
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0,
+        "showValue": "auto",
+        "stacking": "none",
+        "groupWidth": 0.7,
+        "barWidth": 0.8,
+        "legend": {"displayMode": "list", "placement": "bottom", "showLegend": false},
+        "tooltip": {"mode": "single", "sort": "none"}
+      },
+      "targets": [{
+        "refId": "A",
+        "datasource": {"type": "frser-sqlite-datasource", "uid": "pettibon"},
+        "queryType": "table",
+        "timeColumns": [],
+        "rawQueryText": "SELECT variant AS setup, ROUND(SUM(pnl_usd), 2) AS \"pnl usd\" FROM setup_replay WHERE bot_id = 'hummingbot-dman-maker' AND unix_s >= $__from / 1000 AND unix_s < $__to / 1000 AND ('${coin}' = 'ALL' OR coin = '${coin}') GROUP BY variant ORDER BY SUM(pnl_usd) DESC LIMIT 8",
+        "queryText": "SELECT variant AS setup, ROUND(SUM(pnl_usd), 2) AS \"pnl usd\" FROM setup_replay WHERE bot_id = 'hummingbot-dman-maker' AND unix_s >= $__from / 1000 AND unix_s < $__to / 1000 AND ('${coin}' = 'ALL' OR coin = '${coin}') GROUP BY variant ORDER BY SUM(pnl_usd) DESC LIMIT 8"
+      }]
+    },
+    {
+      "id": 10,
+      "type": "table",
+      "title": "Controller snapshots",
+      "description": "A new row is stored when the DMan Maker knobs change. History starts on 2026-10-12.",
+      "gridPos": {"h": 6, "w": 24, "x": 0, "y": 31},
+      "datasource": {"type": "frser-sqlite-datasource", "uid": "pettibon"},
+      "fieldConfig": {"defaults": {"custom": {"align": "auto"}}, "overrides": []},
+      "options": {"showHeader": true, "sortBy": [{"displayName": "time", "desc": true}]},
+      "targets": [{
+        "refId": "A",
+        "datasource": {"type": "frser-sqlite-datasource", "uid": "pettibon"},
+        "queryType": "table",
+        "timeColumns": [],
+        "rawQueryText": "SELECT ts AS time, leverage_tier AS tier, printf('%.2f%%', take_profit * 100) AS \"take profit\", printf('%.2f%%', trail_activation * 100) AS \"trail arms\", printf('%.2f%%', trail_delta * 100) AS \"trail gives back\", printf('%.0f', sl_roe_pct) AS \"stop ROE %\", time_limit_s AS \"time limit s\", CASE dont_go_crazy WHEN 1 THEN 'on' ELSE 'off' END AS \"dont go crazy\", CASE after_loss_no_rebuy WHEN 1 THEN 'on' ELSE 'off' END AS \"no rebuy after loss\", bias_json AS bias, leverage_json AS leverage FROM ctrl_snaps WHERE bot_id = 'hummingbot-dman-maker' ORDER BY unix_s DESC LIMIT 20",
+        "queryText": "SELECT ts AS time, leverage_tier AS tier, printf('%.2f%%', take_profit * 100) AS \"take profit\", printf('%.2f%%', trail_activation * 100) AS \"trail arms\", printf('%.2f%%', trail_delta * 100) AS \"trail gives back\", printf('%.0f', sl_roe_pct) AS \"stop ROE %\", time_limit_s AS \"time limit s\", CASE dont_go_crazy WHEN 1 THEN 'on' ELSE 'off' END AS \"dont go crazy\", CASE after_loss_no_rebuy WHEN 1 THEN 'on' ELSE 'off' END AS \"no rebuy after loss\", bias_json AS bias, leverage_json AS leverage FROM ctrl_snaps WHERE bot_id = 'hummingbot-dman-maker' ORDER BY unix_s DESC LIMIT 20"
+      }]
+    },
+    {
+      "id": 11,
+      "type": "text",
+      "title": "How to read this",
+      "gridPos": {"h": 5, "w": 24, "x": 0, "y": 37},
+      "options": {
+        "mode": "markdown",
+        "content": "The time picker at the top right selects the window. A trade is included when its entry falls in that window. Coin defaults to LTC. The top line is the price: 15-minute candles through the one-time load, then one mid per minute from the hunter status file. The table under the totals is the entry, the exit, the profit or loss, and the controller that was saved at the time. Older rows say **not recorded yet** because controller snapshots start on 2026-10-12.\n\nThe best replay tries take-profit 1/2/3%, trail arm 0.8/1.5/2.5%, trail give-back 0.10/0.50/1.00%, and stop 10/20/40 ROE on the entries DMan Maker already took. It uses 15-minute high and low after the fill, and the minute mids after those candles run out. The label ending in **live** is the knob set saved now. Fees are left out. A trade that opens and closes inside one 15-minute candle keeps its recorded result. This screen does not invent new entries.\n\nPettibon keeps collecting on its own. The 20-second poll reads the local files and does not call Hyperliquid."
+      }
+    }
+  ]
+}

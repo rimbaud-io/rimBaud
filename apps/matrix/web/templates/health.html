@@ -1,0 +1,170 @@
+<!--
+Copyright 2026 rimbaud.io
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>rimBaud // HEALTH</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+:root {
+  --bg: #020804; --panel: #041208; --border: #0d3b1f;
+  --green: #00ff6a; --green-dim: #00b347; --text: #9dffc0; --muted: #3d7a55;
+  --rose: #ff4d6d; --cyan: #7ecbff; --gold: #f0b90b; --amber: #ffc857;
+  --font: 'IBM Plex Mono', ui-monospace, monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 13px; line-height: 1.45; }
+a { color: var(--green); text-decoration: none; }
+a:hover { color: #fff; }
+header {
+  border-bottom: 1px solid var(--border); padding: 14px 22px;
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+  background: linear-gradient(180deg, #03160a 0%, #020804 100%);
+  position: sticky; top: 0; z-index: 200; overflow: visible;
+}
+.brand { font-size: 15px; font-weight: 600; letter-spacing: 2px; color: #2A9FD6; }
+.brand span { color: var(--muted); font-weight: 400; }
+.nav { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.nav a {
+  border: 1px solid var(--border); padding: 5px 12px; color: var(--green-dim);
+  font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
+}
+.nav a.active, .nav a:hover { border-color: var(--gold); color: var(--gold); }
+.sys-dd { position: relative; z-index: 220; overflow: visible; }
+.sys-dd-btn {
+  background: #03160a; border: 1px solid var(--gold); color: var(--gold);
+  font: inherit; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; padding: 5px 12px; cursor: pointer;
+}
+.sys-dd.open .sys-dd-btn { border-color: var(--green); color: var(--green); }
+.sys-dd-menu {
+  display: none; position: absolute; top: calc(100% + 4px); left: 0; min-width: 200px;
+  background: #03160a; border: 1px solid var(--gold); padding: 4px; flex-direction: column;
+  z-index: 230; box-shadow: 0 8px 24px rgba(0,0,0,0.65);
+}
+.sys-dd.open .sys-dd-menu { display: flex; }
+.sys-dd-menu a { display: block; border: 1px solid transparent; padding: 8px 10px; color: var(--green-dim); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
+.sys-dd-menu a:hover, .sys-dd-menu a.on { border-color: var(--gold); color: var(--gold); }
+.wrap { max-width: 1280px; margin: 0 auto; padding: 18px 18px 48px; }
+.lead { color: var(--muted); margin-bottom: 16px; max-width: 920px; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 16px; }
+.kpi { background: var(--panel); border: 1px solid var(--border); padding: 12px 14px; }
+.kpi.hot { border-color: var(--rose); }
+.kpi .lbl { color: var(--muted); font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; }
+.kpi .val { margin-top: 6px; font-size: 20px; color: var(--green); }
+.kpi .val.rose { color: var(--rose); }
+.kpi .val.gold { color: var(--gold); }
+.kpi .val.cyan { color: var(--cyan); }
+.bar { height: 8px; margin-top: 8px; background: #020804; border: 1px solid var(--border); }
+.bar i { display: block; height: 100%; background: var(--green); }
+.bar.hot i { background: var(--rose); }
+.stage { position: relative; min-height: 280px; margin-top: 12px; }
+.tile {
+  position: absolute; background: var(--panel); border: 1px solid var(--border); padding: 12px 14px; width: 280px;
+}
+.tile h3 { font-size: 11px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--gold); margin-bottom: 8px; }
+.tile p { color: var(--muted); font-size: 12px; }
+.empty { color: var(--muted); padding: 24px 0; }
+</style>
+</head>
+<body>
+{% include '_nav.html' %}
+<div class="wrap">
+  <p class="lead">
+    Live desk probes. Layout comes from Wire → Canvas → Health.
+    Alerts use the max knobs on those nodes. Nothing here places orders or writes BIAS.
+    <a href="/wire/">Open Health canvas</a>
+  </p>
+  <div class="kpis" id="kpis"></div>
+  <div class="stage" id="stage"></div>
+</div>
+<script>
+function esc(s){return String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function bar(v, max, hot){
+  const p = Math.max(0, Math.min(100, Number(v)||0));
+  return `<div class="bar${hot?" hot":""}"><i style="width:${p.toFixed(1)}%"></i></div>`;
+}
+function render(d){
+  const h = (d.health && d.health.host) || {};
+  const net = (d.health && d.health.net) || {};
+  const ip = (d.health && d.health.hlip) || {};
+  const nodes = ((d.board && d.board.nodes) || []);
+  const maxOf = (kind) => {
+    const n = nodes.find(x => x.type==="health" && (x.data||{}).kind===kind);
+    return (n && n.data && n.data.max) || {};
+  };
+  const mh = maxOf("host"), mn = maxOf("net"), mi = maxOf("hlip");
+  const cpuHot = h.cpu_pct != null && mh.max_cpu != null && h.cpu_pct >= mh.max_cpu;
+  const memHot = h.mem_pct != null && mh.max_mem != null && h.mem_pct >= mh.max_mem;
+  const dskHot = h.disk_pct != null && mh.max_disk != null && h.disk_pct >= mh.max_disk;
+  const netHot = !net.ok || (net.ms != null && mn.max_ms != null && net.ms >= mn.max_ms);
+  const ipHot = ip.pct != null && mi.max_pct != null && Number(ip.pct) >= Number(mi.max_pct);
+  document.getElementById("kpis").innerHTML = `
+    <div class="kpi${cpuHot||memHot||dskHot?" hot":""}">
+      <div class="lbl">Host</div>
+      <div class="val">CPU ${h.cpu_pct??"—"}% · RAM ${h.mem_pct??"—"}% · disk ${h.disk_pct??"—"}%</div>
+      ${bar(h.cpu_pct, 100, cpuHot)}
+    </div>
+    <div class="kpi${netHot?" hot":""}">
+      <div class="lbl">Internet</div>
+      <div class="val ${net.ok?"cyan":"rose"}">${net.ok ? ("up "+(net.ms??"—")+"ms") : ("DOWN "+(net.error||""))}</div>
+    </div>
+    <div class="kpi${ipHot?" hot":""}">
+      <div class="lbl">HL tokens</div>
+      <div class="val ${ipHot?"rose":"gold"}">${ip.used??0} / ${ip.cap??1200} · ${Number(ip.pct||0).toFixed(0)}%</div>
+      ${bar(ip.pct, 100, ipHot)}
+    </div>`;
+  const stage = document.getElementById("stage");
+  const tiles = nodes.filter(n => n && (n.type==="health" || n.type==="logs" || n.type==="output" || n.type==="agent" || n.type==="backup"));
+  if (!tiles.length){
+    stage.innerHTML = `<div class="empty">Health canvas is empty. Drop Host / Internet / HL tokens, logs, Telegram or Email on Wire → Health. Live probes above still run.</div>`;
+    return;
+  }
+  let maxY = 240;
+  stage.innerHTML = tiles.map(n => {
+    const x = (n.position&&n.position.x)||0, y=(n.position&&n.position.y)||0;
+    maxY = Math.max(maxY, y+160);
+    const dta = n.data || {};
+    let body = "";
+    if (n.type==="health"){
+      const k = dta.kind || "host";
+      if (k==="host") body = `CPU ${h.cpu_pct??"—"}% (max ${dta.max&&dta.max.max_cpu??"—"})<br>RAM ${h.mem_pct??"—"}% · disk ${h.disk_pct??"—"}%`;
+      else if (k==="net") body = net.ok ? `up ${net.ms}ms · max ${dta.max&&dta.max.max_ms??"—"}ms` : `DOWN ${esc(net.error||"")}`;
+      else body = `${ip.used??0}/${ip.cap??1200} · max ${dta.max&&dta.max.max_pct??"—"}%`;
+    } else if (n.type==="backup") body = `1:1 twin placeholder · <a href="/backup">USB ReaR backup →</a>`;
+    else if (n.type==="agent") body = dta.kind==="email" ? ("mail to "+esc(dta.to||"—")+" · SMTP later") : ("Telegram "+esc(dta.name||"bot")+" · alerts, not BIAS");
+    else if (n.type==="logs" || n.type==="output") body = "stream / logs · wire ALERT here on the Health canvas";
+    else body = esc(dta.name||n.type);
+    const title = dta.name || dta.kind || n.type;
+    return `<div class="tile" style="left:${x}px;top:${y}px"><h3>${esc(title)}</h3><p>${body}</p></div>`;
+  }).join("");
+  stage.style.minHeight = maxY+"px";
+}
+async function tick(){
+  try {
+    const r = await fetch("/api/health");
+    render(await r.json());
+  } catch(e) {
+    document.getElementById("stage").innerHTML = `<div class="empty">health load failed: ${esc(e)}</div>`;
+  }
+}
+tick();
+setInterval(tick, 6000);
+</script>
+</body>
+</html>

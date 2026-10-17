@@ -1,0 +1,166 @@
+# Copyright 2026 rimbaud.io
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# V2 standard controllers — STOPPED until WIRE place. Profile v2-sleep.
+# docker compose -f docker-compose.yml -f docker-compose.v2-sleep.yml --profile v2-sleep create
+# Never started by plain `docker compose up`. Empty connectors = no HL keys.
+x-v2: &v2sleeper
+  image: hummingbot/hummingbot:latest
+  restart: "no"
+  profiles: ["v2-sleep"]
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "2"
+  tty: true
+  stdin_open: true
+  network_mode: host
+  volumes:
+    - ./conf:/home/hummingbot/conf
+    - ./conf-v2-sleep/connectors:/home/hummingbot/conf/connectors
+    - ./conf/strategies:/home/hummingbot/conf/strategies
+    - ./conf/controllers:/home/hummingbot/conf/controllers
+    - ./conf/scripts:/home/hummingbot/conf/scripts
+    - ./logs:/home/hummingbot/logs
+    - ./data:/home/hummingbot/data
+    - ./certs:/home/hummingbot/certs
+    - ./scripts:/home/hummingbot/scripts
+    - ./controllers:/home/hummingbot/controllers
+services:
+  hummingbot-v2-bollinger-v1:
+    <<: *v2sleeper
+    container_name: hummingbot-v2-bollinger-v1
+    environment:
+      - CONFIG_PASSWORD=${CONFIG_PASSWORD:-Dan2Delion}
+      - SCRIPT_CONFIG=v2_bollinger-v1.yml
+
+  hummingbot-v2-bollinger-v2:
+    <<: *v2sleeper
+    container_name: hummingbot-v2-bollinger-v2
+    environment:
+      - CONFIG_PASSWORD=${CONFIG_PASSWORD:-Dan2Delion}
+      - SCRIPT_CONFIG=v2_bollinger-v2.yml
+
+  hummingbot-v2-bollingrid:
+    <<: *v2sleeper
+    container_name: hummingbot-v2-bollingrid
+    environment:
+      - CONFIG_PASSWORD=${CONFIG_PASSWORD:-Dan2Delion}
+      - SCRIPT_CONFIG=v2_bollingrid.yml
+
+  hummingbot-v2-macd-bb:
+    <<: *v2sleeper
+    container_name: hummingbot-v2-macd-bb
+    environment:
+      - CONFIG_PASSWORD=${CONFIG_PASSWORD:-Dan2Delion}
+      - SCRIPT_CONFIG=v2_macd-bb.yml
+
+  hummingbot-v2-dman-v3:
+    <<: *v2sleeper
+    container_name: hummingbot-v2-dman-v3
+    environment:
+      - CONFIG_PASSWORD=${CONFIG_PASSWORD:-Dan2Delion}
+      - SCRIPT_CONFIG=v2_dman-v3.yml
+
+  hummingbot-v2-supertrend:
+    <<: *v2sleeper
+    container_name: hummingbot-v2-supertrend
+    environment:
+      - CONFIG_PASSWORD=${CONFIG_PASSWORD:-Dan2Delion}
+      - SCRIPT_CONFIG=v2_supertrend.yml
+
+  hummingbot-v2-ai-livestream:
+    <<: *v2sleeper
+    container_name: hummingbot-v2-ai-livestream
+    environment:
+      - CONFIG_PASSWORD=${CONFIG_PASSWORD:-Dan2Delion}
+      - SCRIPT_CONFIG=v2_ai-livestream.yml
+
+  hummingbot-v2-pmm-dynamic:
+    <<: *v2sleeper
+    container_name: hummingbot-v2-pmm-dynamic
+    environment:
+      - CONFIG_PASSWORD=${CONFIG_PASSWORD:-Dan2Delion}
+      - SCRIPT_CONFIG=v2_pmm-dynamic.yml
+
+  hummingbot-v2-grid-strike:
+    <<: *v2sleeper
+    container_name: hummingbot-v2-grid-strike
+    environment:
+      - CONFIG_PASSWORD=${CONFIG_PASSWORD:-Dan2Delion}
+      - SCRIPT_CONFIG=v2_grid-strike.yml
+
+  hummingbot-v2-multi-grid:
+    <<: *v2sleeper
+    container_name: hummingbot-v2-multi-grid
+    environment:
+      - CONFIG_PASSWORD=${CONFIG_PASSWORD:-Dan2Delion}
+      - SCRIPT_CONFIG=v2_multi-grid.yml
+
+  hummingbot-v2-stat-arb:
+    <<: *v2sleeper
+    container_name: hummingbot-v2-stat-arb
+    environment:
+      - CONFIG_PASSWORD=${CONFIG_PASSWORD:-Dan2Delion}
+      - SCRIPT_CONFIG=v2_stat-arb.yml
+
+  hummingbot-v2-hedge:
+    <<: *v2sleeper
+    container_name: hummingbot-v2-hedge
+    environment:
+      - CONFIG_PASSWORD=${CONFIG_PASSWORD:-Dan2Delion}
+      - SCRIPT_CONFIG=v2_hedge.yml
+
+  hummingbot-v2-pmm-v1:
+    <<: *v2sleeper
+    container_name: hummingbot-v2-pmm-v1
+    environment:
+      - CONFIG_PASSWORD=${CONFIG_PASSWORD:-Dan2Delion}
+      - SCRIPT_CONFIG=v2_pmm-v1.yml
+
+  hummingbot-v2-pmm-mister:
+    <<: *v2sleeper
+    container_name: hummingbot-v2-pmm-mister
+    environment:
+      - CONFIG_PASSWORD=${CONFIG_PASSWORD:-Dan2Delion}
+      - SCRIPT_CONFIG=v2_pmm-mister.yml
+
+  hummingbot-v2-qgrid:
+    <<: *v2sleeper
+    container_name: hummingbot-v2-qgrid
+    environment:
+      - CONFIG_PASSWORD=${CONFIG_PASSWORD:-Dan2Delion}
+      - SCRIPT_CONFIG=v2_qgrid.yml
+
+  hummingbot-v2-arb:
+    <<: *v2sleeper
+    container_name: hummingbot-v2-arb
+    environment:
+      - CONFIG_PASSWORD=${CONFIG_PASSWORD:-Dan2Delion}
+      - SCRIPT_CONFIG=v2_arb.yml
+
+  hummingbot-v2-xemm:
+    <<: *v2sleeper
+    container_name: hummingbot-v2-xemm
+    environment:
+      - CONFIG_PASSWORD=${CONFIG_PASSWORD:-Dan2Delion}
+      - SCRIPT_CONFIG=v2_xemm.yml
+
+  hummingbot-v2-lp:
+    <<: *v2sleeper
+    container_name: hummingbot-v2-lp
+    environment:
+      - CONFIG_PASSWORD=${CONFIG_PASSWORD:-Dan2Delion}
+      - SCRIPT_CONFIG=v2_lp.yml

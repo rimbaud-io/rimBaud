@@ -1,0 +1,342 @@
+<!--
+Copyright 2026 rimbaud.io
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>rimBaud // JANESTREET</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+:root {
+  --bg: #020804; --panel: #041208; --border: #0d3b1f;
+  --green: #00ff6a; --green-dim: #00b347; --text: #9dffc0; --muted: #3d7a55;
+  --rose: #ff4d6d; --cyan: #7ecbff; --gold: #f0b90b; --amber: #ffc857;
+  --font: 'IBM Plex Mono', ui-monospace, monospace;
+  --hour: 28px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 13px; line-height: 1.45; }
+a { color: var(--green); text-decoration: none; }
+a:hover { color: #fff; }
+.wrap { max-width: 1480px; margin: 0 auto; padding: 16px 16px 48px; }
+.banner {
+  border: 1px solid var(--gold); color: var(--gold); padding: 10px 14px; margin-bottom: 14px;
+  letter-spacing: 1px; text-transform: uppercase; font-size: 11px;
+}
+.banner b { color: var(--amber); }
+.lead { color: var(--muted); margin-bottom: 14px; max-width: 980px; }
+.palette {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  background: var(--panel); border: 1px solid var(--border); padding: 10px 12px; margin-bottom: 12px;
+}
+.palette label { color: var(--muted); font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; }
+.palette select, .palette input {
+  background: #020804; border: 1px solid var(--border); color: var(--text);
+  font: inherit; font-size: 12px; padding: 5px 8px;
+}
+.btn {
+  background: transparent; border: 1px solid var(--border); color: var(--green-dim);
+  font: inherit; font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
+  padding: 6px 10px; cursor: pointer;
+}
+.btn:hover { border-color: var(--green); color: var(--green); }
+.btn.on { border-color: var(--gold); color: var(--gold); }
+.btn.rose { border-color: var(--rose); color: var(--rose); }
+.btn.rose.on { background: rgba(255,77,109,0.12); }
+.week-wrap { overflow: auto; border: 1px solid var(--border); background: #010604; }
+.week {
+  display: grid;
+  grid-template-columns: 56px repeat(7, minmax(140px, 1fr));
+  min-width: 1040px;
+  position: relative;
+}
+.week.daily {
+  grid-template-columns: 56px 1fr;
+  min-width: 480px;
+}
+.week.daily .cell { height: 40px; }
+.days {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+}
+.hd, .hr, .cell {
+  border-right: 1px solid rgba(13,59,31,0.7);
+  border-bottom: 1px solid rgba(13,59,31,0.45);
+}
+.hd {
+  position: sticky; top: 0; z-index: 3;
+  background: #03160a; color: var(--gold); font-size: 11px; letter-spacing: 1.5px;
+  text-transform: uppercase; padding: 8px; text-align: center;
+}
+.hr {
+  color: var(--muted); font-size: 10px; padding: 0 6px;
+  height: var(--hour); display: flex; align-items: center; justify-content: flex-end;
+  background: #020804;
+}
+.cell {
+  height: var(--hour); position: relative; cursor: pointer;
+}
+.cell:hover { background: rgba(240,185,11,0.06); }
+.cell.now { background: rgba(0,255,106,0.05); }
+.block {
+  position: absolute; left: 3px; right: 3px; z-index: 2;
+  border: 1px solid; padding: 2px 5px; font-size: 10px; letter-spacing: 0.4px;
+  overflow: hidden; cursor: pointer; line-height: 1.25;
+}
+.block.bias-LONG { border-color: var(--cyan); color: var(--cyan); background: rgba(126,203,255,0.12); }
+.block.bias-FLAT { border-color: var(--amber); color: var(--amber); background: rgba(255,200,87,0.1); }
+.block.bias-SHORT { border-color: var(--rose); color: var(--rose); background: rgba(255,77,109,0.12); }
+.block.close_all { border-color: var(--rose); color: #fff; background: rgba(255,77,109,0.28); }
+.playhead {
+  position: absolute; left: 56px; right: 0; height: 2px; background: var(--green);
+  box-shadow: 0 0 8px var(--green); z-index: 4; pointer-events: none; display: none;
+}
+.log {
+  margin-top: 12px; background: var(--panel); border: 1px solid var(--border);
+  max-height: 220px; overflow: auto; padding: 8px 10px;
+}
+.log h2 { font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--gold); margin-bottom: 8px; }
+.log .row { color: var(--muted); font-size: 12px; padding: 2px 0; }
+.log .row.fire { color: var(--cyan); }
+.log .row.close { color: var(--rose); }
+.hint { color: var(--muted); font-size: 11px; margin-top: 8px; }
+</style>
+</head>
+<body>
+{% include '_nav.html' %}
+<div class="wrap">
+  <div class="banner">JaneStreet · <span id="viewLbl">weekly</span> overlay · dry run only · <b>does not trade</b> · live hummingbots / BIAS / positions unchanged</div>
+  <p class="lead" id="lead">
+    Overlay strategy changes on the week (Monday → Sunday) and by the hour.
+    Drop BIAS or CLOSE ALL on civil clock — e.g. Friday 16:00 futures close, Sunday 23:00 before Tokyo.
+    This is a score on top of the live desk, not a replacement. Play previews the overlay; nothing is sent to hunters.
+  </p>
+  <div class="palette">
+    <label>Hunter</label>
+    <select id="bot"></select>
+    <label>Action</label>
+    <button type="button" class="btn on" id="actBias" onclick="setKind('bias')">BIAS</button>
+    <button type="button" class="btn rose" id="actClose" onclick="setKind('close_all')">CLOSE ALL</button>
+    <select id="coin">
+      <option>LTC</option><option>BTC</option><option>ETH</option><option>TAO</option>
+    </select>
+    <select id="bias">
+      <option>LONG</option><option>FLAT</option><option>SHORT</option>
+    </select>
+    <label>Hours</label>
+    <input id="dur" type="number" min="0.25" max="24" step="0.25" value="1" style="width:64px">
+    <span class="days" id="dayPick" hidden></span>
+    <button type="button" class="btn" id="btnPlay" onclick="playWeek()">Play preview</button>
+    <button type="button" class="btn" onclick="stopPlay()">Stop</button>
+    <span class="hint" id="status">click an hour to overlay · click a block to delete</span>
+  </div>
+  <div class="week-wrap">
+    <div class="week" id="week"></div>
+  </div>
+  <div class="log">
+    <h2>JaneStreet preview · overlay would-fire (not sent)</h2>
+    <div id="log"><div class="row">nothing yet</div></div>
+  </div>
+</div>
+<script>
+const DAYS = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+const VIEW = {{ js_view|default('weekly')|tojson }};
+const HOUR_PX = VIEW === "daily" ? 40 : 28;
+let items = [];
+let hunters = [];
+let kind = "bias";
+let playTimer = null;
+let playMin = 0;
+let dailyDay = ((new Date().getDay() + 6) % 7);
+
+function esc(s){ return String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function hunterName(id){
+  if (!id || id === "*") return "ALL";
+  const h = hunters.find(x => x.id === id);
+  return (h && (h.name || h.id)) || id;
+}
+function setKind(k){
+  kind = k;
+  document.getElementById("actBias").classList.toggle("on", k === "bias");
+  document.getElementById("actClose").classList.toggle("on", k === "close_all");
+  document.getElementById("coin").disabled = k !== "bias";
+  document.getElementById("bias").disabled = k !== "bias";
+}
+function hhmm(min){
+  const h = Math.floor(min/60), m = min%60;
+  return String(h).padStart(2,"0")+":"+String(m).padStart(2,"0");
+}
+function buildGrid(){
+  const el = document.getElementById("week");
+  el.className = "week" + (VIEW === "daily" ? " daily" : "");
+  let html = "";
+  if (VIEW === "daily"){
+    html = `<div class="hd"></div><div class="hd">${DAYS[dailyDay]} · 24h</div>`;
+    for (let h=0; h<24; h++){
+      html += `<div class="hr">${String(h).padStart(2,"0")}:00</div>`;
+      html += `<div class="cell" data-day="${dailyDay}" data-hour="${h}" onclick="place(${dailyDay},${h})"></div>`;
+    }
+  } else {
+    html = `<div class="hd"></div>` + DAYS.map(d => `<div class="hd">${d}</div>`).join("");
+    for (let h=0; h<24; h++){
+      html += `<div class="hr">${String(h).padStart(2,"0")}:00</div>`;
+      for (let d=0; d<7; d++){
+        html += `<div class="cell" data-day="${d}" data-hour="${h}" onclick="place(${d},${h})"></div>`;
+      }
+    }
+  }
+  html += `<div class="playhead" id="playhead"></div>`;
+  el.innerHTML = html;
+  paintBlocks();
+}
+function paintBlocks(){
+  document.querySelectorAll(".block").forEach(n => n.remove());
+  const week = document.getElementById("week");
+  const shown = VIEW === "daily" ? items.filter(it => Number(it.weekday) === dailyDay) : items;
+  shown.forEach(it => {
+    const top = 36 + (Number(it.minute)/60) * HOUR_PX;
+    const h = Math.max(16, (Number(it.duration_min)||60)/60 * HOUR_PX);
+    const cls = it.kind === "close_all" ? "close_all" : ("bias-" + (it.value||"FLAT"));
+    const who = hunterName(it.bot_id);
+    const text = it.kind === "close_all"
+      ? (`CLOSE ALL · ${who}`)
+      : (`${esc(it.coin)} ${esc(it.value)} · ${esc(who)}`);
+    const b = document.createElement("div");
+    b.className = "block " + cls;
+    b.style.top = top + "px";
+    b.style.height = h + "px";
+    if (VIEW === "daily"){
+      b.style.left = "60px";
+      b.style.width = "calc(100% - 68px)";
+    } else {
+      b.style.left = `calc(56px + ${it.weekday} * ((100% - 56px)/7) + 4px)`;
+      b.style.width = `calc((100% - 56px)/7 - 8px)`;
+    }
+    b.innerHTML = hhmm(it.minute) + " " + text;
+    b.title = "click to remove this JaneStreet overlay (does not touch live)";
+    b.onclick = (e) => { e.stopPropagation(); delItem(it.id); };
+    week.appendChild(b);
+  });
+}
+async function load(){
+  const r = await fetch("/api/qa/week");
+  const d = await r.json();
+  items = d.items || [];
+  hunters = d.hunters || [];
+  const sel = document.getElementById("bot");
+  const cur = sel.value;
+  sel.innerHTML = `<option value="*">ALL hunters</option>` + hunters.map(h =>
+    `<option value="${esc(h.id)}">${esc(h.name||h.id)}</option>`
+  ).join("");
+  if (cur) sel.value = cur;
+  document.getElementById("status").textContent = d.message || "QA";
+  paintBlocks();
+}
+async function place(day, hour){
+  const body = {
+    weekday: VIEW === "daily" ? dailyDay : day,
+    minute: hour * 60,
+    duration_min: Math.round(Number(document.getElementById("dur").value||1) * 60),
+    bot_id: document.getElementById("bot").value || "*",
+    kind,
+  };
+  if (kind === "bias"){
+    body.coin = document.getElementById("coin").value;
+    body.value = document.getElementById("bias").value;
+  }
+  const r = await fetch("/api/qa/item", {
+    method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(body)
+  });
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok || !d.ok) { alert(d.error || "save failed"); return; }
+  await load();
+}
+async function delItem(id){
+  if (!confirm("Remove this JaneStreet overlay? Live hunters stay as they are.")) return;
+  await fetch("/api/qa/item/"+id, { method: "DELETE" });
+  await load();
+}
+function logLine(cls, text){
+  const box = document.getElementById("log");
+  if (box.querySelector(".row") && box.textContent.includes("nothing yet")) box.innerHTML = "";
+  const row = document.createElement("div");
+  row.className = "row " + (cls||"");
+  row.textContent = text;
+  box.prepend(row);
+}
+function stopPlay(){
+  if (playTimer) clearInterval(playTimer);
+  playTimer = null;
+  const ph = document.getElementById("playhead");
+  if (ph) ph.style.display = "none";
+}
+function playWeek(){
+  stopPlay();
+  playMin = VIEW === "daily" ? dailyDay * 24 * 60 : 0;
+  const end = VIEW === "daily" ? playMin + 24 * 60 : 7 * 24 * 60;
+  const fired = new Set();
+  const ph = document.getElementById("playhead");
+  ph.style.display = "block";
+  logLine("", "JaneStreet " + VIEW + " preview · overlay only · nothing is sent to hunters");
+  playTimer = setInterval(() => {
+    playMin += 15;
+    if (playMin >= end){
+      logLine("", "preview end");
+      stopPlay();
+      return;
+    }
+    const day = Math.floor(playMin / (24*60));
+    const min = playMin % (24*60);
+    ph.style.top = (36 + (min/60)*HOUR_PX) + "px";
+    items.forEach(it => {
+      const abs = Number(it.weekday) * 24 * 60 + Number(it.minute);
+      if (abs <= playMin - 15 || abs > playMin) return;
+      if (fired.has(it.id)) return;
+      fired.add(it.id);
+      const when = DAYS[day] + " " + hhmm(Number(it.minute));
+      if (it.kind === "close_all"){
+        logLine("close", when + " · WOULD close all on " + hunterName(it.bot_id) + " · not sent");
+      } else {
+        logLine("fire", when + " · WOULD set " + hunterName(it.bot_id) + " " + it.coin + " " + it.value + " · not sent");
+      }
+    });
+  }, 40);
+}
+(function initView(){
+  document.getElementById("viewLbl").textContent = VIEW;
+  if (VIEW === "daily"){
+    document.getElementById("lead").textContent =
+      "Daily overlay: 24 hours of one weekday. Same JaneStreet score as Weekly — pick the day, drop BIAS or CLOSE ALL on the hour. Preview only; live hunters unchanged.";
+    const pick = document.getElementById("dayPick");
+    pick.hidden = false;
+    pick.innerHTML = DAYS.map((d, i) =>
+      `<button type="button" class="btn${i===dailyDay?" on":""}" data-day="${i}">${d}</button>`
+    ).join("");
+    pick.onclick = (e) => {
+      const b = e.target.closest("button[data-day]");
+      if (!b) return;
+      dailyDay = Number(b.getAttribute("data-day"));
+      pick.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
+      buildGrid();
+    };
+  }
+  buildGrid();
+  load();
+})();
+</script>
+</body>
+</html>

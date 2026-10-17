@@ -1,0 +1,489 @@
+<!--
+Copyright 2026 rimbaud.io
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>rimBaud // LEADERS</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #0d0f14; color: #e0e0e0; font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+
+header {
+  background: #13151c; border-bottom: 1px solid #1e2130;
+  padding: 14px 28px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+}
+header h1 { font-size: 16px; font-weight: 700; color: #2A9FD6; }
+header h1 span { color: #7aa8c4; }
+.nav-link {
+  font-size: 12px; color: #4f8cff; text-decoration: none;
+  padding: 6px 14px; border: 1px solid #1e3a6e; border-radius: 8px;
+}
+.nav-link:hover { background: #1a2540; }
+
+.container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+
+/* ── section titles ── */
+.section-title {
+  font-size: 12px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.8px; color: #555; margin: 28px 0 14px;
+  display: flex; align-items: center; gap: 10px;
+}
+.section-title::after { content: ''; flex: 1; height: 1px; background: #1e2130; }
+
+/* ── config bar ── */
+.cfg-bar {
+  display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px;
+}
+.cfg-pill {
+  background: #13151c; border: 1px solid #1e2130; border-radius: 20px;
+  padding: 5px 14px; font-size: 11px; color: #888;
+}
+.cfg-pill span { color: #4f8cff; font-weight: 700; }
+
+/* ── tables ── */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+thead tr { background: #13151c; border-bottom: 2px solid #1e2130; }
+thead th {
+  padding: 9px 12px; text-align: left; font-size: 10px;
+  font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #555;
+  white-space: nowrap;
+}
+tbody tr { border-bottom: 1px solid #1a1c24; transition: background 0.15s; }
+tbody tr:hover { background: #161820; }
+tbody td { padding: 8px 12px; white-space: nowrap; }
+
+.side-long  { color: #2ecc71; font-weight: 700; }
+.side-short { color: #e74c3c; font-weight: 700; }
+.pnl-pos { color: #2ecc71; font-weight: 600; }
+.pnl-neg { color: #e74c3c; font-weight: 600; }
+.pnl-zero { color: #777; }
+.coin-tag {
+  display: inline-block; padding: 2px 8px; border-radius: 6px;
+  background: #1e2130; font-weight: 600; font-size: 11px; color: #ccc;
+}
+.badge {
+  display: inline-block; padding: 2px 8px; border-radius: 6px;
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+}
+.badge-mirror { background: #0e2d1e; color: #2ecc71; border: 1px solid #1a5c3a; }
+.badge-skip   { background: #2a1a0a; color: #e67e22; border: 1px solid #5a3a10; }
+.badge-no     { background: #1a1c24; color: #555;    border: 1px solid #2a2c34; }
+
+/* ── trader cards ── */
+.trader-card {
+  background: #13151c; border: 1px solid #1e2130; border-radius: 14px;
+  margin-bottom: 18px; overflow: hidden;
+}
+.trader-header {
+  display: flex; align-items: center; gap: 16px; padding: 16px 20px;
+  border-bottom: 1px solid #1e2130; flex-wrap: wrap;
+}
+.trader-num {
+  font-size: 22px; font-weight: 900; color: #4f8cff; min-width: 40px;
+  display: flex; align-items: center; gap: 10px;
+}
+.lamp {
+  display: inline-block; width: 12px; height: 12px; border-radius: 50%;
+  box-shadow: 0 0 8px currentColor; flex-shrink: 0;
+}
+.lamp.on { background: #2ecc71; color: #2ecc71; animation: pulse 1.8s infinite; }
+.lamp.off { background: #e74c3c; color: #e74c3c; }
+.trader-addr {
+  font-family: monospace; font-size: 11px; color: #888;
+  word-break: break-all;
+}
+.trader-meta { display: flex; gap: 10px; flex-wrap: wrap; margin-left: auto; }
+.meta-pill {
+  background: #0d0f14; border: 1px solid #1e2130; border-radius: 20px;
+  padding: 4px 12px; font-size: 11px; color: #888;
+}
+.meta-pill span { color: #e0e0e0; font-weight: 700; }
+.meta-pill.active span { color: #2ecc71; }
+.trader-body { padding: 16px 20px; }
+.no-pos { color: #444; font-size: 12px; padding: 8px 0; }
+.error-msg { color: #e74c3c; font-size: 12px; padding: 8px 0; }
+
+/* ── active mirrors grid ── */
+.mirrors-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+  margin-bottom: 10px;
+}
+.mirror-card {
+  background: #0d0f14; border: 1px solid #1e2130; border-radius: 12px;
+  padding: 14px 16px;
+}
+.mirror-card .mc-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.mirror-card .mc-coin { font-size: 18px; font-weight: 800; color: #e0e0e0; }
+.mirror-card .mc-side { font-size: 12px; font-weight: 700; padding: 2px 10px; border-radius: 6px; }
+.mc-side.long  { background: #0e2d1e; color: #2ecc71; }
+.mc-side.short { background: #2d0e0e; color: #e74c3c; }
+.mirror-card .mc-row {
+  display: flex; justify-content: space-between;
+  font-size: 11px; color: #888; padding: 3px 0;
+  border-bottom: 1px solid #1a1c24;
+}
+.mirror-card .mc-row:last-child { border-bottom: none; }
+.mirror-card .mc-row .mc-val { color: #ccc; font-weight: 600; }
+.btn-close-m {
+  margin-top: 10px; width: 100%;
+  background: transparent; border: 1px solid #e74c3c; color: #e74c3c;
+  font-family: inherit; font-size: 11px; font-weight: 700;
+  letter-spacing: 1px; text-transform: uppercase;
+  padding: 7px 10px; border-radius: 6px; cursor: pointer;
+}
+.btn-close-m:hover:not(:disabled) { background: rgba(231,76,60,0.12); color: #fff; }
+.btn-close-m:disabled { opacity: 0.5; cursor: wait; }
+.mc-pnl-pos { color: #2ecc71 !important; }
+.mc-pnl-neg { color: #e74c3c !important; }
+
+.empty-mirrors { color: #444; font-size: 13px; padding: 24px; text-align: center; background: #13151c; border-radius: 12px; }
+
+.dot { width: 7px; height: 7px; border-radius: 50%; background: #2ecc71; animation: pulse 2s infinite; display: inline-block; margin-right: 6px; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.refresh-btn {
+  background: #1a2540; border: 1px solid #1e3a6e; color: #4f8cff;
+  border-radius: 8px; padding: 7px 14px; font-size: 12px; cursor: pointer;
+}
+.refresh-btn:hover { background: #1e3060; }
+.loading { color: #444; font-size: 13px; text-align: center; padding: 40px; }
+
+.followed-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
+  margin-bottom: 8px;
+}
+.followed-card {
+  background: #13151c; border: 1px solid #1e2130; border-radius: 14px;
+  padding: 16px 18px;
+}
+.followed-card.off { opacity: 0.72; border-color: #3a2030; }
+.followed-top {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap;
+}
+.followed-t { font-size: 18px; font-weight: 900; color: #4f8cff; }
+.followed-title { font-size: 13px; font-weight: 700; color: #e0e0e0; }
+.followed-why {
+  font-size: 12px; color: #9aa3b5; line-height: 1.5;
+  white-space: normal; word-break: break-word;
+}
+.followed-meta { font-size: 10px; color: #555; margin-top: 10px; letter-spacing: 0.4px; }
+.badge-follow { background: #0e2d1e; color: #2ecc71; border: 1px solid #1a5c3a; }
+.badge-unf { background: #2d0e0e; color: #e74c3c; border: 1px solid #5c1a1a; }
+</style>
+</head>
+<body>
+
+{% include '_nav.html' %}
+
+<div class="container">
+
+  <!-- Config bar -->
+  <div class="cfg-bar" id="cfg-bar"></div>
+
+  <div class="section-title">Followed leaders <span id="followed-count" style="color:#4f8cff;font-size:11px;font-weight:400;text-transform:none;letter-spacing:0;"></span></div>
+  <div id="followed-section"><div class="loading">Loading…</div></div>
+
+  <!-- Active mirrors -->
+  <div class="section-title">Active Mirrors <span id="mirror-count" style="color:#4f8cff;font-size:11px;font-weight:400;text-transform:none;letter-spacing:0;"></span></div>
+  <div id="mirrors-section"><div class="loading">Loading…</div></div>
+
+  <!-- Trader audit -->
+  <div class="section-title">Trader Audit</div>
+  <div id="traders-section"><div class="loading">Loading…</div></div>
+
+</div>
+
+<script>
+let data = null;
+
+function renderFollowed(payload) {
+  const traders = (payload && payload.traders) || [];
+  const followed = (payload && payload.followed) || traders.filter(t => t.followed !== false);
+  document.getElementById('followed-count').textContent =
+    followed.length ? `(${followed.length} of ${traders.length})` : '';
+  document.getElementById('followed-section').innerHTML = followed.length
+    ? `<div class="followed-grid">${followed.map(t => {
+        const why = t.why || 'On the Copy roster.';
+        const asked = t.why_asked ? ' · asked ' + t.why_asked : '';
+        return `<div class="followed-card${t.unfollowed ? ' off' : ''}">
+          <div class="followed-top">
+            <span class="lamp ${t.alive === false || t.error ? 'off' : 'on'}"></span>
+            <span class="followed-t">T#${t.num}</span>
+            <span class="followed-title">${esc(t.why_title || ('Trader ' + t.num))}</span>
+            <span class="badge ${t.unfollowed ? 'badge-unf' : 'badge-follow'}" style="margin-left:auto">
+              ${t.unfollowed ? 'unfollowed' : 'following'}
+            </span>
+          </div>
+          <div class="trader-addr" style="margin-bottom:8px">${esc(t.address)}</div>
+          <div class="followed-why">${esc(why)}</div>
+          <div class="followed-meta">${t.mirroring != null ? (t.mirroring + ' mirrors · ') : ''}${esc(t.why_source || 'chat')}${asked}</div>
+        </div>`;
+      }).join('')}</div>`
+    : '<div class="empty-mirrors">No followed leaders on the Copy roster</div>';
+}
+
+async function loadFollowed() {
+  try {
+    const r = await fetch('/api/traders/followed');
+    const d = await r.json();
+    renderFollowed(d);
+    const cfg = d.config || {};
+    if (!data) {
+      document.getElementById('cfg-bar').innerHTML = [
+        ['Min Leverage', cfg.min_leverage + 'x'],
+        ['Max Leverage', cfg.max_leverage + 'x'],
+        ['Min Positions', cfg.min_open_positions],
+        ['Allocation', ((cfg.allocation_pct || 0) * 100).toFixed(0) + '%'],
+        ['Traders', (d.traders || []).length],
+      ].map(([k,v]) => `<div class="cfg-pill">${k}: <span>${v}</span></div>`).join('');
+    }
+  } catch (e) {
+    document.getElementById('followed-section').innerHTML =
+      '<div class="empty-mirrors">Failed to load followed leaders</div>';
+  }
+}
+
+async function load() {
+  document.getElementById('last-update').innerHTML = '<span class="dot"></span>Refreshing…';
+  loadFollowed();
+  try {
+    const r = await fetch('/api/traders');
+    data = await r.json();
+    render();
+    document.getElementById('last-update').innerHTML =
+      '<span class="dot"></span>Updated ' + new Date().toLocaleTimeString();
+  } catch(e) {
+    document.getElementById('mirrors-section').innerHTML =
+      '<div class="empty-mirrors">Failed to load data</div>';
+  }
+}
+
+async function closeMirror(coin, btn) {
+  if (!coin) return;
+  if (!confirm('Market-close ' + coin + ' now?')) return;
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+  try {
+    const r = await fetch('/api/hl_close', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ coin }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    if (btn) btn.textContent = 'Signal sent';
+    setTimeout(load, 2500);
+  } catch (e) {
+    alert('Close failed: ' + e.message);
+    if (btn) { btn.disabled = false; btn.textContent = 'Close position'; }
+  }
+}
+
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function fmt_px(v) {
+  if (!v && v !== 0) return '—';
+  if (v >= 1000) return '$' + v.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  if (v >= 1)    return '$' + v.toFixed(4);
+  return '$' + v.toFixed(6);
+}
+
+function fmt_dt(s) {
+  if (!s || s === '?') return '—';
+  return s.replace(' UTC','').replace('T',' ');
+}
+
+function pnl_class(v) {
+  if (v > 0.01) return 'pnl-pos';
+  if (v < -0.01) return 'pnl-neg';
+  return 'pnl-zero';
+}
+
+function render() {
+  if (!data) return;
+
+  // Config bar
+  const cfg = data.config || {};
+  document.getElementById('cfg-bar').innerHTML = [
+    ['Min Leverage', cfg.min_leverage + 'x'],
+    ['Max Leverage', cfg.max_leverage + 'x'],
+    ['Min Positions', cfg.min_open_positions],
+    ['Allocation', (cfg.allocation_pct * 100).toFixed(0) + '%'],
+    ['Traders', data.traders.length],
+  ].map(([k,v]) => `<div class="cfg-pill">${k}: <span>${v}</span></div>`).join('');
+
+  renderFollowed(data);
+
+  // Active mirrors
+  const mirrors = data.mirrors || [];
+  document.getElementById('mirror-count').textContent =
+    mirrors.length ? `(${mirrors.length} open)` : '(none)';
+
+  if (mirrors.length === 0) {
+    document.getElementById('mirrors-section').innerHTML =
+      '<div class="empty-mirrors">No active mirrors — bot is flat</div>';
+  } else {
+    const cards = mirrors.map(m => {
+      const pnlPct  = m.pnl_pct != null ? ((m.pnl_pct > 0 ? '+' : '') + m.pnl_pct.toFixed(2) + '%') : '—';
+      const pnlUsd  = m.pnl_usd != null ? ((m.pnl_usd >= 0 ? '+$' : '-$') + Math.abs(m.pnl_usd).toFixed(2)) : '—';
+      const pnlCls  = m.pnl_pct != null ? (m.pnl_pct > 0 ? 'mc-pnl-pos' : m.pnl_pct < 0 ? 'mc-pnl-neg' : '') : '';
+      const trader  = matchMirrorToTrader(m, data.traders);
+      return `
+      <div class="mirror-card">
+        <div class="mc-header">
+          <div class="mc-coin">${m.coin}</div>
+          <div class="mc-side ${m.side.toLowerCase()}">${m.side}</div>
+          ${trader ? `<div style="margin-left:auto;font-size:10px;color:#4f8cff;font-weight:700;">T#${trader}</div>` : ''}
+        </div>
+        <div class="mc-row"><span>Entry</span><span class="mc-val">${fmt_px(m.entry_px)}</span></div>
+        <div class="mc-row"><span>Current</span><span class="mc-val">${fmt_px(m.current_px)}</span></div>
+        <div class="mc-row"><span>Unrealized</span><span class="mc-val ${pnlCls}">${pnlPct} / ${pnlUsd}</span></div>
+        <div class="mc-row"><span>Margin</span><span class="mc-val">$${m.margin.toFixed(2)}</span></div>
+        <div class="mc-row"><span>Leverage</span><span class="mc-val">${m.leverage}x</span></div>
+        <div class="mc-row"><span>Size</span><span class="mc-val">${m.size.toFixed(4)}</span></div>
+        <div class="mc-row"><span>Opened</span><span class="mc-val" style="color:#555">${fmt_dt(m.open_time)}</span></div>
+        <button type="button" class="btn-close-m"
+                onclick='closeMirror(${JSON.stringify(m.coin)}, this)'>Close position</button>
+      </div>`;
+    }).join('');
+    document.getElementById('mirrors-section').innerHTML =
+      `<div class="mirrors-grid">${cards}</div>`;
+  }
+
+  // Trader audit
+  const traders = data.traders || [];
+  let html = '';
+  for (const t of traders) {
+    const positions = t.positions || [];
+    const capStr = t.cap != null ? `cap: ${t.cap}` : 'no cap';
+
+    html += `
+    <div class="trader-card">
+      <div class="trader-header">
+        <div class="trader-num">
+          <span class="lamp ${t.alive !== false && !t.error ? 'on' : 'off'}"
+                title="${t.alive !== false && !t.error ? 'alive on Hyperliquid' : 'NOT reachable on Hyperliquid'}"></span>
+          #${t.num}
+        </div>
+        <div>
+          <div style="font-size:13px;font-weight:700;color:#e0e0e0;margin-bottom:4px;">
+            ${esc(t.why_title || ('Trader ' + t.num))}
+            <span style="font-size:10px;letter-spacing:1px;margin-left:8px;color:${t.alive !== false && !t.error ? '#2ecc71' : '#e74c3c'}">
+              ${t.alive !== false && !t.error ? 'LIVE' : 'DOWN'}
+            </span>
+            <span class="badge ${t.unfollowed ? 'badge-unf' : 'badge-follow'}" style="margin-left:8px">
+              ${t.unfollowed ? 'unfollowed' : 'following'}
+            </span>
+          </div>
+          <div class="trader-addr">${esc(t.address)}</div>
+          ${t.why ? `<div class="followed-why" style="max-width:640px;margin-top:6px">${esc(t.why)}${t.why_asked ? ' <span style="color:#555">· asked ' + esc(t.why_asked) + '</span>' : ''}</div>` : ''}
+        </div>
+        <div class="trader-meta">
+          <div class="meta-pill ${positions.length > 0 ? 'active' : ''}">
+            Positions open: <span>${t.error ? '?' : positions.length}</span>
+          </div>
+          <div class="meta-pill active">
+            We mirror: <span>${t.mirroring}</span>
+          </div>
+          <div class="meta-pill">
+            Cap: <span>${t.cap != null ? t.cap : '∞'}</span>
+          </div>
+          <div class="meta-pill">
+            Signals: <span>${t.history.opens} opens / ${t.history.closes} closes</span>
+          </div>
+        </div>
+      </div>
+      <div class="trader-body">`;
+
+    if (t.error) {
+      html += `<div class="error-msg">⚠ Failed to fetch positions from Hyperliquid API</div>`;
+    } else if (positions.length === 0) {
+      html += `<div class="no-pos">No open positions</div>`;
+    } else {
+      html += `
+        <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Coin</th><th>Side</th><th>Size</th>
+            <th>Entry</th><th>Current</th><th>Unrealized PnL</th>
+            <th>Leverage</th><th>Status</th>
+          </tr></thead>
+          <tbody>`;
+      for (const p of positions) {
+        const cur     = p.current_px;
+        let upnlPct   = null;
+        if (cur && p.entry_px > 0) {
+          upnlPct = p.side === 'LONG'
+            ? (cur - p.entry_px) / p.entry_px * 100 * p.leverage
+            : (p.entry_px - cur) / p.entry_px * 100 * p.leverage;
+        }
+        const upnlStr = upnlPct != null
+          ? (upnlPct > 0 ? '+' : '') + upnlPct.toFixed(2) + '%'
+          : (p.unrealized_pnl != null ? (p.unrealized_pnl >= 0 ? '+' : '') + '$' + p.unrealized_pnl.toFixed(2) : '—');
+        const upnlCls = upnlPct != null ? pnl_class(upnlPct) : '';
+
+        let statusBadge;
+        if (p.mirrored) {
+          statusBadge = '<span class="badge badge-mirror">✓ Mirroring</span>';
+        } else {
+          // Check if coin is in our mirrors but different side, or just not tracked
+          statusBadge = '<span class="badge badge-no">Not Copied</span>';
+        }
+
+        html += `
+          <tr>
+            <td><span class="coin-tag">${p.coin}</span></td>
+            <td class="${p.side === 'LONG' ? 'side-long' : 'side-short'}">${p.side}</td>
+            <td>${p.size.toFixed(4)}</td>
+            <td>${fmt_px(p.entry_px)}</td>
+            <td>${fmt_px(cur)}</td>
+            <td class="${upnlCls}">${upnlStr}</td>
+            <td style="color:#777">${p.leverage}x</td>
+            <td>${statusBadge}</td>
+          </tr>`;
+      }
+      html += `</tbody></table></div>`;
+    }
+
+    html += `</div></div>`;
+  }
+
+  document.getElementById('traders-section').innerHTML = html || '<div class="loading">No traders configured</div>';
+}
+
+function matchMirrorToTrader(mirror, traders) {
+  for (const t of traders) {
+    if (!t.positions) continue;
+    for (const p of t.positions) {
+      if (p.coin === mirror.coin && p.side === mirror.side) return t.num;
+    }
+  }
+  return null;
+}
+
+load();
+setInterval(load, 15000);
+</script>
+</body>
+</html>

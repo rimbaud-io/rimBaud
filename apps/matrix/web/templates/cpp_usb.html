@@ -1,0 +1,207 @@
+<!--
+Copyright 2026 rimbaud.io
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>rimBaud // C++ USB</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+:root {
+  --bg: #020804; --panel: #041208; --border: #0d3b1f;
+  --green: #00ff6a; --green-dim: #00b347; --text: #9dffc0; --muted: #3d7a55;
+  --rose: #ff4d6d; --cyan: #7ecbff; --gold: #f0b90b; --amber: #ffc857;
+  --font: 'IBM Plex Mono', 'Share Tech Mono', ui-monospace, monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg); color: var(--text); font-family: var(--font); font-size: 13px; line-height: 1.45;
+  background-image: linear-gradient(rgba(0,255,106,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,255,106,0.03) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+a { color: var(--green); text-decoration: none; }
+a:hover { color: #fff; }
+.wrap { max-width: 860px; margin: 0 auto; padding: 18px 18px 48px; }
+.lead { color: var(--muted); margin-bottom: 16px; }
+.card { background: var(--panel); border: 1px solid var(--border); margin-bottom: 14px; padding: 14px; }
+.card h2 { font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: var(--gold); margin-bottom: 10px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 8px 0; }
+label { color: var(--muted); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
+select {
+  background: #020804; border: 1px solid var(--border); color: var(--text);
+  font-family: inherit; font-size: 13px; padding: 6px 8px; min-width: 280px;
+}
+button.primary {
+  background: transparent; border: 1px solid var(--green); color: var(--green);
+  font-family: inherit; font-size: 12px; letter-spacing: 1px; text-transform: uppercase;
+  padding: 10px 16px; cursor: pointer;
+}
+button.primary:hover:not(:disabled) { background: rgba(0,255,106,0.08); }
+button.primary:disabled { opacity: 0.45; cursor: wait; }
+.meta { color: var(--muted); font-size: 12px; }
+.ok { color: var(--green); }
+.bad { color: var(--rose); }
+.warn { color: var(--amber); font-size: 12px; margin-top: 8px; }
+pre {
+  background: #010402; border: 1px solid var(--border); padding: 10px 12px;
+  max-height: 280px; overflow: auto; color: var(--muted); font-size: 11px;
+  white-space: pre-wrap; margin-top: 10px; min-height: 80px;
+}
+ul.kit { color: var(--text); margin: 6px 0 0 18px; }
+ul.kit li { margin: 3px 0; }
+</style>
+</head>
+<body>
+{% include '_nav.html' %}
+<div class="wrap">
+  <p class="lead">
+    Pack the same desk onto a <b>mounted USB stick</b>: C++ server + matrix, eight hunter
+    scripts, compose, Hyperliquid patches, and the hummingbot Docker image.
+    <b>Same settings — empty wallets.</b> The other machine must add a
+    <b>new Hyperliquid account</b>. Live-desk keys stay off the stick.
+    This does <b>not</b> format the stick and does <b>not</b> close Hyperliquid positions.
+    NVMe and the system disk are blocked.
+  </p>
+  <div class="card">
+    <h2>On the stick</h2>
+    <ul class="kit">
+      <li>C++ server / matrix / install.sh</li>
+      <li>Copy, PMM Simple, Helliot, Surfn, Shortn, DMan, Only Up, DMan Maker (up-only wrapper)</li>
+      <li>hummingbot/hummingbot:latest image (~1.4G)</li>
+      <li>strategy yml + registry + SL/ctrl — empty bot_accounts, no keys, no matrix.db</li>
+    </ul>
+    <p class="warn">On the other machine: copy the folder to disk, read START.txt and KEYS.txt. Create a NEW Hyperliquid account. Do not ARM two desks.</p>
+  </div>
+  <div class="card">
+    <h2>Source</h2>
+    <div class="meta" id="srcLine">looking for c++/install …</div>
+  </div>
+  <div class="card">
+    <h2>USB stick (mounted)</h2>
+    <div class="row">
+      <label>Mount</label>
+      <select id="disk"></select>
+      <button type="button" class="primary" onclick="loadStatus()">Refresh</button>
+    </div>
+    <p class="warn">Plug the stick in and mount it (Files / Nautilus). Needs ~2.5G free. Unmounted disks cannot receive a folder copy.</p>
+  </div>
+  <div class="card">
+    <h2>Copy</h2>
+    <div class="row">
+      <button type="button" class="primary" id="btnGo" onclick="startCopy()">Pack desk onto USB</button>
+    </div>
+    <div class="meta" id="jobLine">idle</div>
+    <pre id="log">ready</pre>
+  </div>
+</div>
+<script>
+let pollTimer = null;
+function fmtSize(n){
+  n = Number(n||0);
+  if (n > 1e9) return (n/1e9).toFixed(1)+"G";
+  if (n > 1e6) return (n/1e6).toFixed(0)+"M";
+  return n+"B";
+}
+function esc(s){
+  return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
+}
+function renderJob(job){
+  const line = document.getElementById("jobLine");
+  const log = document.getElementById("log");
+  const btn = document.getElementById("btnGo");
+  job = job || {};
+  const st = job.status || "idle";
+  if (st === "running") {
+    line.className = "meta";
+    line.textContent = "packing… " + (job.dest || "");
+    btn.disabled = true;
+  } else if (st === "done") {
+    line.className = "meta ok";
+    line.textContent = "done " + (job.dest || "") + (job.size ? " ("+job.size+")" : "");
+    btn.disabled = false;
+  } else if (st === "error") {
+    line.className = "meta bad";
+    line.textContent = "failed: " + (job.error || "pack failed");
+    btn.disabled = false;
+  } else {
+    line.className = "meta";
+    line.textContent = "idle";
+    btn.disabled = false;
+  }
+  const rows = (job.log || []).slice(-40);
+  if (rows.length) log.textContent = rows.join("\n");
+}
+async function loadStatus(){
+  const r = await fetch("/api/cpp_usb");
+  const d = await r.json();
+  const src = document.getElementById("srcLine");
+  if (d.source_ok) {
+    src.className = "meta ok";
+    src.textContent = "kit: " + d.source;
+  } else {
+    src.className = "meta bad";
+    src.textContent = "c++ kit not found on host — build it under hummingbot/c++ first";
+  }
+  const sel = document.getElementById("disk");
+  const cur = sel.value;
+  const mounts = d.mounts || [];
+  sel.innerHTML = mounts.length
+    ? mounts.map(x => `<option value="${esc(x.mount)}">${esc(x.mount)} · ${x.name} · ${fmtSize(x.avail||x.size)} free · ${esc(x.model)}${x.label?" · "+esc(x.label):""}</option>`).join("")
+    : `<option value="">no mounted USB stick</option>`;
+  if (cur && [...sel.options].some(o => o.value===cur)) sel.value = cur;
+  if (d.error && !(d.job && (d.job.log||[]).length)) document.getElementById("log").textContent = d.error;
+  renderJob(d.job);
+  const running = d.job && d.job.status === "running";
+  if (running && !pollTimer) pollTimer = setInterval(loadStatus, 2000);
+  if (!running && pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+}
+async function startCopy(){
+  const mount = document.getElementById("disk").value;
+  if (!mount) { alert("Mount a USB stick first."); return; }
+  if (!confirm("Pack the desk onto:\n" + mount + "/freiquell-cpp\n\nIncludes the hummingbot image (~1.4G).\nDoes not format the stick.\nDoes not copy wallets or keys.\nDoes not close positions.")) return;
+  const btn = document.getElementById("btnGo");
+  btn.disabled = true;
+  document.getElementById("jobLine").textContent = "packing…";
+  document.getElementById("log").textContent = "packing to " + mount + " …";
+  try {
+    const r = await fetch("/api/cpp_usb/copy", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mount }),
+    });
+    const d = await r.json();
+    if (d.job) renderJob(d.job);
+    else {
+      document.getElementById("jobLine").textContent = d.ok ? "queued" : "failed";
+      document.getElementById("jobLine").className = "meta " + (d.ok ? "ok" : "bad");
+      document.getElementById("log").textContent = d.message || d.error || JSON.stringify(d, null, 2);
+    }
+    if (!pollTimer) pollTimer = setInterval(loadStatus, 2000);
+    loadStatus();
+  } catch (e) {
+    document.getElementById("jobLine").textContent = "failed";
+    document.getElementById("jobLine").className = "meta bad";
+    document.getElementById("log").textContent = String(e);
+    btn.disabled = false;
+  }
+}
+loadStatus();
+</script>
+</body>
+</html>

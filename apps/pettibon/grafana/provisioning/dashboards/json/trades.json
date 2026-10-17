@@ -1,0 +1,89 @@
+{
+  "uid": "pettibon-trades",
+  "title": "Pettibon trades",
+  "tags": ["pettibon", "hummingbot"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": {"from": "now-120d", "to": "now"},
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "panels": [
+    {
+      "id": 1, "type": "stat", "title": "Wins",
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+      "datasource": {"type": "frser-sqlite-datasource", "uid": "pettibon"},
+      "fieldConfig": {"defaults": {"color": {"mode": "fixed", "fixedColor": "green"}, "decimals": 0}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "value", "graphMode": "none", "textMode": "value"},
+      "targets": [{"refId": "A", "datasource": {"type": "frser-sqlite-datasource", "uid": "pettibon"}, "queryType": "table", "timeColumns": [], "rawQueryText": "SELECT SUM(result = 'WIN') AS wins FROM trade_closes WHERE unix_s >= $__from / 1000 AND unix_s < $__to / 1000", "queryText": "SELECT SUM(result = 'WIN') AS wins FROM trade_closes WHERE unix_s >= $__from / 1000 AND unix_s < $__to / 1000"}]
+    },
+    {
+      "id": 2, "type": "stat", "title": "Losses",
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+      "datasource": {"type": "frser-sqlite-datasource", "uid": "pettibon"},
+      "fieldConfig": {"defaults": {"color": {"mode": "fixed", "fixedColor": "red"}, "decimals": 0}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "value", "graphMode": "none", "textMode": "value"},
+      "targets": [{"refId": "A", "datasource": {"type": "frser-sqlite-datasource", "uid": "pettibon"}, "queryType": "table", "timeColumns": [], "rawQueryText": "SELECT SUM(result = 'LOSS') AS losses FROM trade_closes WHERE unix_s >= $__from / 1000 AND unix_s < $__to / 1000", "queryText": "SELECT SUM(result = 'LOSS') AS losses FROM trade_closes WHERE unix_s >= $__from / 1000 AND unix_s < $__to / 1000"}]
+    },
+    {
+      "id": 3, "type": "stat", "title": "Realized USD",
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+      "datasource": {"type": "frser-sqlite-datasource", "uid": "pettibon"},
+      "fieldConfig": {"defaults": {"decimals": 2, "unit": "currencyUSD", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 0}]}}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "value", "graphMode": "none", "textMode": "value"},
+      "targets": [{"refId": "A", "datasource": {"type": "frser-sqlite-datasource", "uid": "pettibon"}, "queryType": "table", "timeColumns": [], "rawQueryText": "SELECT ROUND(COALESCE(SUM(pnl_usd), 0), 2) AS realized FROM trade_closes WHERE result != 'UNKNOWN' AND unix_s >= $__from / 1000 AND unix_s < $__to / 1000", "queryText": "SELECT ROUND(COALESCE(SUM(pnl_usd), 0), 2) AS realized FROM trade_closes WHERE result != 'UNKNOWN' AND unix_s >= $__from / 1000 AND unix_s < $__to / 1000"}]
+    },
+    {
+      "id": 4, "type": "stat", "title": "Closes with no dollar pnl",
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+      "datasource": {"type": "frser-sqlite-datasource", "uid": "pettibon"},
+      "fieldConfig": {"defaults": {"color": {"mode": "fixed", "fixedColor": "orange"}, "decimals": 0}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "colorMode": "value", "graphMode": "none", "textMode": "value"},
+      "targets": [{"refId": "A", "datasource": {"type": "frser-sqlite-datasource", "uid": "pettibon"}, "queryType": "table", "timeColumns": [], "rawQueryText": "SELECT SUM(result = 'UNKNOWN') AS unknown FROM trade_closes WHERE unix_s >= $__from / 1000 AND unix_s < $__to / 1000", "queryText": "SELECT SUM(result = 'UNKNOWN') AS unknown FROM trade_closes WHERE unix_s >= $__from / 1000 AND unix_s < $__to / 1000"}]
+    },
+    {
+      "id": 5, "type": "table", "title": "Win and loss by hummingbot",
+      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 4},
+      "datasource": {"type": "frser-sqlite-datasource", "uid": "pettibon"},
+      "fieldConfig": {"defaults": {"custom": {"align": "auto"}}, "overrides": [
+        {"matcher": {"id": "byName", "options": "realized usd"}, "properties": [{"id": "unit", "value": "currencyUSD"}, {"id": "decimals", "value": 2}, {"id": "custom.cellOptions", "value": {"type": "color-text"}}, {"id": "thresholds", "value": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 0}]}}]},
+        {"matcher": {"id": "byName", "options": "wins"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}]},
+        {"matcher": {"id": "byName", "options": "losses"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]}
+      ]},
+      "options": {"showHeader": true, "sortBy": [{"displayName": "realized usd", "desc": true}]},
+      "targets": [{"refId": "A", "datasource": {"type": "frser-sqlite-datasource", "uid": "pettibon"}, "queryType": "table", "timeColumns": [], "rawQueryText": "SELECT matrix, hunter, SUM(result = 'WIN') AS wins, SUM(result = 'LOSS') AS losses, SUM(result = 'UNKNOWN') AS \"no dollar pnl\", ROUND(100.0 * SUM(result = 'WIN') / NULLIF(SUM(result IN ('WIN', 'LOSS')), 0), 1) AS \"win %\", ROUND(COALESCE(SUM(pnl_usd), 0), 2) AS \"realized usd\", ROUND(AVG(CASE WHEN result = 'WIN' THEN pnl_usd END), 2) AS \"avg win\", ROUND(AVG(CASE WHEN result = 'LOSS' THEN pnl_usd END), 2) AS \"avg loss\", SUM(result != 'UNKNOWN') AS closes FROM trade_closes WHERE unix_s >= $__from / 1000 AND unix_s < $__to / 1000 GROUP BY matrix, hunter ORDER BY \"realized usd\" DESC", "queryText": "SELECT matrix, hunter, SUM(result = 'WIN') AS wins, SUM(result = 'LOSS') AS losses, SUM(result = 'UNKNOWN') AS \"no dollar pnl\", ROUND(100.0 * SUM(result = 'WIN') / NULLIF(SUM(result IN ('WIN', 'LOSS')), 0), 1) AS \"win %\", ROUND(COALESCE(SUM(pnl_usd), 0), 2) AS \"realized usd\", ROUND(AVG(CASE WHEN result = 'WIN' THEN pnl_usd END), 2) AS \"avg win\", ROUND(AVG(CASE WHEN result = 'LOSS' THEN pnl_usd END), 2) AS \"avg loss\", SUM(result != 'UNKNOWN') AS closes FROM trade_closes WHERE unix_s >= $__from / 1000 AND unix_s < $__to / 1000 GROUP BY matrix, hunter ORDER BY \"realized usd\" DESC"}]
+    },
+    {
+      "id": 6, "type": "barchart", "title": "Wins and losses",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 14},
+      "datasource": {"type": "frser-sqlite-datasource", "uid": "pettibon"},
+      "fieldConfig": {"defaults": {"custom": {"fillOpacity": 80, "lineWidth": 1}, "color": {"mode": "palette-classic"}}, "overrides": [
+        {"matcher": {"id": "byName", "options": "wins"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}]},
+        {"matcher": {"id": "byName", "options": "losses"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]}
+      ]},
+      "options": {"orientation": "horizontal", "xTickLabelRotation": 0, "xTickLabelSpacing": 0, "showValue": "auto", "stacking": "none", "groupWidth": 0.7, "barWidth": 0.8, "legend": {"displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "none"}},
+      "targets": [{"refId": "A", "datasource": {"type": "frser-sqlite-datasource", "uid": "pettibon"}, "queryType": "table", "timeColumns": [], "rawQueryText": "SELECT matrix || ' ' || hunter AS hunter, SUM(result = 'WIN') AS wins, SUM(result = 'LOSS') AS losses FROM trade_closes WHERE unix_s >= $__from / 1000 AND unix_s < $__to / 1000 GROUP BY matrix, hunter ORDER BY wins + losses DESC", "queryText": "SELECT matrix || ' ' || hunter AS hunter, SUM(result = 'WIN') AS wins, SUM(result = 'LOSS') AS losses FROM trade_closes WHERE unix_s >= $__from / 1000 AND unix_s < $__to / 1000 GROUP BY matrix, hunter ORDER BY wins + losses DESC"}]
+    },
+    {
+      "id": 7, "type": "timeseries", "title": "Realized pnl, running total",
+      "gridPos": {"h": 9, "w": 24, "x": 0, "y": 22},
+      "datasource": {"type": "frser-sqlite-datasource", "uid": "pettibon"},
+      "fieldConfig": {"defaults": {"unit": "currencyUSD", "custom": {"drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "spanNulls": true}}, "overrides": []},
+      "options": {"legend": {"displayMode": "table", "placement": "right", "showLegend": true, "calcs": ["lastNotNull"]}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "transformations": [{"id": "partitionByValues", "options": {"fields": ["hunter"], "keepFields": false}}],
+      "targets": [{"refId": "A", "datasource": {"type": "frser-sqlite-datasource", "uid": "pettibon"}, "queryType": "table", "timeColumns": ["time"], "rawQueryText": "SELECT unix_s AS time, matrix || ' ' || hunter AS hunter, ROUND(SUM(pnl_usd) OVER (PARTITION BY matrix_id, bot_id ORDER BY unix_s ROWS UNBOUNDED PRECEDING), 2) AS realized FROM trade_closes WHERE result != 'UNKNOWN' AND unix_s >= $__from / 1000 AND unix_s < $__to / 1000 ORDER BY unix_s", "queryText": "SELECT unix_s AS time, matrix || ' ' || hunter AS hunter, ROUND(SUM(pnl_usd) OVER (PARTITION BY matrix_id, bot_id ORDER BY unix_s ROWS UNBOUNDED PRECEDING), 2) AS realized FROM trade_closes WHERE result != 'UNKNOWN' AND unix_s >= $__from / 1000 AND unix_s < $__to / 1000 ORDER BY unix_s"}]
+    },
+    {
+      "id": 8, "type": "table", "title": "Closes",
+      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 31},
+      "datasource": {"type": "frser-sqlite-datasource", "uid": "pettibon"},
+      "fieldConfig": {"defaults": {"custom": {"align": "auto"}}, "overrides": [
+        {"matcher": {"id": "byName", "options": "pnl usd"}, "properties": [{"id": "unit", "value": "currencyUSD"}, {"id": "decimals", "value": 2}, {"id": "custom.cellOptions", "value": {"type": "color-text"}}, {"id": "thresholds", "value": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 0}]}}]},
+        {"matcher": {"id": "byName", "options": "result"}, "properties": [{"id": "custom.cellOptions", "value": {"type": "color-text"}}, {"id": "mappings", "value": [{"type": "value", "options": {"WIN": {"color": "green", "index": 0}, "LOSS": {"color": "red", "index": 1}, "UNKNOWN": {"color": "orange", "index": 2}}}]}]}
+      ]},
+      "options": {"showHeader": true, "sortBy": [{"displayName": "time", "desc": true}]},
+      "targets": [{"refId": "A", "datasource": {"type": "frser-sqlite-datasource", "uid": "pettibon"}, "queryType": "table", "timeColumns": [], "rawQueryText": "SELECT ts AS time, matrix, hunter, result, side, coin, ROUND(pnl_usd, 2) AS \"pnl usd\", ROUND(roe_pct, 1) AS \"roe %\", reason FROM trade_closes WHERE unix_s >= $__from / 1000 AND unix_s < $__to / 1000 ORDER BY unix_s DESC LIMIT 80", "queryText": "SELECT ts AS time, matrix, hunter, result, side, coin, ROUND(pnl_usd, 2) AS \"pnl usd\", ROUND(roe_pct, 1) AS \"roe %\", reason FROM trade_closes WHERE unix_s >= $__from / 1000 AND unix_s < $__to / 1000 ORDER BY unix_s DESC LIMIT 80"}]
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+<!--
+Copyright 2026 rimbaud.io
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="rimBaud">
+  <meta name="theme-color" content="#03160a">
+  <title>rimBaud // META</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="css/matrix.css">
+</head>
+<body>
+  <div class="toast" id="toast"></div>
+  <header>
+    <div class="brand">rimBaud  //  META</div>
+    <div class="sub" id="meta-line">matrices  —    GET only    never CLOSE/OPEN</div>
+    <div class="note">never CLOSE/OPEN from the phone · USB has no wallets · hunters keep each box public IP</div>
+  </header>
+  <details class="settings">
+    <summary>Settings — static IP gateway</summary>
+    <p>PWA talks only to this URL. Token is the gateway bearer, not an HL key.</p>
+    <input id="apiBase" placeholder="https://YOUR.STATIC.IP" autocomplete="off" spellcheck="false">
+    <input id="token" placeholder="gateway token" autocomplete="off" spellcheck="false">
+    <button type="button" id="save" style="margin:6px 0 10px;padding:8px 14px;background:#2c2c2c;color:#ff764d;border:1px solid #ff764d;font:inherit;">Save</button>
+  </details>
+  <section class="seats" id="seats"></section>
+  <nav class="panic">
+    <button type="button" class="long" data-bias="LONG">LONG</button>
+    <button type="button" class="flat" data-bias="FLAT">FLAT</button>
+    <button type="button" class="short" data-bias="SHORT">SHORT</button>
+  </nav>
+  <script src="js/app.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+  </script>
+</body>
+</html>

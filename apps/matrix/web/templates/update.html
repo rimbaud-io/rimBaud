@@ -1,0 +1,266 @@
+<!--
+Copyright 2026 rimbaud.io
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>rimBaud // UPDATE</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+:root {
+  --bg: #07080c; --panel: #10131a; --border: #2a3344;
+  --text: #d7e2f2; --muted: #7b889c; --green: #3dff9c;
+  --cyan: #7ecbff; --gold: #f0b90b; --rose: #ff5d73;
+  --font: 'IBM Plex Mono', ui-monospace, monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 13px; line-height: 1.45; }
+a { color: var(--cyan); text-decoration: none; }
+a:hover { color: #fff; }
+header {
+  border-bottom: 1px solid var(--border); padding: 14px 22px;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 12px; background: #0c1016;
+}
+.brand { font-size: 15px; font-weight: 600; letter-spacing: 2px; color: #2A9FD6; text-shadow: 0 0 12px rgba(42, 159, 214, 0.55); }
+.brand span { color: var(--muted); font-weight: 400; }
+.nav { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.nav a, .pill, .badge {
+  border: 1px solid var(--border); padding: 5px 12px; border-radius: 2px;
+  color: var(--muted); font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
+}
+.nav a.active, .nav a:hover { border-color: var(--gold); color: var(--gold); }
+.pill.match, .badge.match { border-color: var(--green); color: var(--green); }
+.pill.behind, .badge.behind { border-color: var(--rose); color: var(--rose); }
+.pill.offline, .badge.offline { border-color: var(--muted); color: var(--muted); }
+.pill.unknown, .badge.unknown { border-color: var(--gold); color: var(--gold); }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 18px 18px 48px; }
+.lead { color: var(--muted); margin-bottom: 16px; max-width: 860px; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 16px; }
+.kpi { background: var(--panel); border: 1px solid var(--border); padding: 12px 14px; }
+.kpi .lbl { color: var(--muted); font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; }
+.kpi .val { margin-top: 6px; font-size: 18px; color: var(--cyan); }
+.card { background: var(--panel); border: 1px solid var(--border); margin-bottom: 14px; }
+.card-h { padding: 10px 14px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.card-h h2 { font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: var(--gold); }
+.card-b { padding: 12px 14px; }
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; color: var(--muted); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+td { padding: 8px; border-bottom: 1px solid rgba(42,51,68,0.6); vertical-align: top; }
+.mono { font-size: 12px; }
+.muted { color: var(--muted); }
+.toast { position: fixed; bottom: 22px; right: 22px; background: var(--panel); border: 1px solid var(--rose); color: var(--rose); padding: 10px 16px; display: none; }
+button.primary {
+  background: transparent; border: 1px solid var(--green); color: var(--green);
+  font-family: var(--font); font-size: 12px; letter-spacing: 1px; text-transform: uppercase;
+  padding: 10px 16px; cursor: pointer;
+}
+button.primary:hover:not(:disabled) { background: rgba(61,255,156,0.08); }
+button.primary:disabled { opacity: 0.45; cursor: wait; }
+pre#updLog {
+  background: #0b0e14; border: 1px solid var(--border); padding: 10px 12px;
+  max-height: 220px; overflow: auto; color: var(--muted); font-size: 11px;
+  white-space: pre-wrap; margin-top: 10px;
+}
+</style>
+</head>
+<body>
+{% include '_nav.html' %}
+<div class="wrap">
+  <p class="lead">
+    Running Hummingbot Docker image versus the current GitHub release and Docker Hub
+    <code>latest</code>. Also lists our bot scripts, Hyperliquid / Jupiter / Meteora protocols,
+    and local connector overlays.
+  </p>
+  <div class="kpis" id="kpis"></div>
+  <div class="card">
+    <div class="card-h">
+      <h2>One-click update</h2>
+      <span class="muted" id="updState">idle</span>
+    </div>
+    <div class="card-b">
+      <p class="muted" style="margin-bottom:12px">
+        Pulls official <code>hummingbot/hummingbot:latest</code> and recreates Copy, Swing, Helliot, Surfn, Shorty.
+        Open Hyperliquid positions are <strong>not</strong> closed. Local overlays stay mounted.
+        If a new release changed the connector internals, check overlays after.
+      </p>
+      <button type="button" class="primary" id="btnUpdate" onclick="runUpdate()">Update Hummingbot now</button>
+      <pre id="updLog">ready</pre>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-h"><h2>WIRE pack (one JSON)</h2></div>
+    <div class="card-b">
+      <p class="muted" style="margin-bottom:12px">
+        Saves desk + home + health canvases into <code>conf/wire_pack.json</code>.
+        Restore writes those graph files only. Hyperliquid clips are not closed. Reload WIRE after restore.
+      </p>
+      <button type="button" class="primary" onclick="savePack()">Save wire JSON</button>
+      <button type="button" class="primary" onclick="restorePack()">Restore wire JSON</button>
+      <a class="primary" href="/api/wire/pack?download=1" style="display:inline-block;margin-left:8px">Download JSON</a>
+      <div class="muted" id="packMsg" style="margin-top:10px">idle</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-h"><h2>Containers</h2><span class="muted" id="cmpNote"></span></div>
+    <div class="card-b" style="overflow-x:auto"><table id="tblBots"></table></div>
+  </div>
+  <div class="card">
+    <div class="card-h"><h2>Protocols</h2></div>
+    <div class="card-b" style="overflow-x:auto"><table id="tblProto"></table></div>
+  </div>
+  <div class="card">
+    <div class="card-h"><h2>Local overlays</h2><span class="muted">files we mount over the official image</span></div>
+    <div class="card-b" style="overflow-x:auto"><table id="tblOv"></table></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function short(d){ if(!d) return '—'; const x=String(d).replace(/^sha256:/,''); return x.slice(0,12)+'…'; }
+function badge(st){
+  const t = st === 'match' ? 'IN SYNC' : st === 'behind' ? 'BEHIND' : st === 'offline' ? 'OFF' : 'CHECK';
+  return `<span class="badge ${esc(st||'unknown')}">${t}</span>`;
+}
+
+function render(d){
+  const c = d.compare || {};
+  const gh = (d.online||{}).github || {};
+  const hub = (d.online||{}).dockerhub || {};
+  const verOk = c.version_match;
+  const digOk = c.digest_match;
+  document.getElementById('kpis').innerHTML = `
+    <div class="kpi"><div class="lbl">Local Hummingbot</div><div class="val">${esc(c.local_version||'—')}</div></div>
+    <div class="kpi"><div class="lbl">GitHub latest</div><div class="val">${esc(c.online_version||'—')}</div>
+      <div class="muted">${esc(gh.published_at||'').slice(0,10)} · ${esc(gh.tag||'')}</div></div>
+    <div class="kpi"><div class="lbl">Version</div><div class="val">${verOk ? 'MATCH' : 'DIFF'}</div></div>
+    <div class="kpi"><div class="lbl">Docker digest</div><div class="val">${digOk ? 'MATCH' : 'DIFF'}</div>
+      <div class="muted">local ${esc(short(c.local_digest))} · hub ${esc(short(c.online_digest))}</div></div>
+  `;
+  document.getElementById('cmpNote').innerHTML =
+    hub.last_updated ? ('hub latest pushed ' + esc(String(hub.last_updated).slice(0,16)).replace('T',' ') + ' UTC') : '';
+  const rows = (d.containers||[]).map(b => `<tr>
+    <td><strong>${esc(b.name)}</strong><div class="muted">${esc(b.id)}</div></td>
+    <td>${b.running ? '<span class="badge match">LIVE</span>' : '<span class="badge offline">OFF</span>'} ${badge(b.status)}</td>
+    <td class="mono">${esc(b.hummingbot_version||'—')}<div class="muted">py ${esc(b.python||'—')}</div></td>
+    <td class="mono">${esc(b.image||'—')}<div class="muted">${esc(b.digest_short||'')}</div></td>
+    <td>${esc(b.role||'—')}<div class="muted">${esc(b.script||'')}</div></td>
+    <td>${esc(b.protocol||'—')}<div class="muted">${esc(b.pairs||'')}</div></td>
+    <td class="mono muted">${b.wallet ? esc(b.wallet.slice(0,8)+'…'+b.wallet.slice(-4)) : '—'}</td>
+  </tr>`).join('');
+  document.getElementById('tblBots').innerHTML =
+    `<tr><th>Bot</th><th>State</th><th>HB / Python</th><th>Image</th><th>Algo</th><th>Protocol</th><th>Wallet</th></tr>` + rows;
+
+  document.getElementById('tblProto').innerHTML =
+    `<tr><th>Protocol</th><th>Endpoint</th><th>Connector</th><th>Used by</th></tr>` +
+    (d.protocols||[]).map(p => `<tr>
+      <td>${esc(p.name)}</td>
+      <td class="mono">${esc(p.rest||p.ws||'—')}<div class="muted">${esc(p.ws && p.rest ? p.ws : '')}</div></td>
+      <td>${esc(p.connector||'—')}</td>
+      <td>${esc((p.used_by||[]).join(', '))}</td>
+    </tr>`).join('');
+
+  document.getElementById('tblOv').innerHTML =
+    `<tr><th>Overlay</th><th>Why</th><th>Mounted on</th></tr>` +
+    (d.overlays||[]).map(o => `<tr>
+      <td class="mono">${esc(o.file)}</td>
+      <td>${esc(o.why)}</td>
+      <td class="muted">${esc((o.bots||[]).join(', '))}</td>
+    </tr>`).join('');
+
+}
+
+async function refresh(){
+  try {
+    const r = await fetch('/api/update');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    render(await r.json());
+  } catch (e) {
+    const t = document.getElementById('toast');
+    t.textContent = 'Load failed: ' + e.message;
+    t.style.display = 'block';
+  }
+}
+async function pollJob() {
+  try {
+    const r = await fetch('/api/update/job');
+    if (!r.ok) return;
+    const j = await r.json();
+    const st = j.status || 'idle';
+    document.getElementById('updState').textContent = st;
+    const log = (j.log || []).join('\n') || 'ready';
+    const pre = document.getElementById('updLog');
+    pre.textContent = log;
+    pre.scrollTop = pre.scrollHeight;
+    const btn = document.getElementById('btnUpdate');
+    btn.disabled = st === 'running';
+    if (st === 'running') {
+      clearTimeout(pollJob._t);
+      pollJob._t = setTimeout(pollJob, 2000);
+    } else if (st === 'ok') {
+      refresh();
+    }
+  } catch (e) {}
+}
+
+async function runUpdate() {
+  const ok = confirm(
+    'Pull hummingbot/hummingbot:latest and recreate Copy / Swing / Helliot / Surfn / Shorty?\n\n' +
+    'Hyperliquid positions stay open on the exchange.\n' +
+    'Bots will reconnect (brief not-ready is normal).'
+  );
+  if (!ok) return;
+  const btn = document.getElementById('btnUpdate');
+  btn.disabled = true;
+  try {
+    const r = await fetch('/api/update/run', { method: 'POST' });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    pollJob();
+  } catch (e) {
+    btn.disabled = false;
+    const t = document.getElementById('toast');
+    t.textContent = e.message;
+    t.style.display = 'block';
+  }
+}
+
+async function savePack(){
+  const el = document.getElementById('packMsg');
+  el.textContent = 'saving…';
+  try {
+    const r = await fetch('/api/wire/pack', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'save'})});
+    const d = await r.json();
+    el.textContent = d.message || d.error || 'saved';
+  } catch (e) { el.textContent = String(e); }
+}
+async function restorePack(){
+  if (!confirm('Restore WIRE canvases from conf/wire_pack.json?\nDoes not close Hyperliquid clips.')) return;
+  const el = document.getElementById('packMsg');
+  el.textContent = 'restoring…';
+  try {
+    const r = await fetch('/api/wire/pack', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'restore'})});
+    const d = await r.json();
+    el.textContent = d.message || d.error || 'restored';
+  } catch (e) { el.textContent = String(e); }
+}
+refresh();
+pollJob();
+</script>
+</body>
+</html>

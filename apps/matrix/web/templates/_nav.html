@@ -1,0 +1,360 @@
+<!--
+Copyright 2026 rimbaud.io
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
+{% set active = active|default('') %}
+{% set nav_title = nav_title|default('DESK') %}
+<style>
+header.fq-nav {
+  border-bottom: 1px solid var(--border, #0d3b1f);
+  background: linear-gradient(180deg, #03160a 0%, #020804 100%);
+  padding: 14px 22px;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 12px;
+  position: sticky; top: 0; z-index: 400; overflow: visible;
+  box-shadow: 0 0 30px rgba(240,185,11,0.08);
+}
+header.fq-nav .brand {
+  font-size: 15px; font-weight: 600; letter-spacing: 2px;
+  color: #2A9FD6; text-shadow: 0 0 12px rgba(42, 159, 214, 0.55);
+}
+header.fq-nav .brand span { color: var(--muted, #3d7a55); font-weight: 400; letter-spacing: 1px; }
+header.fq-nav .nav { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; overflow: visible; }
+header.fq-nav .nav a, header.fq-nav .pill {
+  border: 1px solid var(--border, #0d3b1f);
+  padding: 5px 12px; border-radius: 2px;
+  color: var(--green-dim, #00b347); font-size: 11px; letter-spacing: 1px;
+  text-transform: uppercase; text-decoration: none;
+}
+header.fq-nav .nav a:hover { border-color: var(--green, #00ff6a); color: var(--green, #00ff6a); }
+header.fq-nav .nav a.active {
+  border-color: var(--gold, #f0b90b); color: var(--gold, #f0b90b);
+  box-shadow: 0 0 10px rgba(240,185,11,0.25);
+}
+header.fq-nav .sys-dd { position: relative; z-index: 420; overflow: visible; }
+header.fq-nav .sys-dd-btn {
+  background: #03160a; border: 1px solid var(--gold, #f0b90b); color: var(--gold, #f0b90b);
+  font: inherit; font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
+  padding: 5px 12px; cursor: pointer;
+}
+header.fq-nav .sys-dd.open .sys-dd-btn { border-color: var(--green, #00ff6a); color: var(--green, #00ff6a); }
+header.fq-nav .sys-dd-menu {
+  display: none; position: absolute; top: calc(100% + 4px); left: 0; min-width: 220px;
+  max-width: min(280px, calc(100vw - 16px));
+  background: #03160a; border: 1px solid var(--gold, #f0b90b); padding: 4px;
+  flex-direction: column; z-index: 430;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.65);
+  max-height: min(70vh, calc(100vh - 72px));
+  overflow: visible;
+}
+header.fq-nav .nav > .sys-dd:last-child .sys-dd-menu {
+  left: auto; right: 0;
+}
+header.fq-nav .sys-dd.open .sys-dd-menu { display: flex; }
+header.fq-nav .sys-dd-menu a {
+  display: flex; align-items: center; gap: 8px;
+  border: 1px solid transparent; padding: 8px 10px;
+  color: var(--green-dim, #00b347); font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
+}
+header.fq-nav .sys-dd-menu a:hover { border-color: var(--green, #00ff6a); color: var(--green, #00ff6a); }
+header.fq-nav .sys-dd-menu a.on { border-color: var(--gold, #f0b90b); color: var(--gold, #f0b90b); }
+header.fq-nav .nav-sub { position: relative; }
+header.fq-nav .nav-sub > a .sub-caret { margin-left: auto; color: var(--muted, #3d7a55); }
+header.fq-nav .nav-sub-menu {
+  display: none; position: absolute; right: 100%; top: 0; left: auto; min-width: 190px;
+  background: #03160a; border: 1px solid var(--gold, #f0b90b); padding: 4px;
+  flex-direction: column; z-index: 440;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.65);
+}
+header.fq-nav .nav-sub:hover > .nav-sub-menu,
+header.fq-nav .nav-sub.open > .nav-sub-menu { display: flex; }
+@media (max-width: 900px) {
+  header.fq-nav { padding: 10px 12px; }
+  header.fq-nav .nav { width: 100%; }
+  header.fq-nav .sys-dd-menu { max-width: calc(100vw - 16px); }
+}
+header.fq-nav .nav-lamp {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  background: var(--rose, #ff4d6d); box-shadow: 0 0 6px currentColor;
+}
+header.fq-nav .nav-lamp.on { background: var(--green, #00ff6a); color: var(--green, #00ff6a); }
+header.fq-nav .meta { color: var(--muted, #3d7a55); font-size: 11px; }
+header.fq-nav .pill.offline { border-color: var(--rose, #ff4d6d); color: var(--rose, #ff4d6d); }
+.fq-brain-sw { display: flex; align-items: center; gap: 6px; margin-left: 12px; }
+.fq-brain-sw .lbl { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted, #3d7a55); }
+.fq-brain-sw button {
+  background: #03160a; border: 1px solid var(--border, #0d3b1f);
+  color: var(--green-dim, #00b347); font: inherit; font-size: 11px;
+  letter-spacing: 1px; text-transform: uppercase; padding: 5px 10px; cursor: pointer;
+}
+.fq-brain-sw button.on-flask { border-color: var(--gold, #f0b90b); color: var(--gold, #f0b90b); }
+.fq-brain-sw button.on-spring { border-color: #ff764d; color: #ff764d; }
+.fq-brain-banner {
+  display: none; width: 100%;
+  background: #2a140c; border-bottom: 1px solid #ff764d;
+  color: #ffc8a0; font-size: 11px; letter-spacing: 0.6px;
+  padding: 6px 22px;
+}
+body.brain-spring .fq-brain-banner { display: block; }
+body.brain-spring:not(.brain-spring-writes) .btn-bias,
+body.brain-spring:not(.brain-spring-writes) .btn-sl,
+body.brain-spring:not(.brain-spring-writes) .btn-del,
+body.brain-spring:not(.brain-spring-writes) .btn-restart,
+body.brain-spring:not(.brain-spring-writes) .btn-close,
+body.brain-spring:not(.brain-spring-writes) .btn-100 {
+  pointer-events: none; opacity: 0.4;
+}
+body.flask-writes-off:not(.brain-spring) .btn-bias,
+body.flask-writes-off:not(.brain-spring) .btn-sl,
+body.flask-writes-off:not(.brain-spring) .btn-del,
+body.flask-writes-off:not(.brain-spring) .btn-restart {
+  pointer-events: none; opacity: 0.4;
+}
+</style>
+<header class="fq-nav">
+  <div class="brand">rimBaud <span>// {{ nav_title }}</span></div>
+  <div class="fq-brain-sw" title="Matrix APIs go to the Spring daemon on :5004">
+    <span class="lbl">Brain</span>
+    <span class="nav-lamp" id="fqSpringLamp"></span>
+    <button type="button" class="on-spring on" id="fqBrainSpring" disabled>Spring daemon :5004</button>
+  </div>
+  <div class="nav">
+    <span class="pill" id="botState">…</span>
+    <a href="/" class="{{ 'active' if active == 'home' else '' }}">Home</a>
+    <a href="/overview" class="{{ 'active' if active == 'overview' else '' }}">Overview</a>
+    <a href="/wire" class="{{ 'active' if active == 'wire' else '' }}">Wire</a>
+    <a href="/condor" class="{{ 'active' if active == 'condor' else '' }}">Condor</a>
+    <div class="sys-dd" id="botsDd">
+      <button type="button" class="sys-dd-btn" onclick="toggleFqDd(event, 'botsDd')">Hummingbots ▾</button>
+      <div class="sys-dd-menu" id="botsDdMenu">
+        <a href="/confiig">loading…</a>
+      </div>
+    </div>
+    <div class="sys-dd" id="fundsDd">
+      <button type="button" class="sys-dd-btn" onclick="toggleFqDd(event, 'fundsDd')">Funds ▾</button>
+      <div class="sys-dd-menu">
+        <a href="/confiig" class="{{ 'on' if active == 'confiig' else '' }}">Hyperliquid Wallets</a>
+      </div>
+    </div>
+    <div class="sys-dd" id="stratDd">
+      <button type="button" class="sys-dd-btn" onclick="toggleFqDd(event, 'stratDd')">Strategy ▾</button>
+      <div class="sys-dd-menu">
+        <div class="nav-sub{{ ' open' if active in ('janestreet', 'janestreet-daily') else '' }}">
+          <a href="/janestreet" class="{{ 'on' if active in ('janestreet', 'janestreet-daily') else '' }}">JaneStreet<span class="sub-caret">▸</span></a>
+          <div class="nav-sub-menu">
+            <a href="/janestreet" class="{{ 'on' if active == 'janestreet' else '' }}">Weekly</a>
+            <a href="/janestreet/daily" class="{{ 'on' if active == 'janestreet-daily' else '' }}">Daily</a>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="sys-dd" id="sysDd">
+      <button type="button" class="sys-dd-btn" onclick="toggleFqDd(event, 'sysDd')">System ▾</button>
+      <div class="sys-dd-menu">
+        <a href="/health" class="{{ 'on' if active == 'health' else '' }}">Health</a>
+        <a href="/backup" class="{{ 'on' if active == 'backup' else '' }}">Backup</a>
+        <a href="/cpp-usb" class="{{ 'on' if active == 'cpp-usb' else '' }}">Copy C++ app to USB</a>
+        <a href="/version" class="{{ 'on' if active == 'version' else '' }}">Version</a>
+        <a href="/update" class="{{ 'on' if active == 'update' else '' }}">Update</a>
+      </div>
+    </div>
+  </div>
+</header>
+<div id="fqBrainBanner" class="fq-brain-banner">
+  SPRING DAEMON :5004 · hunters still trade in Docker · Flask :5001 is the website only
+</div>
+<script>
+(function () {
+  var SPRING = "http://127.0.0.1:5004";
+  var nativeFetch = window.fetch.bind(window);
+  window.__fqNativeFetch = nativeFetch;
+  window.fqSpringWrites = false;
+  window.fqFlaskWrites = true;
+  window.fqBrain = function () { return "spring"; };
+  window.fqApplyBrainUi = function () {
+    if (document.body) {
+      document.body.classList.add("brain-spring");
+      document.body.classList.toggle("brain-spring-writes", !!window.fqSpringWrites);
+      document.body.classList.remove("flask-writes-off");
+    }
+    var lamp = document.getElementById("fqSpringLamp");
+    if (lamp) lamp.classList.toggle("on", !!window.fqSpringUp);
+    var ban = document.getElementById("fqBrainBanner");
+    if (ban) {
+      if (!window.fqSpringUp) ban.textContent = "SPRING DAEMON :5004 down — start it in springctl. Hunters still trade.";
+      else if (window.fqSpringWrites) ban.textContent = "SPRING DAEMON writes ON · config files only · never CLOSE/OPEN live clips";
+      else ban.textContent = "SPRING DAEMON read-only · enable WRITE MODE in springctl · never CLOSE/OPEN";
+    }
+  };
+  window.fqSetBrain = async function () {
+    var prevUp = window.fqSpringUp;
+    var prevW = window.fqSpringWrites;
+    window.fqSpringUp = false;
+    window.fqSpringWrites = false;
+    try {
+      var r = await nativeFetch(SPRING + "/api/health", { cache: "no-store" });
+      var d = await r.json();
+      window.fqSpringUp = !!(r.ok && d.service === "spring");
+      window.fqSpringWrites = !!(window.fqSpringUp && d.writes);
+    } catch (e) {
+      window.fqSpringUp = false;
+      window.fqSpringWrites = false;
+    }
+    localStorage.setItem("fq_brain", "spring");
+    window.fqApplyBrainUi();
+    var changed = prevUp !== window.fqSpringUp || prevW !== window.fqSpringWrites;
+    if (changed && typeof load === "function") load();
+    if (changed && typeof loadNavBots === "function") loadNavBots();
+  };
+  window.fetch = function (url, opts) {
+    opts = opts || {};
+    var method = String(opts.method || "GET").toUpperCase();
+    var u = typeof url === "string" ? url : (url && url.url) || "";
+    var keepFlask = typeof u === "string" && /\/api\/flask\/|\/api\/ctl/.test(u);
+    var springHas = typeof u === "string" && (
+      /^\/api\/(home|nav|health)(\/|$|\?)/.test(u)
+      || u.indexOf("/api/home/") === 0
+      || u.indexOf("/api/wire/") === 0
+      || u.indexOf("/api/condor/") === 0
+      || u.indexOf("/api/spring/") === 0
+      || u.indexOf("/api/qa/week") === 0
+      || u.indexOf("/api/backup") === 0
+    );
+    if (window.fqSpringUp && window.fqBrain() === "spring" && typeof u === "string" && u.indexOf("/api") === 0 && !keepFlask && springHas) {
+      var low = u.toLowerCase();
+      var closePath = /close|force_entry|force_open|hl_close/.test(low);
+      var homeTrade = /\/api\/home\/(close|open)(\/|$|\?)/.test(u);
+      if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
+        if (closePath && !homeTrade) {
+          if (typeof toast === "function") toast("Spring never CLOSE/OPEN live positions");
+          return Promise.reject(new Error("spring-no-close"));
+        }
+        if (!window.fqSpringWrites) {
+          var msg = "Spring writes are OFF — enable WRITE MODE in springctl. Positions untouched.";
+          if (typeof toast === "function") toast(msg);
+          return Promise.reject(new Error("spring-readonly"));
+        }
+      }
+      url = SPRING + u;
+    } else if (window.fqBrain() !== "spring" && typeof u === "string" && u.indexOf("/api") === 0 && !keepFlask) {
+      if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS" && window.fqFlaskWrites === false) {
+        var fmsg = "Flask WRITE MODE is off — hunter files not written. Positions untouched.";
+        if (typeof toast === "function") toast(fmsg);
+        return Promise.reject(new Error("flask-readonly"));
+      }
+    }
+    return nativeFetch(url, opts);
+  };
+  if (document.readyState === "loading")
+    document.addEventListener("DOMContentLoaded", function () { window.fqSetBrain(); });
+  else window.fqSetBrain();
+  setInterval(function () { window.fqSetBrain(); }, 8000);
+})();
+function placeFqMenu(dd) {
+  if (!dd) return;
+  var menu = dd.querySelector(".sys-dd-menu");
+  if (!menu) return;
+  menu.style.left = "";
+  menu.style.right = "";
+  var last = dd.parentElement && dd.parentElement.lastElementChild === dd;
+  if (last) {
+    menu.style.left = "auto";
+    menu.style.right = "0";
+  } else {
+    menu.style.left = "0";
+    menu.style.right = "auto";
+  }
+  var pad = 8;
+  var r = menu.getBoundingClientRect();
+  if (r.right > window.innerWidth - pad) {
+    menu.style.left = "auto";
+    menu.style.right = "0";
+  }
+  r = menu.getBoundingClientRect();
+  if (r.left < pad) {
+    var box = dd.getBoundingClientRect();
+    menu.style.left = Math.max(pad - box.left, 0) + "px";
+    menu.style.right = "auto";
+  }
+  r = menu.getBoundingClientRect();
+  if (r.bottom > window.innerHeight - pad) {
+    menu.style.maxHeight = Math.max(120, window.innerHeight - r.top - pad) + "px";
+    menu.style.overflowY = "auto";
+  }
+}
+function toggleFqDd(ev, id) {
+  if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+  var el = document.getElementById(id);
+  document.querySelectorAll("header.fq-nav .sys-dd.open").forEach(function (n) {
+    if (n !== el) n.classList.remove("open");
+  });
+  if (el) {
+    el.classList.toggle("open");
+    if (el.classList.contains("open")) {
+      requestAnimationFrame(function () { placeFqMenu(el); });
+    }
+  }
+}
+function toggleSysDd(ev) { toggleFqDd(ev, "sysDd"); }
+function fillNavBots(list) {
+  var menu = document.getElementById("botsDdMenu");
+  if (!menu) return;
+  var here = (location.pathname || "/").replace(/\/$/, "") || "/";
+  var rows = list || [];
+  menu.innerHTML = rows.map(function (h) {
+    var href = h.href || "/confiig";
+    var path = href.replace(/\/$/, "") || "/";
+    var subs = h.submenu || [];
+    var subOn = subs.some(function (s) { return here === String(s.href || "").replace(/\/$/, ""); });
+    var on = here === path || subOn;
+    var lamp = h.running ? "nav-lamp on" : "nav-lamp";
+    var name = (h.icon ? h.icon + " " : "") + (h.name || h.id || "bot");
+    var main = '<a href="' + href + '" class="' + (on ? "on" : "") + '"><span class="' + lamp + '"></span>' + name + (subs.length ? '<span class="sub-caret">▸</span>' : "") + "</a>";
+    if (!subs.length) return main;
+    var nested = subs.map(function (s) {
+      var sp = String(s.href || "").replace(/\/$/, "");
+      return '<a href="' + (s.href || "#") + '" class="' + (here === sp ? "on" : "") + '">' + (s.name || "") + "</a>";
+    }).join("");
+    return '<div class="nav-sub' + (subOn ? " open" : "") + '">' + main + '<div class="nav-sub-menu">' + nested + "</div></div>";
+  }).join("") || '<a href="/confiig">no hunters on Wire desk</a>';
+  var st = document.getElementById("botState");
+  if (st && (st.hidden || st.textContent === "…" || /^\d+\/\d+$/.test(st.textContent))) {
+    var nRun = rows.filter(function (h) { return h.running; }).length;
+    if (rows.length) {
+      st.hidden = false;
+      st.textContent = nRun + "/" + rows.length;
+      st.className = "pill" + (nRun < rows.length ? " offline" : "");
+    }
+  }
+}
+function loadNavBots() {
+  fetch("/api/nav").then(function (r) { return r.json(); }).then(function (d) {
+    if (d && d.ok && Array.isArray(d.hunters)) fillNavBots(d.hunters);
+  }).catch(function () {});
+}
+if (!window.__fqSysNav) {
+  window.__fqSysNav = true;
+  document.addEventListener("click", function (e) {
+    document.querySelectorAll("header.fq-nav .sys-dd.open").forEach(function (n) {
+      if (!n.contains(e.target)) n.classList.remove("open");
+    });
+  });
+  loadNavBots();
+  setInterval(loadNavBots, 15000);
+  window.addEventListener("resize", function () {
+    document.querySelectorAll("header.fq-nav .sys-dd.open").forEach(placeFqMenu);
+  });
+}
+</script>

@@ -1,0 +1,23 @@
+# built binaries
+apps/matrix/desk/rimbaud-desk
+apps/matrix/desk/rimbaud-chart
+apps/spring/spring
+apps/spring/springctl
+apps/meta/rimbaud-meta
+apps/meta/rimbaud-meta-desk
+apps/meta/rimbaud-backup
+apps/pettibon/pettibon
+apps/archy/rimbaud-archy
+
+# build junk
+*.o
+*.pyc
+__pycache__/
+node_modules/
+dist/
+
+# never publish
+conf/
+secrets.env
+*.db
+*.sqlite

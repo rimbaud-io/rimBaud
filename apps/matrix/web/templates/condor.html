@@ -1,0 +1,201 @@
+<!--
+Copyright 2026 rimbaud.io
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>rimBaud // CONDOR</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+:root {
+  --bg: #020804; --panel: #041208; --border: #0d3b1f;
+  --green: #00ff6a; --green-dim: #00b347; --text: #9dffc0;
+  --muted: #3d7a55; --rose: #ff4d6d; --cyan: #7ecbff;
+  --amber: #ffc857; --gold: #f0b90b;
+  --font: 'IBM Plex Mono', 'Share Tech Mono', ui-monospace, monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 13px; line-height: 1.45; }
+a { color: var(--green); text-decoration: none; }
+a:hover { color: #fff; }
+header {
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, #03160a 0%, #020804 100%);
+  padding: 14px 22px; display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 12px; position: sticky; top: 0; z-index: 50;
+}
+.brand { font-size: 15px; font-weight: 600; letter-spacing: 2px; color: #2A9FD6; text-shadow: 0 0 12px rgba(42, 159, 214, 0.55); }
+.brand span { color: var(--muted); font-weight: 400; }
+.nav { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.nav a {
+  border: 1px solid var(--border); padding: 5px 12px; border-radius: 2px;
+  color: var(--green-dim); font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
+}
+.nav a:hover, .nav a.active { border-color: var(--gold); color: var(--gold); }
+.wrap { max-width: 920px; margin: 0 auto; padding: 18px 18px 48px; }
+.lead { color: var(--muted); margin-bottom: 16px; }
+.panel { background: var(--panel); border: 1px solid var(--border); margin-bottom: 14px; }
+.panel-h { padding: 10px 14px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; gap: 8px; }
+.panel-h h2 { font-size: 12px; letter-spacing: 1.5px; color: var(--gold); font-weight: 600; }
+.panel-b { padding: 14px; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.kpi { background: var(--panel); border: 1px solid var(--border); padding: 12px 14px; }
+.kpi .lbl { color: var(--muted); font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; }
+.kpi .val { margin-top: 6px; font-size: 20px; color: var(--cyan); }
+.kpi .val.rose { color: var(--rose); }
+.kpi .val.gold { color: var(--gold); }
+dl { display: grid; grid-template-columns: 110px 1fr; gap: 6px 12px; }
+dt { color: var(--muted); }
+dd.long { color: var(--green); }
+dd.short { color: var(--rose); }
+dd.flat { color: var(--amber); }
+.btn {
+  border: 1px solid var(--gold); background: transparent; color: var(--gold);
+  padding: 6px 12px; cursor: pointer; font-family: inherit; font-size: 11px; letter-spacing: 1px;
+}
+.btn:disabled { opacity: 0.5; cursor: wait; }
+.note { color: var(--muted); font-size: 12px; margin-top: 10px; }
+code { color: var(--amber); }
+.toast {
+  position: fixed; bottom: 16px; right: 16px; display: none;
+  background: var(--panel); border: 1px solid var(--green); color: var(--green); padding: 8px 12px;
+}
+</style>
+</head>
+<body>
+{% include '_nav.html' %}
+<div class="wrap">
+  <p class="lead">
+    Condor measures BTC / ETH / LTC / TAO and predicts LONG / SHORT / FLAT.
+    It does not trade. Bias is written only when you wire <code>REGIME → hunter BIAS</code> on Wire.
+    Copy is never steered. Up-only hunters store SHORT as FLAT; Shorty stores LONG as FLAT.
+    Telegram and Grok: drop bots from the <a href="/wire">Wire</a> Condor toolbox, paste token / xAI key, wire <code>TG</code> / <code>GROK</code> into Condor.
+    Env <code>TELEGRAM_BOT_TOKEN</code> / <code>XAI_API_KEY</code> still work if no bot is wired.
+    From iPhone Telegram: <code>/grok key xai-…</code> then <code>/ask</code> or just type. Commands: /status /tick /wired /grok — no orders.
+  </p>
+  <div class="kpis">
+    <div class="kpi"><div class="lbl">Regime</div><div class="val" id="kReg">—</div></div>
+    <div class="kpi"><div class="lbl">Source</div><div class="val gold" id="kSrc">—</div></div>
+    <div class="kpi"><div class="lbl">Container</div><div class="val" id="kRun">—</div></div>
+    <div class="kpi"><div class="lbl">Last tick</div><div class="val" id="kTs" style="font-size:13px">—</div></div>
+    <div class="kpi"><div class="lbl">Telegram</div><div class="val" id="kTg">—</div></div>
+    <div class="kpi"><div class="lbl">Grok</div><div class="val" id="kGrok">—</div></div>
+  </div>
+  <div class="panel">
+    <div class="panel-h">
+      <h2>Per-coin bias</h2>
+      <button type="button" class="btn" id="btnTick" onclick="doTick()">Tick now</button>
+    </div>
+    <div class="panel-b">
+      <dl id="biasDl"><dt>—</dt><dd>loading</dd></dl>
+      <p class="note" id="why">—</p>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-h"><h2>Wired hunters</h2></div>
+    <div class="panel-b">
+      <p class="note" id="wired">Drop Condor from the Wire toolbox, then connect REGIME into a hunter BIAS.</p>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+function toast(msg) {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.style.display = "block";
+  setTimeout(() => { el.style.display = "none"; }, 3200);
+}
+function paint(d) {
+  const g = d.gauge || d;
+  const reg = (g.regime || "—").toLowerCase();
+  const kReg = document.getElementById("kReg");
+  kReg.textContent = reg.toUpperCase();
+  kReg.className = "val " + (reg === "shock" ? "rose" : (reg === "trend" ? "gold" : ""));
+  document.getElementById("kSrc").textContent = g.source || "—";
+  const run = document.getElementById("kRun");
+  run.textContent = g.running ? "UP" : "DOWN";
+  run.className = "val " + (g.running ? "" : "rose");
+  document.getElementById("kTs").textContent = g.ts || "—";
+  const tg = g.telegram || {};
+  const kTg = document.getElementById("kTg");
+  if (kTg) {
+    if (!tg.configured) {
+      kTg.textContent = "OFF";
+      kTg.className = "val rose";
+    } else {
+      kTg.textContent = (tg.ok ? "ON" : "WAIT") + " · " + (tg.bots || tg.chats || 0);
+      kTg.className = "val " + (tg.ok ? "gold" : "");
+    }
+  }
+  const grok = g.grok_bot || {};
+  const kGrok = document.getElementById("kGrok");
+  if (kGrok) {
+    if (!grok.configured) {
+      kGrok.textContent = "HEURISTIC";
+      kGrok.className = "val";
+    } else {
+      kGrok.textContent = grok.model || grok.name || "ON";
+      kGrok.className = "val gold";
+    }
+  }
+  const dl = document.getElementById("biasDl");
+  const bias = g.bias || {};
+  const reasons = g.reasons || {};
+  const coins = Object.keys(bias).length ? Object.keys(bias) : ["BTC", "ETH", "LTC", "TAO"];
+  dl.innerHTML = coins.map((c) => {
+    const m = (bias[c] || "FLAT").toLowerCase();
+    return "<dt>" + c + "</dt><dd class=\"" + m + "\">" + (bias[c] || "—") +
+      (reasons[c] ? " · " + reasons[c] : "") + "</dd>";
+  }).join("");
+  document.getElementById("why").textContent = g.why || (g.error || "—");
+  const wired = g.wired || [];
+  const applied = g.applied || [];
+  document.getElementById("wired").textContent = wired.length
+    ? ("wired: " + wired.join(", ") + (applied.length ? " · last write " + applied.join("; ") : " · no change last tick"))
+    : "not wired — display only";
+}
+async function load() {
+  try {
+    const r = await fetch("/api/condor/gauge");
+    paint(await r.json());
+  } catch (e) {
+    toast("load failed: " + e);
+  }
+}
+async function doTick() {
+  const btn = document.getElementById("btnTick");
+  btn.disabled = true;
+  btn.textContent = "TICKING…";
+  try {
+    const r = await fetch("/api/condor/tick", { method: "POST" });
+    const d = await r.json();
+    if (!r.ok && !d.regime) throw new Error(d.error || ("HTTP " + r.status));
+    paint(d);
+    toast(d.source ? ("tick · " + d.source + " · " + (d.regime || "")) : (d.error || "ticked"));
+  } catch (e) {
+    toast("tick failed: " + e.message);
+  }
+  btn.disabled = false;
+  btn.textContent = "Tick now";
+}
+load();
+setInterval(load, 15000);
+</script>
+</body>
+</html>

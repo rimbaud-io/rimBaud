@@ -1,0 +1,89 @@
+/*
+ * Copyright 2026 rimbaud.io
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/* rimBaud chrome on top of Mint-Y-Dark. Desk palette. */
+.panel-top, .panel-bottom, .panel-left, .panel-right {
+    background-color: rgba(3, 22, 10, 0.97);
+    color: #9dffc0;
+    box-shadow: none;
+    border-image: none;
+}
+.panel-top { border-bottom: 1px solid #0d3b1f; }
+.panel-bottom { border-top: 1px solid #0d3b1f; }
+
+.applet-box { color: #9dffc0; padding-left: 6px; padding-right: 6px; }
+.applet-box:hover { background-color: rgba(0, 255, 106, 0.12); color: #00ff6a; }
+.applet-box:checked, .applet-box:active {
+    background-color: rgba(240, 185, 11, 0.16);
+    color: #f0b90b;
+}
+.applet-label { color: #9dffc0; }
+
+.menu, .menu-background, .popup-menu-boxpointer, .popup-menu, .popup-combo-menu {
+    background-color: #041208;
+    border: 1px solid #0d3b1f;
+    color: #9dffc0;
+    border-radius: 0;
+}
+.menu-category-button-selected,
+.menu-application-button-selected,
+.popup-menu-item:active,
+.popup-menu-item:hover {
+    background-color: rgba(0, 255, 106, 0.16);
+    color: #00ff6a;
+}
+
+.window-list-item-box, .grouped-window-list-item-box { color: #9dffc0; }
+.window-list-item-box:hover, .grouped-window-list-item-box:hover {
+    background: rgba(0, 255, 106, 0.12);
+}
+.window-list-item-box:active, .window-list-item-box:focus, .window-list-item-box:checked,
+.grouped-window-list-item-box:active, .grouped-window-list-item-box:focus,
+.grouped-window-list-item-box:checked {
+    background: rgba(13, 59, 31, 0.95);
+    color: #00ff6a;
+}
+
+.calendar, .calendar-main-box, .datemenu-toolbar { background: #041208; color: #9dffc0; }
+.calendar-today { background-color: #00ff6a; color: #020804; }
+
+.notification, .notification-applet-container, .switcher-list, .osd-window {
+    background-color: #041208;
+    border: 1px solid #0d3b1f;
+    color: #9dffc0;
+    border-radius: 0;
+}
+
+.modal-dialog {
+    background-color: #041208;
+    border: 1px solid #00ff6a;
+    color: #9dffc0;
+    border-radius: 0;
+}
+.modal-dialog-button {
+    background-color: #2c2c2c;
+    color: #00b347;
+    border: 1px solid #0d3b1f;
+    border-radius: 0;
+}
+.modal-dialog-button:hover { border-color: #00ff6a; color: #00ff6a; }
+.modal-dialog-button:active { background-color: #0d3b1f; color: #f0b90b; }
+
+.sound-player, .info-osd, .workspace-osd {
+    background-color: #041208;
+    border: 1px solid #0d3b1f;
+    color: #9dffc0;
+}

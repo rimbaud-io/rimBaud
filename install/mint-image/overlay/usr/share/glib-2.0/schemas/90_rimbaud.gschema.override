@@ -1,0 +1,60 @@
+# Copyright 2026 rimbaud.io
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Internal rimBaud look. Official Mint/Ubuntu packages stay stock.
+# Applied via glib-compile-schemas in the remaster chroot.
+
+[org.cinnamon.desktop.background]
+picture-uri='file:///usr/share/backgrounds/rimbaud/desktop.png'
+picture-options='zoom'
+primary-color='#020804'
+secondary-color='#020804'
+color-shading-type='solid'
+
+[org.cinnamon.desktop.screensaver]
+picture-uri='file:///usr/share/backgrounds/rimbaud/desktop.png'
+
+[org.cinnamon.theme]
+name='rimBaud'
+
+[org.cinnamon.desktop.interface]
+gtk-theme='rimBaud'
+icon-theme='Mint-Y-Dark'
+cursor-theme='Bibata-Modern-Classic'
+clock-show-date=true
+font-name='DejaVu Sans 10'
+monospace-font-name='DejaVu Sans Mono 10'
+
+[org.gnome.desktop.interface]
+gtk-theme='rimBaud'
+icon-theme='Mint-Y-Dark'
+color-scheme='prefer-dark'
+gtk-application-prefer-dark-theme=true
+
+[org.cinnamon.desktop.wm.preferences]
+theme='rimBaud'
+
+[org.cinnamon]
+panels-enabled="['1:0:top']"
+favorite-apps="['rimbaud-meta.desktop', 'nemo.desktop', 'org.gnome.Terminal.desktop', 'cinnamon-settings.desktop']"
+
+[org.nemo.desktop]
+computer-icon-visible=false
+home-icon-visible=false
+trash-icon-visible=false
+network-icon-visible=false
+volumes-visible=false
+
+[org.x.apps.portal]
+color-scheme='prefer-dark'

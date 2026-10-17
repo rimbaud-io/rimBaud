@@ -1,0 +1,1156 @@
+<!--
+Copyright 2026 rimbaud.io
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>rimBaud // DMAN</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --bg: #020804;
+  --panel: #041208;
+  --border: #0d3b1f;
+  --green: #00ff6a;
+  --green-dim: #00b347;
+  --green-glow: rgba(0, 255, 106, 0.15);
+  --text: #9dffc0;
+  --muted: #3d7a55;
+  --rose: #ff4d6d;
+  --rose-dim: rgba(255, 77, 109, 0.12);
+  --cyan: #7ecbff;
+  --amber: #ffc857;
+  --gold: #c084fc;
+  --font: 'IBM Plex Mono', 'Share Tech Mono', ui-monospace, monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { min-height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13px;
+  line-height: 1.45;
+  background-image:
+    linear-gradient(rgba(0,255,106,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,255,106,0.03) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+a { color: var(--green); text-decoration: none; }
+a:hover { color: #fff; text-shadow: 0 0 8px var(--green); }
+
+body::after {
+  content: "";
+  pointer-events: none;
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(
+    0deg, transparent, transparent 2px,
+    rgba(0,0,0,0.12) 2px, rgba(0,0,0,0.12) 4px
+  );
+  z-index: 9999;
+  opacity: 0.35;
+}
+
+header {
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, #03160a 0%, #020804 100%);
+  padding: 14px 22px;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 12px;
+  position: sticky; top: 0; z-index: 50;
+  box-shadow: 0 0 30px rgba(240,185,11,0.08);
+}
+.brand {
+  font-size: 15px; font-weight: 600; letter-spacing: 2px;
+  color: #2A9FD6; text-shadow: 0 0 12px rgba(42, 159, 214, 0.55);
+}
+.brand span { color: var(--muted); font-weight: 400; letter-spacing: 1px; }
+.nav { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.nav a, .pill {
+  border: 1px solid var(--border);
+  padding: 5px 12px; border-radius: 2px;
+  color: var(--green-dim); font-size: 11px; letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.nav a:hover, .pill.live {
+  border-color: var(--green);
+  color: var(--green);
+  box-shadow: 0 0 10px var(--green-glow);
+}
+.pill.offline { border-color: var(--rose); color: var(--rose); }
+.nav a.active {
+  border-color: var(--gold);
+  color: var(--gold);
+  box-shadow: 0 0 10px rgba(240,185,11,0.25);
+}
+.meta { color: var(--muted); font-size: 11px; }
+
+.wrap { max-width: 1180px; margin: 0 auto; padding: 18px 18px 48px; }
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px; margin-bottom: 16px;
+}
+.kpi {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  padding: 12px 14px;
+  box-shadow: inset 0 0 20px rgba(240,185,11,0.04);
+}
+.kpi .lbl {
+  color: var(--muted); font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase;
+}
+.kpi .val {
+  margin-top: 6px; font-size: 20px; color: var(--green);
+  text-shadow: 0 0 8px rgba(0,255,106,0.35);
+}
+.kpi .val.rose { color: var(--rose); text-shadow: 0 0 8px rgba(255,77,109,0.35); }
+.kpi .val.cyan { color: var(--cyan); text-shadow: 0 0 8px rgba(126,203,255,0.35); }
+.kpi .val.amber { color: var(--amber); text-shadow: 0 0 8px rgba(255,200,87,0.3); }
+.kpi .val.gold { color: var(--gold); text-shadow: 0 0 8px rgba(240,185,11,0.35); }
+
+.rebuy-panel { margin-bottom: 16px; }
+.rebuy-note {
+  color: var(--muted); font-size: 11px; padding: 0 14px 10px;
+}
+.rebuy-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  border-top: 1px solid var(--border);
+}
+@media (max-width: 800px) { .rebuy-grid { grid-template-columns: 1fr; } }
+.rebuy-coin {
+  padding: 12px 14px;
+  border-right: 1px solid var(--border);
+}
+.rebuy-grid .rebuy-coin:last-child { border-right: 0; }
+@media (max-width: 800px) {
+  .rebuy-coin { border-right: 0; border-bottom: 1px solid var(--border); }
+}
+.rebuy-coin .rc-h {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 6px;
+}
+.rebuy-coin .rc-coin { font-weight: 600; letter-spacing: 1.5px; color: var(--gold); }
+.rebuy-coin .rc-bias { font-size: 11px; letter-spacing: 1px; }
+.rebuy-px {
+  font-size: 22px; color: var(--cyan);
+  text-shadow: 0 0 8px rgba(126,203,255,0.3);
+  margin: 4px 0 6px;
+}
+.rebuy-px.wait { color: var(--amber); text-shadow: 0 0 8px rgba(255,200,87,0.3); }
+.rebuy-px.flat { color: var(--muted); text-shadow: none; font-size: 16px; }
+.rebuy-px.in { color: var(--green); }
+.rebuy-meta { color: var(--muted); font-size: 11px; line-height: 1.45; }
+.rebuy-pair {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  gap: 6px 10px;
+  align-items: start;
+  margin-top: 8px;
+}
+.rebuy-pair .rk {
+  font-size: 10px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); padding-top: 4px;
+}
+.rebuy-pair .rv { font-size: 13px; color: var(--text); }
+.rebuy-pair .rv .big { font-size: 18px; color: var(--amber); }
+.rebuy-pair .rv .sell { color: var(--rose); }
+.rebuy-pair .rv .in { color: var(--green); }
+.tune-bar { border-top: 1px solid var(--border); padding: 10px 14px 4px; }
+.tune-row {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  margin-bottom: 8px;
+}
+.tune-row .rk {
+  font-size: 10px; letter-spacing: 1.2px; text-transform: uppercase;
+  color: var(--muted); min-width: 92px;
+}
+.tune-row input {
+  width: 72px;
+  background: #020804;
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+  padding: 5px 7px;
+}
+.tune-row input:focus { outline: none; border-color: var(--gold); }
+.tune-row .btn { min-width: 0; padding: 6px 10px; font-size: 10px; }
+.tune-px {
+  color: var(--amber);
+  font-size: 11px;
+  letter-spacing: 0.2px;
+  flex: 1 1 220px;
+  min-width: 180px;
+  line-height: 1.4;
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+@media (max-width: 1100px) { .grid2 { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 800px) { .grid2 { grid-template-columns: 1fr; } }
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  margin-bottom: 14px;
+  box-shadow: 0 0 24px rgba(0,255,106,0.05);
+}
+.panel-h {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(240,185,11,0.04);
+  flex-wrap: wrap; gap: 8px;
+}
+.panel-h h2 {
+  font-size: 12px; letter-spacing: 2px; text-transform: uppercase;
+  color: var(--gold); font-weight: 600;
+}
+.panel-h .sub { color: var(--muted); font-size: 11px; }
+.panel-b { padding: 16px 14px; }
+
+.btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--green-dim);
+  font-family: var(--font);
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 12px 18px;
+  cursor: pointer;
+  border-radius: 2px;
+  min-width: 90px;
+}
+.btn:hover:not(:disabled) {
+  box-shadow: 0 0 12px var(--green-glow);
+  color: var(--green);
+  border-color: var(--green);
+}
+.btn:disabled { opacity: 0.45; cursor: wait; }
+.btn.long { border-color: var(--cyan); color: var(--cyan); }
+.btn.long:hover:not(:disabled) { background: rgba(126,203,255,0.1); box-shadow: 0 0 12px rgba(126,203,255,0.3); color: #fff; }
+.btn.short { border-color: var(--rose); color: var(--rose); }
+.btn.short:hover:not(:disabled) { background: var(--rose-dim); box-shadow: 0 0 12px rgba(255,77,109,0.35); color: #fff; }
+.btn.flat { border-color: var(--amber); color: var(--amber); }
+.btn.flat:hover:not(:disabled) { background: rgba(255,200,87,0.1); color: #fff; }
+.btn.close { border-color: var(--rose); color: var(--rose); }
+.btn.active-long { background: rgba(126,203,255,0.15); box-shadow: 0 0 14px rgba(126,203,255,0.35); }
+.btn.active-short { background: rgba(255,77,109,0.15); box-shadow: 0 0 14px rgba(255,77,109,0.35); }
+.btn.active-flat { background: rgba(255,200,87,0.12); box-shadow: 0 0 14px rgba(255,200,87,0.3); }
+.btn.size { border-color: var(--gold); color: var(--gold); min-width: 72px; }
+.btn.size:hover:not(:disabled) { background: rgba(240,185,11,0.12); color: #fff; box-shadow: 0 0 12px rgba(240,185,11,0.3); }
+.size-row { margin-top: 4px; }
+.size-lbl {
+  width: 100%; text-align: center;
+  color: var(--muted); font-size: 10px; letter-spacing: 1.5px;
+  text-transform: uppercase; margin-top: 8px;
+}
+
+.controls {
+  display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;
+  margin: 18px 0 8px;
+}
+.hint {
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  line-height: 1.55;
+  margin-top: 14px;
+  text-align: center;
+}
+.side-long { color: var(--cyan); font-weight: 600; }
+.side-short { color: var(--rose); font-weight: 600; }
+
+.toast {
+  position: fixed; bottom: 22px; right: 22px; z-index: 100;
+  background: var(--panel);
+  border: 1px solid var(--green);
+  color: var(--green);
+  padding: 10px 16px;
+  font-size: 12px;
+  letter-spacing: 1px;
+  box-shadow: 0 0 20px var(--green-glow);
+  display: none;
+  max-width: 360px;
+}
+.toast.err { border-color: var(--rose); color: var(--rose); }
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 8px;
+}
+@media (max-width: 700px) {
+  .row { grid-template-columns: 1fr; }
+}
+.kv {
+  border: 1px solid rgba(13,59,31,0.7);
+  padding: 10px 12px;
+}
+.kv .k { color: var(--muted); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; }
+.kv .v { margin-top: 4px; font-size: 14px; }
+
+.feed-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+@media (max-width: 860px) { .feed-layout { grid-template-columns: 1fr; } }
+
+.pnl-panel .panel-b { padding: 18px 16px 16px; }
+.pnl-big {
+  font-size: 28px; font-weight: 600; letter-spacing: 0.5px;
+  color: var(--green); text-shadow: 0 0 12px rgba(0,255,106,0.35);
+}
+.pnl-big.neg { color: var(--rose); text-shadow: 0 0 12px rgba(255,77,109,0.35); }
+.pnl-caption {
+  color: var(--muted); font-size: 10px; letter-spacing: 1.5px;
+  text-transform: uppercase; margin-top: 2px; margin-bottom: 14px;
+}
+.pnl-row {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: 8px 0; border-top: 1px solid rgba(13,59,31,0.7);
+  font-size: 13px;
+}
+.pnl-row .k { color: var(--muted); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; }
+.pnl-row .v { color: var(--text); }
+.pnl-row .v.pos { color: var(--cyan); }
+.pnl-row .v.neg { color: var(--rose); }
+
+.log-feed {
+  max-height: 320px; overflow-y: auto;
+  padding: 8px 8px 10px !important;
+}
+.log-empty { color: var(--muted); text-align: center; padding: 28px 10px; font-size: 12px; }
+.log-item {
+  display: grid;
+  grid-template-columns: 5px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 10px;
+  margin-bottom: 6px;
+  border: 1px solid rgba(13,59,31,0.7);
+  background: rgba(0,0,0,0.18);
+}
+.log-item.open { border-color: rgba(126,203,255,0.35); }
+.log-item.close-win { border-color: rgba(0,255,106,0.35); }
+.log-item.close-loss { border-color: rgba(255,77,109,0.4); }
+.log-bar { width: 5px; height: 100%; min-height: 36px; background: var(--gold); }
+.log-item.open .log-bar { background: var(--cyan); box-shadow: 0 0 8px rgba(126,203,255,0.45); }
+.log-item.close-win .log-bar { background: var(--green); box-shadow: 0 0 8px rgba(0,255,106,0.4); }
+.log-item.close-loss .log-bar { background: var(--rose); box-shadow: 0 0 8px rgba(255,77,109,0.4); }
+.log-top { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.tag {
+  font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase;
+  border: 1px solid var(--border); padding: 2px 7px;
+}
+.tag.open { color: var(--cyan); border-color: var(--cyan); }
+.tag.close { color: var(--gold); border-color: var(--gold); }
+.log-coin { font-weight: 600; letter-spacing: 1px; }
+.log-meta { color: var(--muted); font-size: 11px; margin-top: 3px; }
+.log-right { text-align: right; min-width: 90px; }
+.log-pnl { font-size: 14px; font-weight: 600; }
+.log-roe { font-size: 11px; color: var(--muted); margin-top: 2px; }
+</style>
+</head>
+<body>
+
+{% include '_nav.html' %}
+
+<div class="wrap">
+  <div class="kpis">
+    <div class="kpi"><div class="lbl">Container</div><div class="val" id="kRun">—</div></div>
+    <div class="kpi"><div class="lbl">BTC bias</div><div class="val amber" id="kBiasBtc">—</div></div>
+    <div class="kpi"><div class="lbl">ETH bias</div><div class="val amber" id="kBiasEth">—</div></div>
+    <div class="kpi"><div class="lbl">LTC bias</div><div class="val amber" id="kBiasLtc">—</div></div>
+    <div class="kpi"><div class="lbl">Perp / Spot USDC</div><div class="val cyan" id="kFree">—</div></div>
+    <div class="kpi"><div class="lbl">Realized PnL</div><div class="val" id="kRealized">—</div></div>
+    <div class="kpi"><div class="lbl">Open uPnL</div><div class="val" id="kUpnl">—</div></div>
+    <div class="kpi"><div class="lbl">Trail / SL ROE</div><div class="val gold" id="kTpsl">1.5/0.5 · −40%</div></div>
+    <div class="kpi"><div class="lbl">Hold clip</div><div class="val gold" id="kHold">12h</div></div>
+  </div>
+
+  <div class="panel rebuy-panel">
+    <div class="panel-h">
+      <h2>▦ Rebuy / sell</h2>
+      <span class="sub">DMan BBP % and trail % · same strategy, live file</span>
+    </div>
+    <div class="tune-bar">
+      <div class="tune-row">
+        <span class="rk">Long BBP &lt;</span>
+        <input id="tuneLong" type="number" min="0" max="1" step="0.05" value="0" oninput="previewTune()">
+        <span class="tune-px" id="tuneLongPx">≈ —</span>
+        <button type="button" class="btn flat" onclick="setTune({bb_long_threshold:0})">Official 0</button>
+        <button type="button" class="btn size" onclick="setTune({bb_long_threshold:0.5})">Mid 0.50</button>
+        <button type="button" class="btn size" onclick="setTune({bb_long_threshold:0.75})">Early 0.75</button>
+        <button type="button" class="btn long" onclick="applyTuneField('bb_long_threshold','tuneLong')">Set</button>
+      </div>
+      <div class="tune-row">
+        <span class="rk">Short BBP &gt;</span>
+        <input id="tuneShort" type="number" min="0" max="1.2" step="0.05" value="1" oninput="previewTune()">
+        <span class="tune-px" id="tuneShortPx">≈ —</span>
+        <button type="button" class="btn flat" onclick="setTune({bb_short_threshold:1})">Official 1</button>
+        <button type="button" class="btn long" onclick="applyTuneField('bb_short_threshold','tuneShort')">Set</button>
+      </div>
+      <div class="tune-row">
+        <span class="rk">Trail %</span>
+        <span class="rebuy-meta">arm</span>
+        <input id="tuneArm" type="number" min="0.1" max="20" step="0.1" value="1.5" oninput="previewTune()">
+        <span class="rebuy-meta">giveback</span>
+        <input id="tuneGive" type="number" min="0.1" max="10" step="0.1" value="0.5" oninput="previewTune()">
+        <span class="tune-px" id="tuneTrailPx">≈ —</span>
+        <button type="button" class="btn long" onclick="applyTrail()">Set trail</button>
+      </div>
+      <div class="rebuy-meta" id="tuneHint" style="padding:0 14px 8px">Prices update as you type. Set writes the %. Official long = BBP&lt;0 (below lower band).</div>
+    </div>
+    <div class="rebuy-grid" id="rebuyGrid">
+      <div class="rebuy-coin"><div class="rebuy-meta">loading…</div></div>
+    </div>
+    <p class="rebuy-note">
+      <b>Rebuy</b> — 15m BBP vs the long threshold (0 = official lower band, 0.75 ≈ ¾ up the band, near $49.7 on LTC today). First fill is DCA clip 1/4.
+      <b>Sell</b> — first of Trail (arm % / giveback %), SL ROE, TIME. No dollar target — % only.
+    </p>
+  </div>
+
+  <div class="feed-layout">
+    <div class="panel pnl-panel">
+      <div class="panel-h"><h2>▦ PnL</h2><span class="sub">dman only</span></div>
+      <div class="panel-b">
+        <div class="pnl-big" id="pnlRealized">$0.00</div>
+        <div class="pnl-caption">realized (closed trades)</div>
+        <div class="pnl-row"><span class="k">Open uPnL</span><span class="v" id="pnlOpen">—</span></div>
+        <div class="pnl-row"><span class="k">Wins / Losses</span><span class="v" id="pnlWl">—</span></div>
+        <div class="pnl-row"><span class="k">Opens / Closes</span><span class="v" id="pnlOc">—</span></div>
+      </div>
+    </div>
+    <div class="panel log-panel">
+      <div class="panel-h">
+        <h2>▦ Position log</h2>
+        <span class="sub">open / DCA add / close</span>
+      </div>
+      <div class="panel-b log-feed" id="tradeLog">
+        <div class="log-empty">no dman opens or closes yet</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="panel" data-coin="BTC">
+      <div class="panel-h">
+        <h2>▦ BTC-USD</h2>
+        <span class="sub" id="btcPosSub">BB + DCA ladder</span>
+      </div>
+      <div class="panel-b">
+        <div class="controls">
+          <button type="button" class="btn long" id="btnBtcLong" onclick="setBias('BTC','LONG')">LONG</button>
+          <button type="button" class="btn short" id="btnBtcShort" onclick="setBias('BTC','SHORT')">SHORT</button>
+          <button type="button" class="btn flat" id="btnBtcFlat" onclick="setBias('BTC','FLAT')">FLAT</button>
+          <button type="button" class="btn close" onclick="forceClose('BTC')">CLOSE</button>
+        </div>
+        <div class="size-lbl">start DCA now · leftover</div>
+        <div class="controls size-row">
+          <button type="button" class="btn size" id="btnBtc100" onclick="forceOpen('BTC', 100)">100%</button>
+          <button type="button" class="btn size" id="btnBtc50" onclick="forceOpen('BTC', 50)">50%</button>
+          <button type="button" class="btn size" id="btnBtc20" onclick="forceOpen('BTC', 20)">20%</button>
+        </div>
+        <div class="row">
+          <div class="kv"><div class="k">Position</div><div class="v" id="btcSide">—</div></div>
+          <div class="kv"><div class="k">ROE</div><div class="v" id="btcRoe">—</div></div>
+          <div class="kv"><div class="k">Entry</div><div class="v" id="btcEntry">—</div></div>
+          <div class="kv"><div class="k">Mark</div><div class="v" id="btcMid">—</div></div>
+          <div class="kv"><div class="k">Amount</div><div class="v" id="btcAmt">—</div></div>
+          <div class="kv"><div class="k">Leverage</div><div class="v" id="btcLev">—</div></div>
+          <div class="kv"><div class="k">BBP / Sig</div><div class="v" id="btcSig">—</div></div>
+          <div class="kv"><div class="k">DCA</div><div class="v" id="btcDca">—</div></div>
+          <div class="kv"><div class="k">Trail</div><div class="v" id="btcTrail">—</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" data-coin="ETH">
+      <div class="panel-h">
+        <h2>▦ ETH-USD</h2>
+        <span class="sub" id="ethPosSub">BB + DCA ladder</span>
+      </div>
+      <div class="panel-b">
+        <div class="controls">
+          <button type="button" class="btn long" id="btnEthLong" onclick="setBias('ETH','LONG')">LONG</button>
+          <button type="button" class="btn short" id="btnEthShort" onclick="setBias('ETH','SHORT')">SHORT</button>
+          <button type="button" class="btn flat" id="btnEthFlat" onclick="setBias('ETH','FLAT')">FLAT</button>
+          <button type="button" class="btn close" onclick="forceClose('ETH')">CLOSE</button>
+        </div>
+        <div class="size-lbl">start DCA now · leftover</div>
+        <div class="controls size-row">
+          <button type="button" class="btn size" id="btnEth100" onclick="forceOpen('ETH', 100)">100%</button>
+          <button type="button" class="btn size" id="btnEth50" onclick="forceOpen('ETH', 50)">50%</button>
+          <button type="button" class="btn size" id="btnEth20" onclick="forceOpen('ETH', 20)">20%</button>
+        </div>
+        <div class="row">
+          <div class="kv"><div class="k">Position</div><div class="v" id="ethSide">—</div></div>
+          <div class="kv"><div class="k">ROE</div><div class="v" id="ethRoe">—</div></div>
+          <div class="kv"><div class="k">Entry</div><div class="v" id="ethEntry">—</div></div>
+          <div class="kv"><div class="k">Mark</div><div class="v" id="ethMid">—</div></div>
+          <div class="kv"><div class="k">Amount</div><div class="v" id="ethAmt">—</div></div>
+          <div class="kv"><div class="k">Leverage</div><div class="v" id="ethLev">—</div></div>
+          <div class="kv"><div class="k">BBP / Sig</div><div class="v" id="ethSig">—</div></div>
+          <div class="kv"><div class="k">DCA</div><div class="v" id="ethDca">—</div></div>
+          <div class="kv"><div class="k">Trail</div><div class="v" id="ethTrail">—</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" data-coin="LTC">
+      <div class="panel-h">
+        <h2>▦ LTC-USD</h2>
+        <span class="sub" id="ltcPosSub">BB + DCA ladder</span>
+      </div>
+      <div class="panel-b">
+        <div class="controls">
+          <button type="button" class="btn long" id="btnLtcLong" onclick="setBias('LTC','LONG')">LONG</button>
+          <button type="button" class="btn short" id="btnLtcShort" onclick="setBias('LTC','SHORT')">SHORT</button>
+          <button type="button" class="btn flat" id="btnLtcFlat" onclick="setBias('LTC','FLAT')">FLAT</button>
+          <button type="button" class="btn close" onclick="forceClose('LTC')">CLOSE</button>
+        </div>
+        <div class="size-lbl">start DCA now · leftover</div>
+        <div class="controls size-row">
+          <button type="button" class="btn size" id="btnLtc100" onclick="forceOpen('LTC', 100)">100%</button>
+          <button type="button" class="btn size" id="btnLtc50" onclick="forceOpen('LTC', 50)">50%</button>
+          <button type="button" class="btn size" id="btnLtc20" onclick="forceOpen('LTC', 20)">20%</button>
+        </div>
+        <div class="row">
+          <div class="kv"><div class="k">Position</div><div class="v" id="ltcSide">—</div></div>
+          <div class="kv"><div class="k">ROE</div><div class="v" id="ltcRoe">—</div></div>
+          <div class="kv"><div class="k">Entry</div><div class="v" id="ltcEntry">—</div></div>
+          <div class="kv"><div class="k">Mark</div><div class="v" id="ltcMid">—</div></div>
+          <div class="kv"><div class="k">Amount</div><div class="v" id="ltcAmt">—</div></div>
+          <div class="kv"><div class="k">Leverage</div><div class="v" id="ltcLev">—</div></div>
+          <div class="kv"><div class="k">BBP / Sig</div><div class="v" id="ltcSig">—</div></div>
+          <div class="kv"><div class="k">DCA</div><div class="v" id="ltcDca">—</div></div>
+          <div class="kv"><div class="k">Trail</div><div class="v" id="ltcTrail">—</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" data-coin="TAO">
+      <div class="panel-h">
+        <h2>▦ TAO-USD</h2>
+        <span class="sub" id="taoPosSub">BB + DCA ladder</span>
+      </div>
+      <div class="panel-b">
+        <div class="controls">
+          <button type="button" class="btn long" id="btnTaoLong" onclick="setBias('TAO','LONG')">LONG</button>
+          <button type="button" class="btn short" id="btnTaoShort" onclick="setBias('TAO','SHORT')">SHORT</button>
+          <button type="button" class="btn flat" id="btnTaoFlat" onclick="setBias('TAO','FLAT')">FLAT</button>
+          <button type="button" class="btn close" onclick="forceClose('TAO')">CLOSE</button>
+        </div>
+        <div class="size-lbl">start DCA now · leftover</div>
+        <div class="controls size-row">
+          <button type="button" class="btn size" id="btnTao100" onclick="forceOpen('TAO', 100)">100%</button>
+          <button type="button" class="btn size" id="btnTao50" onclick="forceOpen('TAO', 50)">50%</button>
+          <button type="button" class="btn size" id="btnTao20" onclick="forceOpen('TAO', 20)">20%</button>
+        </div>
+        <div class="row">
+          <div class="kv"><div class="k">Position</div><div class="v" id="taoSide">—</div></div>
+          <div class="kv"><div class="k">ROE</div><div class="v" id="taoRoe">—</div></div>
+          <div class="kv"><div class="k">Entry</div><div class="v" id="taoEntry">—</div></div>
+          <div class="kv"><div class="k">Mark</div><div class="v" id="taoMid">—</div></div>
+          <div class="kv"><div class="k">Amount</div><div class="v" id="taoAmt">—</div></div>
+          <div class="kv"><div class="k">Leverage</div><div class="v" id="taoLev">—</div></div>
+          <div class="kv"><div class="k">BBP / Sig</div><div class="v" id="taoSig">—</div></div>
+          <div class="kv"><div class="k">DCA</div><div class="v" id="taoDca">—</div></div>
+          <div class="kv"><div class="k">Trail</div><div class="v" id="taoTrail">—</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-h">
+      <h2>▦ Notes</h2>
+      <span class="sub" id="statusSub">set unique subaccount in Confiig</span>
+    </div>
+    <div class="panel-b">
+      <p class="hint">
+        Official <strong>DMan V3</strong>: 15m Bollinger outside the bands (BBP &lt; 0 long, BBP &gt; 1 short), then a 4-level DCA ladder
+        (0.1% / 1.8% / 15% / 25%, scaled by band width). Level 0 is market; further clips add when price goes against.<br>
+        Exit: <strong>trailing stop</strong> 1.5% / 0.5% of price, <strong>3% price stop</strong>, hold buttons below. No 93% ROE dump.<br>
+        Max leverage: <strong>BTC 40x</strong> · <strong>ETH 25x</strong> · <strong>LTC 10x</strong> · <strong>TAO 5x</strong>.<br>
+        <strong>Will not trade</strong> until Confiig has a unique Dman subaccount (not Copy / Swing / Helliot / Surfn / Shorty).<br>
+        Container: <code>hummingbot-dman</code> · pairs <code>BTC-USD</code> + <code>ETH-USD</code> + <code>LTC-USD</code> + <code>TAO-USD</code>
+      </p>
+      <div class="size-lbl">hold clip · time limit</div>
+      <div class="controls size-row">
+        <button type="button" class="btn size" id="btnHold12" onclick="setHold(12)">12h</button>
+        <button type="button" class="btn size" id="btnHold24" onclick="setHold(24)">24h</button>
+        <button type="button" class="btn size" id="btnHold68" onclick="setHold(68)">68h</button>
+      </div>
+      <div class="controls">
+        <button type="button" class="btn close" onclick="forceClose('ALL')">CLOSE ALL</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% include '_hunter_desk.html' %}
+<div class="toast" id="toast"></div>
+
+<script>
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function showToast(msg, isErr) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast' + (isErr ? ' err' : '');
+  el.style.display = 'block';
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => { el.style.display = 'none'; }, 4000);
+}
+
+function coinPrefix(coin) {
+  return coin.charAt(0) + coin.slice(1).toLowerCase();
+}
+
+function setActiveBiasBtn(coin, bias) {
+  const prefix = coinPrefix(coin);
+  ['Long','Short','Flat'].forEach(x => {
+    const b = document.getElementById('btn' + prefix + x);
+    if (!b) return;
+    b.classList.remove('active-long', 'active-short', 'active-flat');
+  });
+  if (bias === 'LONG') document.getElementById('btn' + prefix + 'Long')?.classList.add('active-long');
+  if (bias === 'SHORT') document.getElementById('btn' + prefix + 'Short')?.classList.add('active-short');
+  if (bias === 'FLAT') document.getElementById('btn' + prefix + 'Flat')?.classList.add('active-flat');
+}
+
+function paintBiasKpi(id, bias) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = bias || 'FLAT';
+  el.className = 'val ' + (bias === 'LONG' ? 'cyan' : bias === 'SHORT' ? 'rose' : 'amber');
+}
+
+function fmtUsd(n, digits) {
+  if (n == null || Number.isNaN(Number(n))) return '—';
+  const x = Number(n);
+  const sign = x > 0 ? '+' : '';
+  return sign + '$' + x.toFixed(digits == null ? 2 : digits);
+}
+
+function paintPnl(st, summary, positions) {
+  const realized = summary.realized_pnl_usd != null ? Number(summary.realized_pnl_usd)
+    : (st.realized_pnl_usd != null ? Number(st.realized_pnl_usd) : 0);
+  const upnl = st.open_upnl_usd != null ? Number(st.open_upnl_usd) : 0;
+  const elR = document.getElementById('pnlRealized');
+  elR.textContent = fmtUsd(realized);
+  elR.className = 'pnl-big' + (realized < 0 ? ' neg' : '');
+  const kR = document.getElementById('kRealized');
+  kR.textContent = fmtUsd(realized);
+  kR.className = 'val ' + (realized < 0 ? 'rose' : realized > 0 ? 'cyan' : '');
+  const kU = document.getElementById('kUpnl');
+  kU.textContent = fmtUsd(upnl);
+  kU.className = 'val ' + (upnl < 0 ? 'rose' : upnl > 0 ? 'cyan' : '');
+  const o = document.getElementById('pnlOpen');
+  o.textContent = fmtUsd(upnl);
+  o.className = 'v ' + (upnl < 0 ? 'neg' : upnl > 0 ? 'pos' : '');
+  document.getElementById('pnlWl').textContent =
+    (summary.n_wins ?? st.n_wins ?? 0) + ' / ' + (summary.n_losses ?? st.n_losses ?? 0);
+  document.getElementById('pnlOc').textContent =
+    (summary.n_opens ?? st.n_opens ?? 0) + ' / ' + (summary.n_closes ?? st.n_closes ?? 0);
+}
+
+function paintTradeLog(trades) {
+  const box = document.getElementById('tradeLog');
+  if (!trades.length) {
+    box.innerHTML = '<div class="log-empty">no dman opens or closes yet</div>';
+    return;
+  }
+  box.innerHTML = trades.map(t => {
+    const action = String(t.action || '').toUpperCase();
+    const isOpen = action === 'OPEN' || action === 'ADD';
+    const pnl = t.pnl_usd == null ? null : Number(t.pnl_usd);
+    const roe = t.roe_pct == null ? null : Number(t.roe_pct);
+    let cls = isOpen ? 'open' : (pnl != null && pnl >= 0 ? 'close-win' : 'close-loss');
+    if (!isOpen && pnl == null) cls = 'open';
+    const side = t.side || '';
+    const coin = t.coin || '';
+    const amt = t.amount != null ? Number(t.amount).toFixed(5) : '—';
+    const px = t.price != null ? Number(t.price).toFixed(2) : '—';
+    const lev = t.leverage != null ? (t.leverage + 'x') : '';
+    const why = t.reason ? esc(t.reason) : '';
+    const ts = t.ts ? esc(String(t.ts).replace(' UTC','')) : '';
+    const pnlHtml = isOpen
+      ? '<div class="log-pnl" style="color:var(--muted)">—</div>'
+      : `<div class="log-pnl ${pnl != null && pnl < 0 ? 'neg' : 'pos'}" style="color:${pnl != null && pnl < 0 ? 'var(--rose)' : 'var(--cyan)'}">${fmtUsd(pnl, 3)}</div>
+         <div class="log-roe">${roe == null ? '' : ((roe >= 0 ? '+' : '') + roe.toFixed(2) + '% ROE')}</div>`;
+    return `<div class="log-item ${cls}">
+      <div class="log-bar"></div>
+      <div>
+        <div class="log-top">
+          <span class="tag ${isOpen ? 'open' : 'close'}">${action === 'ADD' ? 'ADD' : (isOpen ? 'OPEN' : 'CLOSE')}</span>
+          <span class="log-coin">${esc(coin)}</span>
+          <span class="${side === 'LONG' ? 'side-long' : 'side-short'}">${esc(side)}</span>
+        </div>
+        <div class="log-meta">${ts} · ${amt} @ ${px} ${lev} ${why ? '· ' + why : ''}</div>
+      </div>
+      <div class="log-right">${pnlHtml}</div>
+    </div>`;
+  }).join('');
+}
+
+function fmtPx(n) {
+  if (n == null || isNaN(Number(n))) return '—';
+  const x = Number(n);
+  if (x >= 1000) return x.toFixed(1);
+  if (x >= 100) return x.toFixed(2);
+  if (x >= 1) return x.toFixed(4);
+  return x.toFixed(6);
+}
+
+function fmtHold(s) {
+  if (s == null || isNaN(Number(s))) return '—';
+  const n = Math.max(0, Number(s));
+  const h = Math.floor(n / 3600);
+  const m = Math.floor((n % 3600) / 60);
+  if (h >= 48) return (h / 24).toFixed(1) + 'd';
+  if (h >= 1) return h + 'h ' + m + 'm';
+  return m + 'm';
+}
+
+function paintRebuy(rows, bias, positions, extra) {
+  extra = extra || {};
+  const box = document.getElementById('rebuyGrid');
+  if (!box) return;
+  const coins = ['BTC', 'ETH', 'LTC', 'TAO'];
+  const byCoin = {};
+  (rows || []).forEach(r => { if (r && r.coin) byCoin[r.coin] = r; });
+  box.innerHTML = coins.map(coin => {
+    const pos = (positions && positions[coin]) || {};
+    const r = byCoin[coin] || {};
+    const b = r.bias || (bias && bias[coin]) || pos.bias || 'FLAT';
+    let trigger = r.trigger;
+    let action = r.action;
+    let mid = r.mid != null ? r.mid : pos.mid_price;
+    let lower = r.lower;
+    let upper = r.upper;
+    if (lower == null && pos.bbp != null && pos.bbb != null && pos.mid_price != null) {
+      const m = Number(pos.mid_price);
+      const w = Number(pos.bbb) / 100 * m;
+      if (w > 0) {
+        lower = m - Number(pos.bbp) * w;
+        upper = lower + w;
+        mid = m;
+      }
+    }
+    const side = r.side || pos.position_side;
+    const thL = r.bb_long_threshold != null ? Number(r.bb_long_threshold)
+      : (extra.tune && extra.tune.bb_long_threshold != null ? Number(extra.tune.bb_long_threshold) : 0);
+    const thS = r.bb_short_threshold != null ? Number(r.bb_short_threshold)
+      : (extra.tune && extra.tune.bb_short_threshold != null ? Number(extra.tune.bb_short_threshold) : 1);
+    if (lower != null && upper != null) {
+      if (r.long_px == null) r.long_px = lower + thL * (upper - lower);
+      if (r.short_px == null) r.short_px = lower + thS * (upper - lower);
+    }
+    if (side) action = 'in_pos';
+    else if (b === 'LONG' && r.long_px != null) { action = 'wait_long'; trigger = r.long_px; }
+    else if (b === 'SHORT' && r.short_px != null) { action = 'wait_short'; trigger = r.short_px; }
+    else action = 'flat';
+    const gapPct = (trigger != null && mid != null) ? ((Number(mid) - Number(trigger)) / Number(mid) * 100) : null;
+    let buyHtml = '<span class="flat">no auto</span>';
+    let buyMeta = 'bias FLAT — set LONG/SHORT to arm a band';
+    if (action === 'in_pos') {
+      buyHtml = '<span class="in">in clip</span>';
+      buyMeta = (side || '') + ' @ $' + fmtPx(pos.entry_price || r.entry) + ' · next auto after close';
+    } else if (action === 'wait_long') {
+      buyHtml = '<span class="big">&lt; $' + fmtPx(trigger) + '</span>';
+      buyMeta = 'BBP &lt; ' + thL.toFixed(2) + ' · 15m close &lt; $' + fmtPx(trigger)
+        + ' · now $' + fmtPx(mid)
+        + (gapPct != null ? (' · ' + gapPct.toFixed(2) + '% above') : '');
+    } else if (action === 'wait_short') {
+      buyHtml = '<span class="big">&gt; $' + fmtPx(trigger) + '</span>';
+      buyMeta = 'BBP &gt; ' + thS.toFixed(2) + ' · 15m close &gt; $' + fmtPx(trigger)
+        + ' · now $' + fmtPx(mid)
+        + (gapPct != null ? (' · ' + Math.abs(gapPct).toFixed(2) + '% below') : '');
+    }
+    const slRoe = r.sl_roe_pct != null ? r.sl_roe_pct : extra.sl_roe;
+    const lev = r.leverage || pos.leverage || extra.lev && extra.lev[coin];
+    let sellHtml = '<span class="flat">—</span>';
+    let sellMeta = 'no clip · Trail + SL idle';
+    if (r.sl_px != null || r.trail_arm != null) {
+      const trailLbl = r.trail_live
+        ? ('TRAIL stop $' + fmtPx(r.trail_stop) + (r.trail_extreme ? (' from $' + fmtPx(r.trail_extreme)) : ''))
+        : ('TRAIL arm $' + fmtPx(r.trail_arm) + ' then −' + (r.trail_delta_pct || 0.5) + '% off high');
+      const slLbl = 'SL $' + fmtPx(r.sl_px) + ' (−' + (slRoe != null ? slRoe : '—') + '% ROE'
+        + (lev ? (' @ ' + lev + 'x') : '') + ')';
+      let timeLbl = 'TIME ' + (r.hold_s ? Math.round(r.hold_s / 3600) + 'h max' : '—');
+      if (r.time_left_s != null) timeLbl = 'TIME ' + fmtHold(r.time_left_s) + ' left';
+      sellHtml = '<span class="sell">' + trailLbl + '</span>';
+      sellMeta = slLbl + ' · ' + timeLbl;
+    }
+    const biasCls = b === 'LONG' ? 'side-long' : b === 'SHORT' ? 'side-short' : '';
+    return `<div class="rebuy-coin">
+      <div class="rc-h"><span class="rc-coin">${coin}</span><span class="rc-bias ${biasCls}">${esc(b)}</span></div>
+      <div class="rebuy-pair">
+        <div class="rk">Rebuy</div><div class="rv">${buyHtml}<div class="rebuy-meta">${buyMeta}</div></div>
+        <div class="rk">Sell</div><div class="rv">${sellHtml}<div class="rebuy-meta">${sellMeta}</div></div>
+      </div>
+      <div class="rebuy-meta" style="margin-top:8px">lower ${fmtPx(lower)} · upper ${fmtPx(upper)} · BBP ${pos.bbp != null ? Number(pos.bbp).toFixed(3) : '—'}</div>
+    </div>`;
+  }).join('');
+}
+
+let lastSnap = { positions: {}, bias: {}, rebuy: [], slRoe: 40 };
+
+function bandsOf(coin) {
+  const r = (lastSnap.rebuy || []).find(x => x.coin === coin) || {};
+  const pos = (lastSnap.positions || {})[coin] || {};
+  let lower = r.lower, upper = r.upper, mid = r.mid != null ? r.mid : pos.mid_price;
+  if ((lower == null || upper == null) && pos.bbp != null && pos.bbb != null && pos.mid_price != null) {
+    const m = Number(pos.mid_price);
+    const w = Number(pos.bbb) / 100 * m;
+    if (w > 0) {
+      lower = m - Number(pos.bbp) * w;
+      upper = lower + w;
+      mid = m;
+    }
+  }
+  return { lower, upper, mid, pos, r };
+}
+
+function previewTune() {
+  const thL = Number(document.getElementById('tuneLong') && document.getElementById('tuneLong').value);
+  const thS = Number(document.getElementById('tuneShort') && document.getElementById('tuneShort').value);
+  const armIn = Number(document.getElementById('tuneArm') && document.getElementById('tuneArm').value);
+  const giveIn = Number(document.getElementById('tuneGive') && document.getElementById('tuneGive').value);
+  const act = isNaN(armIn) ? 0.015 : armIn / 100;
+  const dlt = isNaN(giveIn) ? 0.005 : giveIn / 100;
+  const buy = [];
+  const sh = [];
+  const tr = [];
+  ['BTC', 'ETH', 'LTC', 'TAO'].forEach(coin => {
+    const { lower, upper, pos, r } = bandsOf(coin);
+    if (lower != null && upper != null && !isNaN(thL)) {
+      buy.push(coin + ' $' + fmtPx(lower + thL * (upper - lower)));
+    }
+    if (lower != null && upper != null && !isNaN(thS)) {
+      sh.push(coin + ' $' + fmtPx(lower + thS * (upper - lower)));
+    }
+    const side = String(pos.position_side || r.side || '').toUpperCase();
+    const bias = String((lastSnap.bias || {})[coin] || pos.bias || '').toUpperCase();
+    if (!side && bias !== 'LONG' && bias !== 'SHORT') {
+      return;
+    }
+    let entry = Number(pos.entry_price || r.entry);
+    if (!entry && lower != null && upper != null) {
+      entry = bias === 'SHORT' && !isNaN(thS)
+        ? lower + thS * (upper - lower)
+        : lower + thL * (upper - lower);
+    }
+    const useShort = side === 'SHORT' || (!side && bias === 'SHORT');
+    if (entry && !isNaN(act) && !isNaN(dlt)) {
+      if (useShort) {
+        const arm = entry * (1 - act);
+        tr.push(coin + ' arm $' + fmtPx(arm) + ' stop $' + fmtPx(arm * (1 + dlt)));
+      } else {
+        const arm = entry * (1 + act);
+        tr.push(coin + ' arm $' + fmtPx(arm) + ' stop $' + fmtPx(arm * (1 - dlt)));
+      }
+    }
+  });
+  const elB = document.getElementById('tuneLongPx');
+  const elS = document.getElementById('tuneShortPx');
+  const elT = document.getElementById('tuneTrailPx');
+  if (elB) elB.textContent = buy.length ? ('buy < ' + buy.join(' · ')) : '≈ —';
+  if (elS) elS.textContent = sh.length ? ('sell short > ' + sh.join(' · ')) : '≈ —';
+  if (elT) elT.textContent = tr.length ? ('sell ' + tr.join(' · ')) : '≈ —';
+}
+
+function paintTune(tune) {
+  tune = tune || {};
+  const active = document.activeElement && document.activeElement.id;
+  const elL = document.getElementById('tuneLong');
+  const elS = document.getElementById('tuneShort');
+  const elA = document.getElementById('tuneArm');
+  const elG = document.getElementById('tuneGive');
+  if (elL && tune.bb_long_threshold != null && active !== 'tuneLong') elL.value = Number(tune.bb_long_threshold).toFixed(2);
+  if (elS && tune.bb_short_threshold != null && active !== 'tuneShort') elS.value = Number(tune.bb_short_threshold).toFixed(2);
+  if (elA && tune.trail_activation != null && active !== 'tuneArm') elA.value = (Number(tune.trail_activation) * 100).toFixed(2);
+  if (elG && tune.trail_delta != null && active !== 'tuneGive') elG.value = (Number(tune.trail_delta) * 100).toFixed(2);
+  previewTune();
+}
+
+async function setTune(body) {
+  try {
+    const r = await fetch('/api/dman/tune', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    showToast(d.message || 'Tune updated');
+    refresh();
+  } catch (e) {
+    showToast('Tune failed: ' + e.message, true);
+  }
+}
+
+function applyTuneField(key, id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const body = {};
+  body[key] = el.value;
+  setTune(body);
+}
+
+function applyTrail() {
+  const arm = document.getElementById('tuneArm');
+  const give = document.getElementById('tuneGive');
+  setTune({
+    trail_activation: arm ? arm.value : undefined,
+    trail_delta: give ? give.value : undefined,
+  });
+}
+
+function paintPos(prefix, pos) {
+  const side = pos && pos.position_side;
+  const sideEl = document.getElementById(prefix + 'Side');
+  if (side) {
+    sideEl.innerHTML = `<span class="${side === 'LONG' ? 'side-long' : 'side-short'}">${esc(side)}</span>`;
+  } else {
+    sideEl.textContent = 'FLAT';
+  }
+  const roe = pos && pos.roe_pct;
+  const roeEl = document.getElementById(prefix + 'Roe');
+  if (roe == null) {
+    roeEl.textContent = '—';
+  } else {
+    roeEl.textContent = (roe >= 0 ? '+' : '') + Number(roe).toFixed(2) + '%';
+    roeEl.style.color = roe >= 0 ? 'var(--cyan)' : 'var(--rose)';
+  }
+  document.getElementById(prefix + 'Entry').textContent =
+    pos && pos.entry_price != null ? Number(pos.entry_price).toFixed(4) : '—';
+  document.getElementById(prefix + 'Mid').textContent =
+    pos && pos.mid_price != null ? Number(pos.mid_price).toFixed(4) : '—';
+  document.getElementById(prefix + 'Amt').textContent =
+    pos && pos.amount != null ? Number(pos.amount).toFixed(6) : '—';
+  const levEl = document.getElementById(prefix + 'Lev');
+  if (levEl) {
+    const lev = pos && pos.leverage;
+    levEl.textContent = lev != null ? (lev + 'x') : '—';
+  }
+  const bbp = pos && pos.bbp != null ? Number(pos.bbp).toFixed(3) : '—';
+  const sig = pos && pos.signal === 1 ? 'LONG' : pos && pos.signal === -1 ? 'SHORT' : '—';
+  document.getElementById(prefix + 'Sig').textContent = bbp + ' / ' + sig;
+  const dcaEl = document.getElementById(prefix + 'Dca');
+  if (dcaEl) {
+    const filled = pos && pos.dca_filled != null ? pos.dca_filled : 0;
+    const total = pos && pos.dca_total != null ? pos.dca_total : 0;
+    dcaEl.textContent = total ? (filled + ' / ' + total) : '—';
+  }
+  const trailEl = document.getElementById(prefix + 'Trail');
+  if (trailEl) {
+    trailEl.textContent = pos && pos.trail_active ? 'ON' : '—';
+    trailEl.style.color = pos && pos.trail_active ? 'var(--gold)' : '';
+  }
+}
+
+async function setBias(coin, bias) {
+  try {
+    const r = await fetch('/api/dman/bias', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bias, coin }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    showToast(d.message || (coin + ' bias ' + bias));
+    refresh();
+  } catch (e) {
+    showToast('Bias failed: ' + e.message, true);
+  }
+}
+
+let lastBias = { BTC: 'FLAT', ETH: 'FLAT', LTC: 'FLAT', TAO: 'FLAT' };
+
+function setSizeButtonsEnabled(coin, enabled) {
+  const prefix = coinPrefix(coin);
+  ['100','50','20'].forEach(p => {
+    const b = document.getElementById('btn' + prefix + p);
+    if (b) b.disabled = !enabled;
+  });
+}
+
+async function forceOpen(coin, pct) {
+  const side = lastBias[coin] || 'FLAT';
+  if (side !== 'LONG' && side !== 'SHORT') {
+    showToast('Set ' + coin + ' to LONG or SHORT first', true);
+    return;
+  }
+  if (!confirm('Open ' + side + ' ' + coin + ' now at ' + pct + '% of leftover free USD?')) return;
+  try {
+    const r = await fetch('/api/dman/open', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ coin, pct, side }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    showToast(d.message || ('Opening ' + coin + ' ' + pct + '%'));
+    setTimeout(refresh, 2000);
+  } catch (e) {
+    showToast('Open failed: ' + e.message, true);
+  }
+}
+
+async function setHold(hours) {
+  try {
+    const r = await fetch('/api/dman/hold', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hours }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    showToast(d.message || ('Hold ' + hours + 'h'));
+    refresh();
+  } catch (e) {
+    showToast('Hold failed: ' + e.message, true);
+  }
+}
+
+async function forceClose(coin) {
+  const label = coin === 'ALL' ? 'BTC, ETH, LTC and TAO' : coin;
+  if (!confirm('Force-close ' + label + ' on Hyperliquid now?')) return;
+  try {
+    const body = coin === 'ALL' ? {} : { coin };
+    const r = await fetch('/api/dman/close', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    showToast(d.message || 'Close signal sent');
+    setTimeout(refresh, 2000);
+  } catch (e) {
+    showToast('Close failed: ' + e.message, true);
+  }
+}
+
+async function refresh() {
+  try {
+    const r = await fetch('/api/dman');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    const st = d.status || {};
+    const bias = d.bias || {};
+    const live = !!d.running;
+    const positions = st.positions || {};
+
+    const pill = document.getElementById('botState');
+    pill.textContent = live ? 'LIVE' : 'OFFLINE';
+    pill.className = 'pill ' + (live ? 'live' : 'offline');
+
+    document.getElementById('kRun').textContent = live ? 'LIVE' : 'OFF';
+    document.getElementById('kRun').className = 'val' + (live ? '' : ' rose');
+
+    const btcBias = bias.BTC || (positions.BTC && positions.BTC.bias) || 'FLAT';
+    const ethBias = bias.ETH || (positions.ETH && positions.ETH.bias) || 'FLAT';
+    const ltcBias = bias.LTC || (positions.LTC && positions.LTC.bias) || 'FLAT';
+    const taoBias = bias.TAO || (positions.TAO && positions.TAO.bias) || 'FLAT';
+    lastBias = { BTC: btcBias, ETH: ethBias, LTC: ltcBias, TAO: taoBias };
+    paintBiasKpi('kBiasBtc', btcBias);
+    paintBiasKpi('kBiasEth', ethBias);
+    paintBiasKpi('kBiasLtc', ltcBias);
+    if (document.getElementById('kBiasTao')) paintBiasKpi('kBiasTao', taoBias);
+    setActiveBiasBtn('BTC', btcBias);
+    setActiveBiasBtn('ETH', ethBias);
+    setActiveBiasBtn('LTC', ltcBias);
+    setActiveBiasBtn('TAO', taoBias);
+    const btcOpen = !!(positions.BTC && positions.BTC.position_side);
+    const ethOpen = !!(positions.ETH && positions.ETH.position_side);
+    const ltcOpen = !!(positions.LTC && positions.LTC.position_side);
+    const taoOpen = !!(positions.TAO && positions.TAO.position_side);
+    setSizeButtonsEnabled('BTC', live && !btcOpen && (btcBias === 'LONG' || btcBias === 'SHORT'));
+    setSizeButtonsEnabled('ETH', live && !ethOpen && (ethBias === 'LONG' || ethBias === 'SHORT'));
+    setSizeButtonsEnabled('LTC', live && !ltcOpen && (ltcBias === 'LONG' || ltcBias === 'SHORT'));
+    setSizeButtonsEnabled('TAO', live && !taoOpen && (taoBias === 'LONG' || taoBias === 'SHORT'));
+
+    const eq = st.equity_usd != null ? Number(st.equity_usd) : null;
+    const free = st.free_usd != null ? st.free_usd : st.free_usdt;
+    const spot = st.spot_usd != null ? Number(st.spot_usd) : null;
+    const spotFree = st.spot_free_usd != null ? Number(st.spot_free_usd) : null;
+    const perpTxt = eq != null ? ('$' + eq.toFixed(2)) : '—';
+    const spotTxt = spot != null ? ('$' + spot.toFixed(2)) : '—';
+    document.getElementById('kFree').textContent = perpTxt + ' / ' + spotTxt;
+    document.getElementById('kFree').title =
+      'Perp equity / Spot USDC'
+      + (free != null ? (' · perp free $' + Number(free).toFixed(2)) : '')
+      + (spotFree != null ? (' · spot leftover $' + spotFree.toFixed(2) + ' (Spot→Perp to trade it)') : '');
+    const act = st.trail_activation != null ? (Number(st.trail_activation) * 100).toFixed(1) : '1.5';
+    const dlt = st.trail_delta != null ? (Number(st.trail_delta) * 100).toFixed(1) : '0.5';
+    const slRoe = d.sl_roe_pct != null ? Number(d.sl_roe_pct) : (st.sl_roe_pct != null ? Number(st.sl_roe_pct) : 40);
+    document.getElementById('kTpsl').textContent = act + '/' + dlt + ' · −' + slRoe + '%';
+    const holdH = Number(d.time_limit_h || st.time_limit_h || 12);
+    document.getElementById('kHold').textContent = holdH + 'h';
+    lastSnap = { positions: positions, bias: bias, rebuy: d.rebuy || [], slRoe: slRoe };
+    paintTune(d.tune || st.tune || {});
+    paintRebuy(d.rebuy, bias, positions, { sl_roe: slRoe, lev: st.leverage, tune: d.tune || st.tune });
+    [12, 24, 68].forEach(h => {
+      const b = document.getElementById('btnHold' + h);
+      if (!b) return;
+      b.classList.toggle('active-flat', Math.abs(holdH - h) < 0.01);
+    });
+
+    paintPos('btc', positions.BTC || {});
+    paintPos('eth', positions.ETH || {});
+    paintPos('ltc', positions.LTC || {});
+    paintPos('tao', positions.TAO || {});
+    paintPnl(st, d.trade_summary || {}, positions);
+    paintTradeLog(d.trades || []);
+
+    const ok = st.wallet_ok;
+    document.getElementById('statusSub').textContent = !live
+      ? 'container offline — start hummingbot-dman'
+      : (ok ? 'bot online · DMan V3 · BTC/ETH/LTC/TAO'
+            : 'bot online but blocked — set unique subaccount in Confiig');
+  } catch (e) {
+    console.error(e);
+    document.getElementById('botState').textContent = 'API ERR';
+    document.getElementById('botState').className = 'pill offline';
+  }
+}
+
+refresh();
+setInterval(refresh, 8000);
+</script>
+</body>
+</html>

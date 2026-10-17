@@ -1,0 +1,305 @@
+<!--
+Copyright 2026 rimbaud.io
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>rimBaud // BACKUP</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+:root {
+  --bg: #020804; --panel: #041208; --border: #0d3b1f;
+  --green: #00ff6a; --green-dim: #00b347; --text: #9dffc0; --muted: #3d7a55;
+  --rose: #ff4d6d; --cyan: #7ecbff; --gold: #f0b90b; --amber: #ffc857;
+  --font: 'IBM Plex Mono', 'Share Tech Mono', ui-monospace, monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg); color: var(--text); font-family: var(--font); font-size: 13px; line-height: 1.45;
+  background-image: linear-gradient(rgba(0,255,106,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,255,106,0.03) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+a { color: var(--green); text-decoration: none; }
+a:hover { color: #fff; }
+header {
+  border-bottom: 1px solid var(--border); padding: 14px 22px;
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+  background: linear-gradient(180deg, #03160a 0%, #020804 100%);
+  position: sticky; top: 0; z-index: 200; overflow: visible;
+}
+.brand { font-size: 15px; font-weight: 600; letter-spacing: 2px; color: #2A9FD6; }
+.brand span { color: var(--muted); font-weight: 400; }
+.nav { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.nav a {
+  border: 1px solid var(--border); padding: 5px 12px; color: var(--green-dim);
+  font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
+}
+.nav a.active, .nav a:hover { border-color: var(--gold); color: var(--gold); }
+.sys-dd { position: relative; z-index: 220; overflow: visible; }
+.sys-dd-btn {
+  background: #03160a; border: 1px solid var(--gold); color: var(--gold);
+  font: inherit; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; padding: 5px 12px; cursor: pointer;
+}
+.sys-dd.open .sys-dd-btn { border-color: var(--green); color: var(--green); }
+.sys-dd-menu {
+  display: none; position: absolute; top: calc(100% + 4px); left: 0; min-width: 200px;
+  background: #03160a; border: 1px solid var(--gold); padding: 4px; flex-direction: column;
+  z-index: 230; box-shadow: 0 8px 24px rgba(0,0,0,0.65);
+}
+.sys-dd.open .sys-dd-menu { display: flex; }
+.sys-dd-menu a { display: block; border: 1px solid transparent; padding: 8px 10px; color: var(--green-dim); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
+.sys-dd-menu a:hover, .sys-dd-menu a.on { border-color: var(--gold); color: var(--gold); }
+.wrap { max-width: 860px; margin: 0 auto; padding: 18px 18px 48px; }
+.lead { color: var(--muted); margin-bottom: 16px; }
+.card { background: var(--panel); border: 1px solid var(--border); margin-bottom: 14px; padding: 14px; }
+.card h2 { font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: var(--gold); margin-bottom: 10px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 8px 0; }
+label { color: var(--muted); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
+select, input[type=text] {
+  background: #020804; border: 1px solid var(--border); color: var(--text);
+  font-family: inherit; font-size: 13px; padding: 6px 8px; min-width: 220px;
+}
+button.primary {
+  background: transparent; border: 1px solid var(--green); color: var(--green);
+  font-family: inherit; font-size: 12px; letter-spacing: 1px; text-transform: uppercase;
+  padding: 10px 16px; cursor: pointer;
+}
+button.primary:hover:not(:disabled) { background: rgba(0,255,106,0.08); }
+button.primary:disabled { opacity: 0.45; cursor: wait; }
+.spin {
+  font-size: 42px; color: var(--green); text-shadow: 0 0 12px rgba(0,255,106,0.45);
+  width: 48px; text-align: center; font-family: 'Share Tech Mono', monospace;
+}
+.spin.idle { color: var(--muted); text-shadow: none; }
+.spin.err { color: var(--rose); }
+.meta { color: var(--muted); font-size: 12px; }
+.ok { color: var(--green); }
+.bad { color: var(--rose); }
+.card.hot { border-color: var(--rose); }
+pre {
+  background: #010402; border: 1px solid var(--border); padding: 10px 12px;
+  max-height: 280px; overflow: auto; color: var(--muted); font-size: 11px;
+  white-space: pre-wrap; margin-top: 10px; min-height: 120px;
+}
+.warn { color: var(--amber); font-size: 12px; margin-top: 8px; }
+</style>
+</head>
+<body>
+{% include '_nav.html' %}
+<div class="wrap">
+  <p class="lead">
+    Bare-metal rescue USB via <b>ReaR</b> (Relax-and-Recover). This writes a bootable stick.
+    If the PC dies, boot that USB and run <code>rear recover</code>.
+    It does <b>not</b> restore the running machine from here, and it does <b>not</b> close Hyperliquid positions.
+    Docker image layers are skipped. A checkup runs first: the stick must be large enough for the gzip estimate.
+  </p>
+  <div class="card" id="chkCard">
+    <h2>Checkup</h2>
+    <div class="meta" id="chkRear">rear: …</div>
+    <div class="meta" id="chkHost">host payload: …</div>
+    <div class="meta" id="chkUsb">USB: …</div>
+    <div class="meta" id="chkResult">…</div>
+  </div>
+  <div class="card">
+    <h2>USB stick</h2>
+    <div class="row">
+      <label>Device</label>
+      <select id="disk"></select>
+      <button type="button" class="primary" id="btnRef" onclick="loadStatus()">Refresh disks</button>
+    </div>
+    <div class="row">
+      <label>Type name to confirm wipe of the stick</label>
+      <input id="confirm" type="text" placeholder="sdb" autocomplete="off">
+    </div>
+    <p class="warn" id="diskNote">Select a USB disk. NVMe system disks are hidden. The stick will be formatted.</p>
+  </div>
+  <div class="card">
+    <h2>Last backup</h2>
+    <div class="row">
+      <div class="spin idle" id="spin">·</div>
+      <div>
+        <div class="meta" id="lastLine">no ReaR USB written yet</div>
+        <div class="meta" id="rearLine">rear: checking…</div>
+        <div class="meta" id="jobLine">status: idle</div>
+      </div>
+    </div>
+    <div class="row">
+      <button type="button" class="primary" id="btnGo" onclick="startBackup()">Write rescue USB</button>
+    </div>
+    <pre id="log">ready</pre>
+  </div>
+  <div class="card">
+    <h2>WIRE pack (one JSON)</h2>
+    <p class="meta">Desk + Home + Health canvases in <code>conf/wire_pack.json</code>. Restore writes those graph files only. It does not close or open Hyperliquid clips. Reload WIRE after restore.</p>
+    <div class="row">
+      <button type="button" class="primary" onclick="savePack()">Save wire JSON</button>
+      <button type="button" class="primary" onclick="restorePack()">Restore wire JSON</button>
+      <a class="primary" href="/api/wire/pack?download=1" style="display:inline-block;padding:10px 16px">Download JSON</a>
+    </div>
+    <div class="meta" id="packMsg">idle</div>
+  </div>
+</div>
+<script>
+const FRAMES = ["|","/","-","\\"];
+let fi = 0, running = false, timer = null, lastBackup = null;
+function fmtSize(n){
+  n = Number(n||0);
+  if (n > 1e9) return (n/1e9).toFixed(1)+"G";
+  if (n > 1e6) return (n/1e6).toFixed(0)+"M";
+  return n+"B";
+}
+function setSpin(mode, ch){
+  const el = document.getElementById("spin");
+  el.className = "spin" + (mode==="err"?" err": mode==="run"?"":" idle");
+  el.textContent = ch || (mode==="run" ? FRAMES[fi%4] : mode==="ok" ? "*" : "·");
+}
+async function loadStatus(){
+  const r = await fetch("/api/backup");
+  const d = await r.json();
+  lastBackup = d;
+  const sel = document.getElementById("disk");
+  const cur = sel.value;
+  sel.innerHTML = (d.disks||[]).map(x =>
+    `<option value="${x.name}">${x.name} · ${fmtSize(x.size)} · ${x.fits ? "fits" : "TOO SMALL"} · ${x.model}${x.label?" · "+x.label:""}</option>`
+  ).join("") || `<option value="">no USB disk ≥ 1G</option>`;
+  if (cur && [...sel.options].some(o => o.value===cur)) sel.value = cur;
+  sel.onchange = renderCheck;
+  renderCheck();
+  const j = d.job || {};
+  const rear = d.rear || {};
+  document.getElementById("rearLine").textContent = rear.installed
+    ? ("rear: " + (rear.version||"installed"))
+    : "rear: not installed yet — first write will apt-install it on the host";
+  document.getElementById("lastLine").textContent = j.last_ok
+    ? ("last ok " + j.last_ok + (j.last_device ? " on "+j.last_device : ""))
+    : "no ReaR USB written yet";
+  document.getElementById("jobLine").textContent = "status: " + (j.status||"idle")
+    + (j.device ? " · "+j.device : "")
+    + (j.error ? " · "+j.error : "");
+  document.getElementById("jobLine").className = "meta" + (j.status==="error"?" bad": j.status==="ok"?" ok":"");
+  const tail = (d.log_tail || j.log || []).join("\n");
+  if (tail) document.getElementById("log").textContent = tail;
+  running = j.status === "running";
+  if (running) {
+    setSpin("run", j.spinner || FRAMES[fi%4]);
+    if (!timer) timer = setInterval(pollJob, 1000);
+  } else {
+    setSpin(j.status==="error"?"err": j.status==="ok"?"ok":"idle",
+      j.status==="error"?"!": j.status==="ok"?"*":"·");
+    if (timer) { clearInterval(timer); timer = null; }
+  }
+  if (d.disks_error) document.getElementById("diskNote").textContent = d.disks_error;
+}
+function renderCheck(){
+  const d = lastBackup || {};
+  const sel = document.getElementById("disk");
+  const disk = (d.disks || []).find((x) => x.name === sel.value) || (d.disks || [])[0] || {};
+  const chk = d.check || {};
+  const rear = d.rear || {};
+  document.getElementById("chkRear").textContent = rear.installed
+    ? ("rear: " + (rear.version || "installed"))
+    : "rear: not found";
+  document.getElementById("chkRear").className = "meta " + (rear.installed ? "ok" : "bad");
+  document.getElementById("chkHost").textContent =
+    "host used " + (chk.host_used_h || "—")
+    + " − skip " + (chk.exclude_h || "—")
+    + " → raw " + (chk.payload_raw_h || "—")
+    + " · gzip est " + (chk.payload_gzip_h || "—")
+    + " · need " + (chk.need_h || "—");
+  document.getElementById("chkUsb").textContent = disk.name
+    ? ("USB /dev/" + disk.name + " " + fmtSize(disk.size) + " · " + (disk.note || ""))
+    : "no USB selected";
+  const ok = !!(disk.fits);
+  const res = document.getElementById("chkResult");
+  res.textContent = ok ? ("OK  " + (chk.message || "fits")) : (chk.message || "USB too small");
+  res.className = "meta " + (ok ? "ok" : "bad");
+  document.getElementById("chkCard").className = "card" + (ok ? "" : " hot");
+  document.getElementById("btnGo").disabled = running || !sel.value || !ok;
+}
+async function pollJob(){
+  fi += 1;
+  try {
+    const r = await fetch("/api/backup/job");
+    const d = await r.json();
+    const j = d.job || {};
+    setSpin(j.status==="running"?"run": j.status==="error"?"err":"ok", j.spinner || FRAMES[fi%4]);
+    document.getElementById("jobLine").textContent = "status: " + (j.status||"") + (j.device?" · "+j.device:"");
+    const tail = (d.log_tail || []).join("\n");
+    if (tail) {
+      const pre = document.getElementById("log");
+      pre.textContent = tail;
+      pre.scrollTop = pre.scrollHeight;
+    }
+    if (j.status !== "running") loadStatus();
+  } catch (e) {
+    setSpin("err", "!");
+  }
+}
+async function startBackup(){
+  const dev = document.getElementById("disk").value;
+  const confirm = document.getElementById("confirm").value.trim();
+  if (!dev) { alert("no USB selected"); return; }
+  if (confirm !== dev) { alert("type "+dev+" in the confirm box — this formats the USB stick only"); return; }
+  if (!confirm("Write ReaR rescue USB to /dev/"+dev+"?\n\nThis ERASES the stick. It does not touch NVMe or Hyperliquid positions.")) return;
+  document.getElementById("btnGo").disabled = true;
+  running = true;
+  setSpin("run", "/");
+  document.getElementById("log").textContent = "queuing…";
+  try {
+    const r = await fetch("/api/backup/run", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({device: dev, confirm: confirm}),
+    });
+    const d = await r.json();
+    if (!r.ok || d.ok === false) throw new Error(d.error || "HTTP "+r.status);
+    if (!timer) timer = setInterval(pollJob, 1000);
+  } catch (e) {
+    running = false;
+    setSpin("err", "!");
+    document.getElementById("log").textContent = String(e);
+    document.getElementById("btnGo").disabled = false;
+  }
+}
+async function savePack(){
+  const el = document.getElementById("packMsg");
+  el.textContent = "saving…";
+  try {
+    const r = await fetch("/api/wire/pack", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({action:"save"})});
+    const d = await r.json();
+    el.textContent = d.message || d.error || "saved";
+    el.className = "meta " + (d.ok ? "ok" : "bad");
+  } catch (e) { el.textContent = String(e); el.className = "meta bad"; }
+}
+async function restorePack(){
+  if (!confirm("Restore WIRE canvases from conf/wire_pack.json?\nDoes not close Hyperliquid clips.")) return;
+  const el = document.getElementById("packMsg");
+  el.textContent = "restoring…";
+  try {
+    const r = await fetch("/api/wire/pack", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({action:"restore"})});
+    const d = await r.json();
+    el.textContent = d.message || d.error || "restored";
+    el.className = "meta " + (d.ok ? "ok" : "bad");
+  } catch (e) { el.textContent = String(e); el.className = "meta bad"; }
+}
+loadStatus();
+setInterval(() => { if (!running) loadStatus(); }, 8000);
+</script>
+</body>
+</html>
