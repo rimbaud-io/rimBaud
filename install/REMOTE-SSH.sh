@@ -13,11 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Run ON torky as forklifter. Installs gerdy's live-push SSH pubkey.
+# Run ON remote as forklifter. Installs operator's live-push SSH pubkey.
 # Does not restart hunters. Does not CLOSE/OPEN Hyperliquid.
 set -euo pipefail
 HOST="$(hostname -s 2>/dev/null || hostname)"
-[ "$HOST" = "torky" ] || { echo "xx run on torky (this is $HOST)"; exit 1; }
+if [ -n "${RIMBAUD_REMOTE_HOST:-}" ] && [ "$HOST" != "$RIMBAUD_REMOTE_HOST" ]; then echo "xx run on $RIMBAUD_REMOTE_HOST (this is $HOST)"; exit 1; fi
 [ "$(id -un)" = "forklifter" ] || echo "!! expected user forklifter, got $(id -un)"
 
 PUB=""
@@ -30,8 +30,8 @@ do
 done
 if [ -z "$PUB" ]; then
   echo "xx no rimbaud-deploy.pub"
-  echo "   mount gerdy share:  ~/desk-share/rimbaud-deploy.pub"
-  echo "   or copy the one line from gerdy ~/.ssh/id_ed25519_rimbaud_deploy.pub into /tmp/"
+  echo "   mount operator share:  ~/desk-share/rimbaud-deploy.pub"
+  echo "   or copy the one line from operator ~/.ssh/id_ed25519_rimbaud_deploy.pub into /tmp/"
   exit 1
 fi
 
@@ -55,7 +55,7 @@ echo "==> this box:"
 hostname
 ip -4 addr show | awk '/inet /{print "  "$2"  "$NF}'
 echo
-echo "back on gerdy Meta: PUSH latest"
-echo "LAN ssh should work: forklifter@192.168.1.123"
+echo "back on operator Meta: PUSH latest"
+echo "LAN ssh should work: forklifter@192.168.1.20"
 echo "VPN 10.66.80.2:22 is often closed — live-push will use LAN if VPN times out."
 echo "positions untouched."

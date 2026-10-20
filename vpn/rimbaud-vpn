@@ -93,7 +93,7 @@ detect_endpoint() {
   fi
   local src
   src="$(lan_src)"
-  [ -n "$src" ] || src="192.168.1.73"
+  [ -n "$src" ] || src="192.168.1.10"
   echo "${src}:${PORT}"
 }
 
@@ -411,7 +411,7 @@ cmd_down() {
 cmd_endpoint() {
   need_root
   local ep="${1:-}"
-  [[ "$ep" == *:* ]] || die "usage: $0 endpoint 192.168.1.73:51820"
+  [[ "$ep" == *:* ]] || die "usage: $0 endpoint 192.168.1.10:51820"
   mkdir_vpn
   echo "$ep" > "$VPN_DIR/endpoint"
   python3 - "$PEERS_JSON" "$ep" <<'PY' 2>/dev/null || true

@@ -19,7 +19,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 SCRIPT="$HERE/write-usb.sh"
 ASK="$(cd "$HERE/.." && pwd)/askpass-zenity.sh"
 TARGET="${1:-}"
-[ -n "$TARGET" ] || { echo "usage: $0 /dev/sdX|/media/user/Ventoy"; exit 2; }
+[ -n "$TARGET" ] || { echo "usage: $0 /dev/sdX|/media/usb/Ventoy"; exit 2; }
 [ -x "$SCRIPT" ] || { echo "missing $SCRIPT"; exit 1; }
 
 MODE=--dd

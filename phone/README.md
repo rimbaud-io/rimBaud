@@ -32,7 +32,7 @@ Talks **only** to your **static-IP gateway**. Never holds HL keys. **LONG / FLAT
 
 1. A VPS / home box with a **public IPv4** (or domain + Let’s Encrypt).
 2. That box must **reach the hub Spring** (`127.0.0.1:5004` if the gateway runs **on the hub**, or WireGuard `10.66.80.1:5004` if the VPS is elsewhere).
-3. To see **torky**, the gateway host must also GET `http://10.66.80.2:5004/api/home` (join the same `10.66.80.0/24` control plane; UFW 5004 on `wg-rimbaud`).
+3. To see **remote**, the gateway host must also GET `http://10.66.80.2:5004/api/home` (join the same `10.66.80.0/24` control plane; UFW 5004 on `wg-rimbaud`).
 4. `GATEWAY_TOKEN` — long random string. Put the same token in the iPhone Settings field.
 5. **HTTPS** if you want “Add to Home Screen” to behave as an app (iOS requires HTTPS except localhost).
 
@@ -41,18 +41,18 @@ Do **not** bind Spring itself to `0.0.0.0`. Only this gateway listens on the sta
 ## Run on the hub (LAN test)
 
 ```bash
-cd /home/gerdy/hummingbird/hummingbot/iphone
+cd phone
 GATEWAY_TOKEN='pick-a-long-secret' ./run.sh
 ```
 
-iPhone on the same Wi-Fi: `http://192.168.1.73:8787/`  
+iPhone on the same Wi-Fi: `http://192.168.1.10:8787/`  
 Settings → API base that URL, paste token, Save.  
 Safari → Share → **Add to Home Screen**.
 
 ## Run on the static-IP box
 
 ```bash
-# WireGuard to 10.66.80.1 (hub) and 10.66.80.2 (torky)
+# WireGuard to 10.66.80.1 (hub) and 10.66.80.2 (remote)
 export HUB_SPRING=http://10.66.80.1:5004
 export GATEWAY_TOKEN='…'
 python3 gateway.py   # :8787

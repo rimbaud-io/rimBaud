@@ -27,7 +27,7 @@ Does **not** copy wallets. Does **not** CLOSE/OPEN Hyperliquid.
 | Software path | this tree → `/opt/rimbaud` |
 | Package | `rimbaud` (built by `build-deb.sh` from `pack.sh`) |
 | Public APT repo | **none yet** — ISO ships `deb [trusted=yes] file:/var/lib/rimbaud/apt ./`. Set `"apt_repo"` in `config.json` to a `https://…` URL when you publish one. |
-| Install user | `forklifter` / password `rimbaud` (first boot expires it) |
+| Install user | `forklifter` / password set at install (first boot expires it) |
 
 ## Directory tree
 

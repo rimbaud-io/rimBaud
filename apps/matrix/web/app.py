@@ -410,7 +410,7 @@ SURFN_STATUS_FILE = os.path.join(CONF_DIR, "surfn_status.json")
 SURFN_FORCE_CLOSE = os.path.join(CONF_DIR, "force_close_surfn.txt")
 SURFN_FORCE_OPEN = os.path.join(CONF_DIR, "force_open_surfn.json")
 SURFN_TRADES_FILE = os.path.join(CONF_DIR, "surfn_trades.json")
-SURFN_WALLET = "0x1619ed7e5cb3f7d465e8f8d4df0648e97732a840"
+SURFN_WALLET = ""
 SHORTN_BIAS_FILE = os.path.join(CONF_DIR, "shortn_bias.json")
 SHORTN_STATUS_FILE = os.path.join(CONF_DIR, "shortn_status.json")
 SHORTN_FORCE_CLOSE = os.path.join(CONF_DIR, "force_close_shortn.txt")
@@ -1313,7 +1313,7 @@ def _desk_health():
 # Main copy-trader wallet (not the swing/helliot subaccounts).
 COPY_WALLET         = wallet_for(
     "hummingbot-hl",
-    os.environ.get("HL_COPY_WALLET", "0x3D9723f603052281a4CF6b3D188728a9AcBc0710"),
+    os.environ.get("HL_COPY_WALLET", ""),
 )
 
 _CACHE = {}
@@ -7586,10 +7586,10 @@ def _copy_leader_cards():
         title = (why.get("title") or "").strip()
         if not roster and (not title or title == "Copy roster"):
             title = {
-                "0xf27ebb91ea420f73b59b205ac7e0b77a90ec8f3c": "Sleepy shorts book (old T#2)",
-                "0xa4e33be0b96c1ec4031f2db53dcd5660621ce3ec": "HYPE / NEAR shorts",
-                "0x07fd993f0fa3a185f7207adccd29f7a87404689d": "Large ETH / BTC / HYPE longs",
-                "0x53f8f390fd4f70941c5d160a964f6893c8dbceff": "BTC + HYPE longs",
+                "": "Sleepy shorts book (old T#2)",
+                "": "HYPE / NEAR shorts",
+                "": "Large ETH / BTC / HYPE longs",
+                "": "BTC + HYPE longs",
             }.get(addr) or ((coins[0] + " book") if coins else "Retired leader")
         if not title:
             title = f"T#{num}" if num else "Leader"
@@ -11371,7 +11371,7 @@ def api_helliot():
     except Exception:
         pass
     wallet = (status or {}).get("subaccount") or wallet_for(
-        "hummingbot-helliot", "0xe4b3656470cfbe6bf487bc022e944ec9de343802"
+        "hummingbot-helliot", ""
     )
     live = fetch_hl_account(wallet)
     spot = fetch_hl_spot_usdc(wallet)
@@ -13811,7 +13811,7 @@ def _cpp_host_root():
     r = _host_sh(
         r"""
 set -e
-for p in /home/gerdy/hummingbird/hummingbot/c++ /opt/freiquell/c++ /opt/hummingbot/c++; do
+for p in /opt/freiquell/c++ /opt/freiquell/c++ /opt/hummingbot/c++; do
   if [ -x "$p/install/install.sh" ] && [ -d "$p/server" ] && [ -d "$p/matrix" ]; then
     echo "$p"
     exit 0

@@ -22,7 +22,7 @@ services:
     ports:
       - "127.0.0.1:3000:3000"
     env_file:
-      - /home/gerdy/.config/pettibon/grafana.env
+      - ./grafana.env
     environment:
       GF_INSTALL_PLUGINS: frser-sqlite-datasource
       GF_AUTH_ANONYMOUS_ENABLED: "true"
@@ -33,5 +33,5 @@ services:
       GF_SERVER_ROOT_URL: http://127.0.0.1:3000
       GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/provisioning/dashboards/json/trades.json
     volumes:
-      - /home/gerdy/hummingbird/hummingbot/pettibon_data:/var/lib/pettibon:ro
+      - ./pettibon_data:/var/lib/pettibon:ro
       - ./provisioning:/etc/grafana/provisioning:ro

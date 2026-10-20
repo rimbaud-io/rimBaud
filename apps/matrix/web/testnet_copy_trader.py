@@ -38,7 +38,7 @@ from eth_account import Account
 # ── Config from env ───────────────────────────────────────────────────────────
 
 PRIVATE_KEY        = os.environ.get("HL_PRIVATE_KEY", "")
-TRADER_ADDRESS     = os.environ.get("TRADER_ADDRESS", "0x9f3e77cb89df964003053aa5b438e5697c77f4f9")
+TRADER_ADDRESS     = os.environ.get("TRADER_ADDRESS", "")
 ALLOCATION_PCT     = float(os.environ.get("ALLOCATION_PCT", "1.0"))
 MAX_LEVERAGE       = int(os.environ.get("MAX_LEVERAGE", "20"))
 POLL_INTERVAL      = int(os.environ.get("POLL_INTERVAL", "5"))

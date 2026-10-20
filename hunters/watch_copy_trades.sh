@@ -17,7 +17,7 @@
 # Live colour-coded view of the copy trader log.
 # Usage: bash watch_copy_trades.sh [log_path]
 
-LOG="${1:-/home/gerdy/hummingbird/hummingbot/logs/copy_trades.log}"
+LOG="${1:-/home/operator/hummingbird/hummingbot/logs/copy_trades.log}"
 
 if [ ! -f "$LOG" ]; then
     echo "Log not found yet: $LOG"

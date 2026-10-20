@@ -17,7 +17,7 @@
 # The system disk is never opened. Nothing is written until you run create.
 #
 #   python3 install_new/backup-image.py status
-#   python3 install_new/backup-image.py create /media/you/USB
+#   python3 install_new/backup-image.py create /media/usb/USB
 #   python3 install_new/backup-image.py selftest
 #
 # The archive holds one member, remember.img: the raw whole-disk bytes.

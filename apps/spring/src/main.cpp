@@ -68,7 +68,7 @@ int main(int argc, char** argv) {
         return 1;
     }
     if (br.conf.empty()) {
-        const char* guesses[] = {"../conf", "conf", "/home/gerdy/hummingbird/hummingbot/conf"};
+        const char* guesses[] = {"../conf", "conf", "conf"};
         for (auto g : guesses) if (is_conf(g)) { br.conf = g; break; }
     }
     if (br.conf.empty() || !is_conf(br.conf)) {

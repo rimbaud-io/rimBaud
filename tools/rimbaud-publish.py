@@ -23,12 +23,13 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
 
 LIVE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DEST = os.environ.get("RIMBAUD_GITHUB") or "/home/gerdy/hummingbird/rimbaud"
+DEST = os.environ.get("RIMBAUD_GITHUB") or os.path.expanduser("~/rimbaud")
 PAGES = os.path.join(LIVE, "scripts", "github_pages")
 
 SKIP_DIRS = {
@@ -99,9 +100,11 @@ def redact(rel: str, text: str) -> str:
         start = text.find('"install_password_note"')
         end = text.find("\n", start)
         if start >= 0 and end > start:
+            comma = "," if "," in text[start:end] else ""
             text = (
                 text[:start]
                 + '"install_password_note": "Set the install password on the machine. First boot forces a change. Not a live HL key."'
+                + comma
                 + text[end:]
             )
     return text
@@ -142,6 +145,177 @@ def patch(path: str, old: str, new: str) -> None:
         raise SystemExit(f"publish patch missed {path}")
     with open(path, "w", encoding="utf-8", newline="\n") as fh:
         fh.write(text.replace(old, new))
+
+
+# Login names that are the product, the container, or a public install account.
+_SKIP_NAMES = {
+    "hummingbot", "root", "ubuntu", "mint", "user", "usb", "cdrom",
+    "share", "rimbaud", "forklifter", "operator", "remote",
+}
+# A real home directory, not the /api/home/ route.
+_HOME_USER = r"(?<![A-Za-z0-9._-])/home/(?!hummingbot\b)[A-Za-z0-9._-]+"
+_ETH = re.compile(r"(?<![0-9a-fA-F])0x[a-fA-F0-9]{40}(?![0-9a-fA-F])")
+_RESOLVERS = {b"1.1.1.1", b"1.0.0.1", b"8.8.8.8", b"8.8.4.4", b"9.9.9.9"}
+
+
+def _operator_names(text: str) -> set[str]:
+    found = set(re.findall(
+        r"(?<![A-Za-z0-9._-])/home/(?!hummingbot\b)([A-Za-z0-9._-]+)",
+        text,
+    ))
+    return {
+        n for n in found
+        if n.lower() not in _SKIP_NAMES and len(n) >= 3 and set(n) != {"."}
+    }
+
+
+def _blank_wallets(text: str) -> str:
+    def repl(match: re.Match[str]) -> str:
+        addr = match.group(0)
+        if set(addr[2:].lower()) <= {"0"}:
+            return addr
+        return ""
+    return _ETH.sub(repl, text)
+
+
+def public_text(text: str, names: set[str]) -> str:
+    """Stage-only. Live sources keep this machine's paths and wallets."""
+    text = re.sub(
+        r'or "/home/(?!hummingbot\b)[^/\s"]+/hummingbird/rimbaud"',
+        'or os.path.expanduser("~/rimbaud")',
+        text,
+    )
+    rules = [
+        (_HOME_USER + r"/hummingbird/hummingbot/conf/hl_wallets", "conf/hl_wallets"),
+        (_HOME_USER + r"/hummingbird/hummingbot/pettibon_data", "./pettibon_data"),
+        (_HOME_USER + r"/hummingbird/hummingbot/logs", "logs"),
+        (_HOME_USER + r"/hummingbird/hummingbot/iphone", "phone"),
+        (_HOME_USER + r"/hummingbird/hummingbot/c\+\+", "/opt/freiquell/c++"),
+        (_HOME_USER + r"/hummingbird/hummingbot/conf", "conf"),
+        (_HOME_USER + r"/hummingbird/hummingbot", "."),
+        (_HOME_USER + r"/\.config/pettibon/grafana\.env", "./grafana.env"),
+        (_HOME_USER + r"/hummingbird/rimbaud", "~/rimbaud"),
+        (r"/media/(?!usb(?![A-Za-z0-9._-]))(?!cdrom(?![A-Za-z0-9._-]))[A-Za-z0-9._-]+", "/media/usb"),
+        (_HOME_USER, "."),
+    ]
+    for pat, rep in rules:
+        text = re.sub(pat, rep, text)
+    # This desk's public relay and LAN hosts. A scrubbed copy of this file
+    # turns the two sides into the same placeholder, so the literals do not ship.
+    text = text.replace("127.0.0.1", "127.0.0.1")
+    text = text.replace("192.168.1.10", "192.168.1.10")
+    text = text.replace("192.168.1.20", "192.168.1.20")
+    text = text.replace(
+        'if [ -n "${RIMBAUD_REMOTE_HOST:-}" ] && [ "$HOST" != "$RIMBAUD_REMOTE_HOST" ]; then echo "xx run on $RIMBAUD_REMOTE_HOST (this is $HOST)"; exit 1; fi',
+        'if [ -n "${RIMBAUD_REMOTE_HOST:-}" ] && [ "$HOST" != "$RIMBAUD_REMOTE_HOST" ]; then echo "xx run on $RIMBAUD_REMOTE_HOST (this is $HOST)"; exit 1; fi',
+    )
+    text = text.replace("REMOTE", "REMOTE")
+    text = text.replace("Remote", "Remote")
+    text = text.replace("remote", "remote")
+    text = text.replace("password set at install", "password set at install")
+    text = _blank_wallets(text)
+    for name in sorted(names, key=len, reverse=True):
+        text = re.sub(rf"\b{re.escape(name)}\b", "operator", text)
+        cap = name[:1].upper() + name[1:]
+        if cap != name:
+            text = re.sub(rf"\b{re.escape(cap)}\b", "Operator", text)
+        up = name.upper()
+        if up not in {name, cap}:
+            text = re.sub(rf"\b{re.escape(up)}\b", "OPERATOR", text)
+    return text
+
+
+def _read_text(path: str) -> str | None:
+    try:
+        blob = open(path, "rb").read()
+    except OSError:
+        return None
+    if b"\0" in blob or len(blob) > 5_000_000:
+        return None
+    try:
+        return blob.decode("utf-8")
+    except UnicodeError:
+        return None
+
+
+def sanitize_stage(stage: str) -> None:
+    names: set[str] = set()
+    user = os.environ.get("USER") or os.environ.get("LOGNAME") or ""
+    if user and user.lower() not in _SKIP_NAMES:
+        names.add(user)
+    files: list[str] = []
+    for dirpath, dirnames, filenames in os.walk(stage):
+        dirnames[:] = [d for d in dirnames if d != "third_party" and d != ".git"]
+        for name in filenames:
+            path = os.path.join(dirpath, name)
+            files.append(path)
+            text = _read_text(path)
+            if text:
+                names.update(_operator_names(text))
+    names = {n for n in names if n.lower() not in _SKIP_NAMES and len(n) >= 3}
+    for path in files:
+        text = _read_text(path)
+        if text is None:
+            continue
+        new = public_text(text, names)
+        if new != text:
+            with open(path, "w", encoding="utf-8", newline="\n") as fh:
+                fh.write(new)
+    for dirpath, dirnames, filenames in os.walk(stage, topdown=False):
+        for name in filenames:
+            new = name.replace("REMOTE", "REMOTE").replace("Remote", "Remote").replace("remote", "remote")
+            for op in names:
+                new = re.sub(rf"(?i)\b{re.escape(op)}\b", "operator", new)
+            if new != name:
+                src = os.path.join(dirpath, name)
+                dst = os.path.join(dirpath, new)
+                if os.path.exists(dst):
+                    raise SystemExit(f"publish rename collision {dst}")
+                os.rename(src, dst)
+
+
+def assert_public(stage: str) -> None:
+    user = os.environ.get("USER") or os.environ.get("LOGNAME") or ""
+    name_b = user.encode() if user and user.lower() not in _SKIP_NAMES else b""
+    eth = re.compile(br"(?<![0-9a-fA-F])0x(?!0{40}(?![0-9a-fA-F]))[0-9a-fA-F]{40}(?![0-9a-fA-F])")
+    home = re.compile(br"(?<![A-Za-z0-9._-])/home/(?!hummingbot\b)[A-Za-z0-9._-]")
+    media = re.compile(br"/media/(?!usb(?![A-Za-z0-9._-]))(?!cdrom(?![A-Za-z0-9._-]))[A-Za-z0-9._-]+")
+    ip = re.compile(br"\b(?:\d{1,3}\.){3}\d{1,3}\b")
+    for dirpath, dirnames, filenames in os.walk(stage):
+        dirnames[:] = [d for d in dirnames if d != "third_party" and d != ".git"]
+        for name in filenames:
+            path = os.path.join(dirpath, name)
+            try:
+                blob = open(path, "rb").read()
+            except OSError:
+                continue
+            if b"\0" in blob or len(blob) > 5_000_000:
+                continue
+            rel = os.path.relpath(path, stage)
+            if home.search(blob):
+                raise SystemExit(f"publish refused, home path in {rel}")
+            if name_b and re.search(rb"(?i)\b" + re.escape(name_b) + rb"\b", blob):
+                raise SystemExit(f"publish refused, operator name in {rel}")
+            if eth.search(blob):
+                raise SystemExit(f"publish refused, wallet in {rel}")
+            if media.search(blob):
+                raise SystemExit(f"publish refused, media user in {rel}")
+            for match in ip.finditer(blob):
+                addr = match.group(0)
+                try:
+                    nums = [int(part) for part in addr.split(b".")]
+                except ValueError:
+                    continue
+                if len(nums) != 4 or any(n > 255 for n in nums):
+                    continue
+                a, b = nums[0], nums[1]
+                if a in (0, 127) or addr in _RESOLVERS or addr == b"255.255.255.255":
+                    continue
+                if a == 10 or (a == 192 and b == 168) or (a == 172 and 16 <= b <= 31):
+                    continue
+                if a == 169 and b == 254:
+                    continue
+                raise SystemExit(f"publish refused, public address in {rel}")
 
 
 def build_stage(stage: str, version: str, summary: str) -> None:
@@ -232,6 +406,8 @@ def build_stage(stage: str, version: str, summary: str) -> None:
         fh.write(lic)
     with open(os.path.join(stage, "VERSION"), "w", encoding="utf-8", newline="\n") as fh:
         fh.write(f"{version}\n{summary}\n")
+    sanitize_stage(stage)
+    assert_public(stage)
     forbidden = ("BEGIN PRIVATE", "user-password-crypted password $6$", "plaintext: rimbaud")
     for dirpath, _, filenames in os.walk(stage):
         for name in filenames:

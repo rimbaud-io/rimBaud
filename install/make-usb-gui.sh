@@ -21,7 +21,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 SCRIPT="$HERE/make-usb.sh"
 ASK="$HERE/askpass-zenity.sh"
 TARGET="${1:-}"
-[ -n "$TARGET" ] || { echo "FAIL usage: $0 /dev/sdX|/media/user/stick"; exit 2; }
+[ -n "$TARGET" ] || { echo "FAIL usage: $0 /dev/sdX|/media/usb/stick"; exit 2; }
 [ -x "$SCRIPT" ] || { echo "FAIL missing $SCRIPT"; exit 1; }
 
 printf 'CMD  USB kit  %s\n' "$TARGET"

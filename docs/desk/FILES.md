@@ -207,7 +207,7 @@ V2 controllers we ship: `directional_trading/{dman_v3,supertrend_v1,bollinger_v1
 | `vpn.sh` | WireGuard control plane |
 | `live-push.sh` | SSH update to a joined matrix |
 | `make-usb.sh` `make-usb-gui.sh` | USB kit + CMD/OK/FAIL log |
-| `TORKY-SSH.sh` | torky LAN key |
+| `REMOTE-SSH.sh` | remote LAN key |
 | `setup.sh` `setup_tui.py` | wallet TUI (new unique accounts) |
 | `bootstrap.sh` | Copy-only first weeks |
 | `env.example` | env template (no live secrets) |

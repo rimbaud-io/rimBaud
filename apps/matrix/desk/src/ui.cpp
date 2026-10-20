@@ -232,7 +232,7 @@ static void wipe_secret(std::string& s) {
 static std::string desk_repo() {
     char exe[4096];
     ssize_t n = readlink("/proc/self/exe", exe, sizeof(exe) - 1);
-    std::string fallback = "/home/gerdy/hummingbird/hummingbot";
+    std::string fallback = ".";
     if (n <= 0) return fallback;
     exe[n] = 0;
     std::string p(exe);

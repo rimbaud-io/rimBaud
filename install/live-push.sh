@@ -244,15 +244,15 @@ stage_samba() {
   if [ -f "$ROOT/conf/archy.json" ]; then
     cp -f "$ROOT/conf/archy.json" "$dest/conf/archy.json"
   fi
-  cat > "$SHARE/APPLY-ON-TORKY.sh" <<EOF
+  cat > "$SHARE/APPLY-ON-REMOTE.sh" <<EOF
 #!/usr/bin/env bash
-# Run ON the machine after a live-push staged to the gerdy share.
+# Run ON the machine after a live-push staged to the operator share.
 # Copies CODE only. Leaves wallets in conf alone.
 # Updates the tree the running Spring uses. Does not start a second Spring.
 set -euo pipefail
 SRC="\$HOME/desk-share/live-push"
 DST="\$HOME/hummingbird/hummingbot"
-[ -d "\$SRC/scripts" ] || { echo "xx mount share first: sudo mount -t cifs //192.168.1.73/share \$HOME/desk-share -o guest,uid=\$(id -u),gid=\$(id -g),iocharset=utf8"; exit 1; }
+[ -d "\$SRC/scripts" ] || { echo "xx mount share first: sudo mount -t cifs //192.168.1.10/share \$HOME/desk-share -o guest,uid=\$(id -u),gid=\$(id -g),iocharset=utf8"; exit 1; }
 rsync -a --delete --no-owner --no-group \\
   --exclude 'conf/' --exclude 'logs/' --exclude 'data/' --exclude 'certs/' \\
   --exclude '.compose.env' --exclude '.env' \\
@@ -276,13 +276,13 @@ if [ "\$rc" -ne 0 ]; then
 fi
 echo "==> done. positions stay on Hyperliquid."
 EOF
-  chmod +x "$SHARE/APPLY-ON-TORKY.sh"
-  cp -f "$ROOT/install_new/TORKY-SSH.sh" "$SHARE/TORKY-SSH.sh"
-  chmod +x "$SHARE/TORKY-SSH.sh"
+  chmod +x "$SHARE/APPLY-ON-REMOTE.sh"
+  cp -f "$ROOT/install_new/REMOTE-SSH.sh" "$SHARE/REMOTE-SSH.sh"
+  chmod +x "$SHARE/REMOTE-SSH.sh"
   if [ -f "${IDENT}.pub" ]; then
     cp -f "${IDENT}.pub" "$SHARE/rimbaud-deploy.pub"
   fi
-  printf 'OK   staged %s  +  APPLY-ON-TORKY.sh  +  TORKY-SSH.sh\n' "$dest"
+  printf 'OK   staged %s  +  APPLY-ON-REMOTE.sh  +  REMOTE-SSH.sh\n' "$dest"
 }
 
 ssh_ok() {
@@ -321,8 +321,8 @@ remote_apply() {
 step "ensure deploy key" ensure_key
 if [ "$SAMBA_ONLY" -eq 1 ]; then
   step "stage samba share" stage_samba
-  job_set state ok site "$SITE" message "staged samba — run APPLY-ON-TORKY.sh on torky"
-  printf 'OK   SSH skipped (--samba-only). On torky: bash ~/desk-share/APPLY-ON-TORKY.sh\n'
+  job_set state ok site "$SITE" message "staged samba — run APPLY-ON-REMOTE.sh on remote"
+  printf 'OK   SSH skipped (--samba-only). On remote: bash ~/desk-share/APPLY-ON-REMOTE.sh\n'
   exit 0
 fi
 
@@ -341,15 +341,15 @@ for spec in "$SSH_VPN" "$SSH_LAN"; do
 done
 
 if [ -z "$TARGET" ]; then
-  printf 'FAIL SSH not accepted — on torky run: bash ~/desk-share/TORKY-SSH.sh\n'
+  printf 'FAIL SSH not accepted — on remote run: bash ~/desk-share/REMOTE-SSH.sh\n'
   step "stage samba share (fallback)" stage_samba
-  job_set state wait-ssh site "$SITE" message "no SSH — staged samba + TORKY-SSH.sh"
+  job_set state wait-ssh site "$SITE" message "no SSH — staged samba + REMOTE-SSH.sh"
   echo
-  echo "On torky:"
-  echo "  bash ~/desk-share/TORKY-SSH.sh"
+  echo "On remote:"
+  echo "  bash ~/desk-share/REMOTE-SSH.sh"
   echo "  then PUSH latest again from meta"
   echo "or apply staged code without SSH:"
-  echo "  bash ~/desk-share/APPLY-ON-TORKY.sh"
+  echo "  bash ~/desk-share/APPLY-ON-REMOTE.sh"
   exit 2
 fi
 

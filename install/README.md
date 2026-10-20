@@ -25,9 +25,9 @@ and **rimbaud-vpn**. It does **not** copy live wallets, keys, logs, or clips.
 VPN is a **control plane** (`10.66.80.0/24`). Hunters keep the **new machine’s
 public IP** so you get a **new Hyperliquid 1200 weight / 60s** bucket.
 
-## Live push (torky already joined)
+## Live push (remote already joined)
 
-From **rimbaud-meta-desk → DEPLOY → PUSH latest to torky**, or:
+From **rimbaud-meta-desk → DEPLOY → PUSH latest to remote**, or:
 
 ```bash
 ./install_new/live-push.sh usb-stick
@@ -35,7 +35,7 @@ From **rimbaud-meta-desk → DEPLOY → PUSH latest to torky**, or:
 
 Copies Spring + matrix **code** over VPN/LAN SSH (`forklifter@10.66.80.2`, LAN fallback). Does **not** copy wallets, `conf/`, `.compose.env`, VPN keys, or logs. Restarts Spring and hunter containers; clips stay on Hyperliquid.
 
-If SSH is not set up yet, the script stages `~/share/live-push/` and `APPLY-ON-TORKY.sh`. Install `~/share/rimbaud-deploy.pub` into torky’s `~/.ssh/authorized_keys` once, then PUSH works from meta.
+If SSH is not set up yet, the script stages `~/share/live-push/` and `APPLY-ON-REMOTE.sh`. Install `~/share/rimbaud-deploy.pub` into remote’s `~/.ssh/authorized_keys` once, then PUSH works from meta.
 
 ## On this machine (pack)
 

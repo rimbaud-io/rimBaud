@@ -60,7 +60,7 @@ Ports on the hub:
 ### `rimbaud-meta` / `rimbaud-meta-desk` — mothership
 
 - **Where:** `rimbaud_meta_c++/src/main.cpp` (console) and `src/desk.cpp` (X11). Shares `freiquell_c++/src/http.cpp`.
-- **Role:** HOME lists connected matrices (hub + torky…). DEPLOY: live-push, USB kit, Mint ISO, with CMD/OK/FAIL log overlay. iPhone gateway on/off. GET only toward clips. Never CLOSE/OPEN.
+- **Role:** HOME lists connected matrices (hub + remote…). DEPLOY: live-push, USB kit, Mint ISO, with CMD/OK/FAIL log overlay. iPhone gateway on/off. GET only toward clips. Never CLOSE/OPEN.
 
 ### `rimbaud-archy` — version desk
 
@@ -131,11 +131,11 @@ Per-hunter connector dirs (so wallets never mix): `conf-swing/`, `conf-helliot/`
 |--------------|------|
 | `install_new/install.sh` | Full install on a Mint box: deps, dirs, hunters, Spring, desk, autostart |
 | `install_new/pack.sh` | Tarball **without** secrets / VPN keys |
-| `install_new/live-push.sh` | SSH code update to a joined matrix (torky). Restarts Spring + containers, not clips |
+| `install_new/live-push.sh` | SSH code update to a joined matrix (remote). Restarts Spring + containers, not clips |
 | `install_new/make-usb.sh` + `make-usb-gui.sh` | FAT32 USB kit + JOIN.conf, CMD/OK/FAIL log |
 | `install_new/mint-image/*` | Remaster official Mint 22.3 ISO (look, preseed, first-boot, `.deb`) |
 | `install_new/vpn.sh` | WireGuard control plane `init` / `add` / `join` |
-| `install_new/TORKY-SSH.sh` | One-shot LAN SSH for torky |
+| `install_new/REMOTE-SSH.sh` | One-shot LAN SSH for remote |
 | `rimbaud_vpn/spring-proxy.py` | GET-only Spring proxy over VPN |
 | `HL_wallet_creator/` | New HL wallet / subaccount helper (run on the **new** box) |
 | `iphone/` | PWA + `gateway.py` (optional; Meta can stop it) |

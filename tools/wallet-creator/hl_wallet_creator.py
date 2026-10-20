@@ -27,7 +27,7 @@ import sys
 import time
 import urllib.request
 
-OUT = os.environ.get("HL_WALLET_OUT") or "/home/gerdy/hummingbird/hummingbot/conf/hl_wallets"
+OUT = os.environ.get("HL_WALLET_OUT") or "conf/hl_wallets"
 INFO = "https://api.hyperliquid.xyz/info"
 EXCHANGE = "https://api.hyperliquid.xyz/exchange"
 HUNTER_SUBS = (
@@ -311,7 +311,7 @@ def create_subs() -> dict:
     st["phase"] = "done"
     st["copy"] = {"name": "Copy", "address": st["master"], "use_vault": False}
     save_state(st)
-    _log("DONE  Copy=master  + %d subs. Paste into torky wallets (s). Do not use on the hub hunters." % len(st.get("subs") or []))
+    _log("DONE  Copy=master  + %d subs. Paste into remote wallets (s). Do not use on the hub hunters." % len(st.get("subs") or []))
     return st
 
 

@@ -17,7 +17,7 @@
 surfn_trader.py
 ===============
 Hummingbot directional_trading.supertrend_v1 on the Surfn HL subaccount
-0x1619ed7e5cb3f7d465e8f8d4df0648e97732a840 (id hummingbot-surfn).
+ (id hummingbot-surfn).
 
 Official SuperTrend V1 signal (length 20, multiplier 4, 3m, 1% distance):
 - LONG  when SUPERTd == 1  and |close-ST|/close < percentage_threshold
@@ -91,7 +91,7 @@ MOON_COIN_PCT = 50.0
 
 SURFN_COINS = ("BTC", "ETH", "LTC", "TAO")
 VALID_BIAS = ("LONG", "SHORT", "FLAT")
-DEFAULT_SUBACCOUNT = "0x1619ed7e5cb3f7d465e8f8d4df0648e97732a840"
+DEFAULT_SUBACCOUNT = ""
 ACCOUNTS_FILE = "/home/hummingbot/conf/bot_accounts.json"
 
 

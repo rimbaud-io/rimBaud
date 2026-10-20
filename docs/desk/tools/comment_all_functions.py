@@ -230,7 +230,7 @@ KNOWN: dict[str, str] = {
     "is_conf": "True if path looks like hummingbot conf/ (wire_registry or bot_sl).",
     "valid_id": "True if this is a known hunter container id.",
     "host_allowed": "Only loopback / LAN / VPN 10.66.80.x — no random hosts.",
-    "load_sites": "Read conf/deploy_hosts.json (hub + torky …).",
+    "load_sites": "Read conf/deploy_hosts.json (hub + remote …).",
     "poll_site": "GET /api/home + ping one matrix. Never POST.",
     "fetch": "HTTP GET one site snapshot. GET only.",
     "fetch_all": "GET every configured matrix.",

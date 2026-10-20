@@ -72,7 +72,7 @@ static std::string jstr(const json& j, const char* k, const std::string& d = "")
 static std::string conf_dir() {
     if (const char* e = getenv("RIMBAUD_CONF")) return e;
     if (const char* e = getenv("FREIQUELL_CONF")) return e;
-    return "/home/gerdy/hummingbird/hummingbot/conf";
+    return "conf";
 }
 static std::string repo_root() {
     auto c = conf_dir();

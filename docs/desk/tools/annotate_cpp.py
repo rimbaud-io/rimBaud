@@ -387,7 +387,7 @@ FUNCS: dict[str, dict[str, str]] = {
     },
     "rimbaud_meta_c++/src/main.cpp": {
         "static bool host_allowed": "Only loopback / LAN / VPN 10.66.80.x — no random hosts.",
-        "static std::vector<Site> load_sites": "Read conf/deploy_hosts.json (hub + torky …).",
+        "static std::vector<Site> load_sites": "Read conf/deploy_hosts.json (hub + remote …).",
         "static Snap parse_home": "One matrix snapshot from GET /api/home.",
         "static Snap fetch": "HTTP GET one site. GET only.",
         "static std::string frame": "Render the console dashboard.",

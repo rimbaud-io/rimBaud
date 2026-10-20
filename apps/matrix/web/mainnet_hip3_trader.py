@@ -36,7 +36,7 @@ from hyperliquid.utils import constants
 # ── Config ────────────────────────────────────────────────────────────────────
 
 PRIVATE_KEY    = os.environ.get("HL_PRIVATE_KEY", "")
-TRADER_ADDRESS = os.environ.get("TRADER_ADDRESS", "0x9f3e77cb89df964003053aa5b438e5697c77f4f9")
+TRADER_ADDRESS = os.environ.get("TRADER_ADDRESS", "")
 ALLOCATION_USD = float(os.environ.get("ALLOCATION_USD", "10"))   # fixed $ per position
 POLL_INTERVAL  = int(os.environ.get("POLL_INTERVAL", "5"))
 LOG_PATH       = os.environ.get("LOG_PATH", "/logs/copy_trades_hip3.log")

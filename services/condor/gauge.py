@@ -1151,7 +1151,7 @@ def wired_hunters_for_bot(bot_id):
 def dman_only_positions_bot(bot):
     """True when this bot's log wires are DMan Maker and nothing else.
 
-    Gerdy's Positionen node is wired to every hunter, so bare close stays refused
+    Operator's Positionen node is wired to every hunter, so bare close stays refused
     there. A bot wired only to hummingbot-dman-maker accepts bare close.
     """
     return set(wired_hunters_for_bot((bot or {}).get("id"))) == {"hummingbot-dman-maker"}

@@ -22,7 +22,7 @@ Needs: `g++` (C++17), `libx11-dev`, `libssl-dev` (chart only), `libpthread`. No 
 
 ```bash
 sudo apt-get install -y g++ libx11-dev libssl-dev
-cd /home/gerdy/hummingbird/hummingbot
+cd .
 ```
 
 ---
@@ -148,4 +148,4 @@ cd doku/copy/freiquell_c++ && make
 
 ## After a live rebuild
 
-Restart the process you replaced (desk / Spring / meta). Hunters do not need a rebuild for C++ UI changes. Archy `--bump-g` records the edit; Meta PUSH ships code to torky.
+Restart the process you replaced (desk / Spring / meta). Hunters do not need a rebuild for C++ UI changes. Archy `--bump-g` records the edit; Meta PUSH ships code to remote.

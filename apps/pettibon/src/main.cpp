@@ -88,7 +88,7 @@ int main(int argc, char** argv) {
     if (list_n > 500) list_n = 500;
 
     if (conf.empty()) {
-        const char* guesses[] = {"../conf", "conf", "/home/gerdy/hummingbird/hummingbot/conf"};
+        const char* guesses[] = {"../conf", "conf", "conf"};
         for (auto g : guesses) if (is_conf(g)) { conf = g; break; }
     }
     if (conf.empty() || !is_conf(conf)) {

@@ -32,9 +32,9 @@ Config (hl_copy_trader.yml):
   poll_interval_seconds: 5
   copy_shorts: false                 # set true to also mirror short positions
   trader_addresses:
-    - "0x350e33a777d510616fbdb483d1de3b50d1edfcfb"
-    - "0xf517639a8872e756ac98d3c65507d2ebc25cc032"
-    - "0x77375a8c9d13bf79afb2a87f1b0ac1dfd5f5bf66"
+    - ""
+    - ""
+    - ""
 """
 
 import json

@@ -20,7 +20,7 @@ This folder is a **read-only documentation copy** of the live project.
 
 **Open files under `doku/copy/`, not the live tree.** The live sources at the repo root (`freiquell_c++/src/ui.cpp`, …) have **no** extra comments on purpose. Every function in the copy has a `// name — …` (C++) or `# name — …` (Python) line directly above it, so it is visible as soon as you open the file.
 
-- **Live code** stays at the repo root (`/home/gerdy/hummingbird/hummingbot`). Do not compile or run traders from here.
+- **Live code** stays at the repo root (`.`). Do not compile or run traders from here.
 - **`doku/copy/`** is a snapshot of production folders (source + configs + scripts), **without secrets, wallets, logs, clips, or compiled binaries**.
 - Comments exist **only** inside `doku/copy/`. Live `.cpp` / hunters were not changed.
 
@@ -58,7 +58,7 @@ The operator front is **native C++**, not the browser. Hunters stay in Docker. S
 ### 1.1 Compile (live tree, not doku)
 
 ```bash
-cd /home/gerdy/hummingbird/hummingbot
+cd .
 # deps: g++ libx11-dev libssl-dev
 make -C freiquell_c++            # rimbaud-desk  rimbaud-chart
 make -C freiquell_server_c++     # spring        springctl
@@ -95,7 +95,7 @@ cd freiquell_c++
 ### 1.4 Start hunters (Docker)
 
 ```bash
-cd /home/gerdy/hummingbird/hummingbot
+cd .
 # production list (install_new/services.list):
 docker compose up -d \
   hummingbot-hl hummingbot-bn-swing hummingbot-helliot hummingbot-surfn \
@@ -131,12 +131,12 @@ Two paths from **rimbaud-meta-desk → DEPLOY** (or the scripts under `install_n
 
 ### A. USB kit — box already runs Linux Mint
 
-For a second Mint Cinnamon box (example: torky). Writes a FAT32 stick `RIMBAUD` (≥2G) with the install tarball + `JOIN.conf`. **No wallets.**
+For a second Mint Cinnamon box (example: remote). Writes a FAT32 stick `RIMBAUD` (≥2G) with the install tarball + `JOIN.conf`. **No wallets.**
 
 ```bash
 ./install_new/make-usb.sh          # or Meta → Create USB install media
 # on the new box:
-sudo tar -C /opt -xzf /media/.../rimbaud-install-*.tar.gz
+sudo tar -C /opt -xzf /media/usb/rimbaud-install-*.tar.gz
 cd /opt/rimbaud
 sudo ./install_new/install.sh
 ./install_new/setup.sh             # NEW unique subaccounts
@@ -154,7 +154,7 @@ springctl    # tick VPN
 
 Later updates: Meta **PUSH latest** → `install_new/live-push.sh`. Copies code over SSH, restarts Spring + hunter containers, **does not** copy wallets / `conf/` / VPN keys. Clips stay on Hyperliquid.
 
-SSH helper for torky: `install_new/TORKY-SSH.sh` (LAN `forklifter@192.168.1.123`, key `~/.ssh/id_ed25519_rimbaud_deploy`).
+SSH helper for remote: `install_new/REMOTE-SSH.sh` (LAN `forklifter@192.168.1.20`, key `~/.ssh/id_ed25519_rimbaud_deploy`).
 
 ### B. Mint ISO — bare metal / new disk
 
@@ -166,7 +166,7 @@ Remaster **official** Linux Mint Cinnamon 22.3 into a hybrid BIOS+UEFI live+inst
 ./install_new/mint-image/write-usb.sh   # USB ≥8G
 ```
 
-Default install user `forklifter`, first-boot password `rimbaud` (expires). German locale. See `copy/install_new/mint-image/README.md` and `CHECKLIST.md`.
+Default install user `forklifter`, first-boot password set at install (expires). German locale. See `copy/install_new/mint-image/README.md` and `CHECKLIST.md`.
 
 ### First weeks on a new HL account
 

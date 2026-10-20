@@ -18,7 +18,7 @@
   "apt_repo_comment": "Empty = ISO ships a local file:// repo of the rimbaud .deb. Set a https:// URL here when your package server exists; apt upgrade then pulls rimBaud too.",
   "default_user": "forklifter",
   "default_fullname": "rimBaud",
-  "install_password_note": "Set the install password on the machine. First boot forces a change. Not a live HL key."
+  "install_password_note": "Set the install password on the machine. First boot forces a change. Not a live HL key.",
   "volume_label": "RIMBAUD",
   "min_usb_gb": 8,
   "closes": false

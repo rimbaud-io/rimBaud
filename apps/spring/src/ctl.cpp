@@ -553,8 +553,8 @@ int main(int argc, char** argv) {
     if (access(c.bin.c_str(), X_OK) != 0) c.bin = here + "/freiquell-server";
     std::string g1 = here + "/../conf";
     if (is_conf(g1)) c.conf = g1;
-    else if (is_conf("/home/gerdy/hummingbird/hummingbot/conf"))
-        c.conf = "/home/gerdy/hummingbird/hummingbot/conf";
+    else if (is_conf("conf"))
+        c.conf = "conf";
     else if (is_conf("conf")) c.conf = "conf";
     else if (is_conf("../conf")) c.conf = "../conf";
     char resolved[4096];

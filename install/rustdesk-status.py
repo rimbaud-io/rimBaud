@@ -26,7 +26,7 @@ def arg(i, default=""):
     return sys.argv[i] if len(sys.argv) > i and sys.argv[i] else default
 
 
-HOST = arg(1, "31.70.135.253")
+HOST = arg(1, "127.0.0.1")
 try:
     ID_PORT = int(arg(2, "21126"))
     RELAY_PORT = int(arg(3, "21127"))

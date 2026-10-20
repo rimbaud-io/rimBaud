@@ -25,7 +25,7 @@ Hyperliquid perpetual swing bot for BTC, ETH, and LTC.
     take-profit  ≥ +tp_roe_pct   (default 93%)
     stop-loss    ≤ -sl_roe_pct   (default 20%)
 - One position per coin; force-close via conf/force_close_bn_swing.txt
-- Trades on HL subaccount 0x55ba1fe05b96a435b2f2c9bf51bb74fdafa1f64d
+- Trades on HL subaccount 
   (separate from copy trader and Helliot).
 
 ROE ≈ (price_move_pct) × leverage.
@@ -97,7 +97,7 @@ TRADE_LOG_FILE = "/home/hummingbot/conf/bn_swing_trades.json"
 
 SWING_COINS = ("BTC", "ETH", "LTC", "TAO")
 VALID_BIAS = ("LONG", "SHORT", "FLAT")
-DEFAULT_SUBACCOUNT = "0x55ba1fe05b96a435b2f2c9bf51bb74fdafa1f64d"
+DEFAULT_SUBACCOUNT = ""
 ACCOUNTS_FILE = "/home/hummingbot/conf/bot_accounts.json"
 
 

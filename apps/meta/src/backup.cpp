@@ -54,7 +54,7 @@ enum { SQLITE_OK = 0, SQLITE_DONE = 101, SQLITE_OPEN_READONLY = 1, SQLITE_OPEN_R
 using json = nlohmann::json;
 namespace fs = std::filesystem;
 
-static const char* kTree = "/home/gerdy/hummingbird/hummingbot";
+static const char* kTree = ".";
 static std::atomic<int> g_stop{0};
 static fs::path g_stage;
 static fs::path g_partial;
@@ -577,7 +577,7 @@ static int do_status(const std::string& root) {
         };
         walk(blk["blockdevices"]);
     }
-    fs::path safe = "/media/gerdy/remember/rimbaud_safe";
+    fs::path safe = "/media/usb/remember/rimbaud_safe";
     if (fs::is_directory(safe)) add_dest(dests, safe.string(), "ext4", free_bytes(safe), "remember", false);
     if (suggested.empty()) {
         for (auto& d : dests)

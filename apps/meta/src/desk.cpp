@@ -14,7 +14,7 @@
 
 // rimbaud-meta-desk — X11 meta matrix. Same look as rimBaud desk.
 // HOME: connected matrices (this box + VPN 10.66.80.x). GET only.
-// DEPLOY: LIVE PUSH code to a client (torky) + USB kit or Mint Cinnamon ISO.
+// DEPLOY: LIVE PUSH code to a client (remote) + USB kit or Mint Cinnamon ISO.
 // Never CLOSE/OPEN. Never copies wallets / conf / .compose.env.
 #include "http.hpp"
 #include <nlohmann/json.hpp>
@@ -151,7 +151,7 @@ static bool jflag(const json& j, const char* k, bool d = false) {
 static std::string conf_dir() {
     if (const char* e = getenv("RIMBAUD_CONF")) return e;
     if (const char* e = getenv("FREIQUELL_CONF")) return e;
-    return "/home/gerdy/hummingbird/hummingbot/conf";
+    return "conf";
 }
 static std::string repo_root() {
     auto c = conf_dir();
@@ -1134,7 +1134,7 @@ static double rd_now() {
 }
 
 struct RdNet {
-    std::string host = "31.70.135.253";
+    std::string host = "127.0.0.1";
     std::string id_port = "21126";
     std::string relay_port = "21127";
 };
@@ -1157,7 +1157,7 @@ static RdNet rd_net() {
     auto rc = relay.rfind(':');
     if (rc != std::string::npos && rc + 1 < relay.size()) n.relay_port = relay.substr(rc + 1);
     in_addr a{};
-    if (inet_pton(AF_INET, n.host.c_str(), &a) != 1) n.host = "31.70.135.253";
+    if (inet_pton(AF_INET, n.host.c_str(), &a) != 1) n.host = "127.0.0.1";
     if (n.id_port.find_first_not_of("0123456789") != std::string::npos) n.id_port = "21126";
     if (n.relay_port.find_first_not_of("0123456789") != std::string::npos) n.relay_port = "21127";
     return n;
@@ -1266,7 +1266,7 @@ static bool save_ssh_cred(const std::string& id, const std::string& name,
     else row["live_root"] = live;
     if (!row.contains("identity") || !row["identity"].is_string() || jstr(row, "identity").empty()) {
         const char* home = getenv("HOME");
-        if (!home) home = "/home/gerdy";
+        if (!home) home = ".";
         row["identity"] = std::string(home) + "/.ssh/id_ed25519_rimbaud_deploy";
     }
     if (!row.contains("note") || !row["note"].is_string())
@@ -1376,7 +1376,7 @@ static bool rd_ssh_for(const Site& s, std::string& target, std::string& identity
     identity = jstr(*row, "identity");
     if (identity.empty()) {
         const char* home = getenv("HOME");
-        if (!home) home = "/home/gerdy";
+        if (!home) home = ".";
         identity = std::string(home) + "/.ssh/id_ed25519_rimbaud_deploy";
     } else if (identity[0] == '~') {
         const char* home = getenv("HOME");
@@ -2109,8 +2109,8 @@ int main(int argc, char** argv) {
     pid_t hb_pid = 0;
     double hb_fetch_at = 0;
     std::string bk_dest = load_bk_dest();
-    if (bk_dest.empty() && access("/media/gerdy/USB-STICK", R_OK) == 0)
-        bk_dest = "/media/gerdy/USB-STICK";
+    if (bk_dest.empty() && access("/media/usb/USB-STICK", R_OK) == 0)
+        bk_dest = "/media/usb/USB-STICK";
     bool bk_picked = !bk_dest.empty();
     bool bk_edit = false;
     std::string bk_buf;
@@ -2621,7 +2621,7 @@ int main(int argc, char** argv) {
                     break;
                 }
         }
-        if (site_id.empty()) { say("no remote matrix (torky) in meta.json"); return; }
+        if (site_id.empty()) { say("no remote matrix (remote) in meta.json"); return; }
         std::string script = repo_root() + "/install_new/live-push.sh";
         if (access(script.c_str(), X_OK) != 0) {
             say("missing install_new/live-push.sh");
@@ -2676,7 +2676,7 @@ int main(int argc, char** argv) {
             say(last.empty() ? "LIVE PUSH ok — Spring/hunters restarted, clips stay" : last);
             log_close_at = now() + 1.8;
         } else if (live_exit == 2) {
-            say(last.empty() ? "no SSH — staged share, run TORKY-SSH.sh on torky" : last);
+            say(last.empty() ? "no SSH — staged share, run REMOTE-SSH.sh on remote" : last);
             log_close_at = 0;
         } else {
             say(last.empty() ? "LIVE PUSH failed — log stays open" : last);
@@ -2981,7 +2981,7 @@ int main(int argc, char** argv) {
                     fill(live_busy ? clip : rgb(dpy, cm, 8, 40, 18), btnH);
                     stroke(live_busy ? border : green, btnH);
                     txt(live_busy ? muted : green, btnH.x + 14, btnH.y + 18,
-                        live_busy ? "Pushing…" : "PUSH latest to torky");
+                        live_busy ? "Pushing…" : "PUSH latest to remote");
                     hits.push_back({Hit::LivePush, pidx < 0 ? 0 : pidx, btnH});
                 } else {
                     txt(muted, btnH.x + 14, btnH.y + 18, "already latest");
@@ -3273,7 +3273,7 @@ int main(int argc, char** argv) {
                 Rect empty{18, y, W - 36, 36};
                 fill(clip, empty);
                 stroke(border, empty);
-                txt(muted, empty.x + 14, empty.y + 22, "no remote matrix in meta.json (usb-stick / torky)");
+                txt(muted, empty.x + 14, empty.y + 22, "no remote matrix in meta.json (usb-stick / remote)");
                 y += 42;
             }
 
@@ -3283,7 +3283,7 @@ int main(int argc, char** argv) {
                 fill(live_busy ? clip : rgb(dpy, cm, 8, 40, 18), btnL);
                 stroke(live_busy ? border : green, btnL);
                 txt(live_busy ? muted : green, btnL.x + 16, btnL.y + 22,
-                    live_busy ? "Pushing…" : "PUSH latest to torky");
+                    live_busy ? "Pushing…" : "PUSH latest to remote");
                 hits.push_back({Hit::LivePush, pidx < 0 ? 0 : pidx, btnL});
             } else if (pidx >= 0) {
                 std::string note = sites[static_cast<size_t>(pidx)].name + " already on "
@@ -3698,7 +3698,7 @@ int main(int argc, char** argv) {
             Rect pathb{18, y, W - 36, 28};
             fill(bk_edit ? rgb(dpy, cm, 40, 22, 8) : navy, pathb);
             stroke(bk_edit ? gold : border, pathb);
-            std::string shown_path = bk_edit ? bk_buf : (bk_dest.empty() ? "/media/gerdy/USB-STICK" : bk_dest);
+            std::string shown_path = bk_edit ? bk_buf : (bk_dest.empty() ? "/media/usb/USB-STICK" : bk_dest);
             if (bk_edit) shown_path += "_";
             txt(bk_edit ? gold : text, pathb.x + 10, pathb.y + 19, ascii(shown_path, (pathb.w - 20) / 9));
             hits.push_back({Hit::BkEdit, 0, pathb});
@@ -3817,7 +3817,7 @@ int main(int argc, char** argv) {
             const char* kindn = log_kind == 1 ? "USB KIT LOG"
                                 : (log_kind == 2 ? "MINT ISO LOG" : "LIVE PUSH LOG");
             std::string who = job_label.empty()
-                                  ? (log_kind == 1 ? "stick" : (log_kind == 2 ? "iso" : (live_site_label.empty() ? "torky" : live_site_label)))
+                                  ? (log_kind == 1 ? "stick" : (log_kind == 2 ? "iso" : (live_site_label.empty() ? "remote" : live_site_label)))
                                   : job_label;
             std::string title = std::string(kindn) + "   " + who + "   ·   " + stword;
             txt(stcol, logp.x + 14, logp.y + 20, ascii(title, (logp.w - 250) / 9));

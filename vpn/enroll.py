@@ -628,7 +628,7 @@ def selftest():
     write_json(paths["peers"], {
         "role": "hub",
         "public_key": "A" * 43 + "=",
-        "endpoint": "192.168.1.73:51820",
+        "endpoint": "192.168.1.10:51820",
         "next": 3,
         "peers": [{"id": "usb-stick", "vpn_ip": "10.66.80.2", "public_key": "B" * 43 + "="}],
     })
@@ -665,7 +665,7 @@ def selftest():
     write_json(paths2["peers"], {
         "role": "hub",
         "public_key": "A" * 43 + "=",
-        "endpoint": "192.168.1.73:51820",
+        "endpoint": "192.168.1.10:51820",
         "next": 3,
         "peers": [{"id": "usb-stick", "vpn_ip": "10.66.80.2", "public_key": "B" * 43 + "="}],
     })

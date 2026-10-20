@@ -189,7 +189,7 @@ static Winsize winsz() {
 static std::string conf_dir() {
     if (const char* e = getenv("RIMBAUD_CONF")) return e;
     if (const char* e = getenv("FREIQUELL_CONF")) return e;
-    return "/home/gerdy/hummingbird/hummingbot/conf";
+    return "conf";
 }
 
 static std::vector<Site> load_sites() {

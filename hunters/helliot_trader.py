@@ -19,7 +19,7 @@ helliot_trader.py
 Elliott-structure perpetual trader on a Hyperliquid *subaccount*.
 
 Runs in container hummingbot-helliot with use_vault=true so orders hit
-subaccount 0xe4b3656470cfbe6bf487bc022e944ec9de343802 — parallel to HL Swing
+subaccount  — parallel to HL Swing
 on the main account, same coins (BTC / ETH / LTC).
 
 Auto entry (when bias is LONG/SHORT):
@@ -96,7 +96,7 @@ TRADE_LOG_FILE = "/home/hummingbot/conf/helliot_trades.json"
 
 HELLIOT_COINS = ("BTC", "ETH", "LTC", "TAO")
 VALID_BIAS = ("LONG", "SHORT", "FLAT")
-DEFAULT_SUBACCOUNT = "0xe4b3656470cfbe6bf487bc022e944ec9de343802"
+DEFAULT_SUBACCOUNT = ""
 ACCOUNTS_FILE = "/home/hummingbot/conf/bot_accounts.json"
 
 
