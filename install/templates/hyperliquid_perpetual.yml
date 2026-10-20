@@ -1,4 +1,4 @@
-# Copyright 2026 Laurence Sterne www.rimbaud.io
+# Copyright 2026 Freiquell e.V., Fichtestraße 1-4, 08451 Crimmitschau, GERMANY www.rimbaud.io
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.

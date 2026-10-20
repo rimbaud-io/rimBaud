@@ -1,4 +1,4 @@
-# Copyright 2026 Laurence Sterne www.rimbaud.io
+# Copyright 2026 Freiquell e.V., Fichtestraße 1-4, 08451 Crimmitschau, GERMANY www.rimbaud.io
 # Starter only. Add the addresses you choose to follow. This file follows nobody.
 script_file_name: hl_copy_trader.py
 connector_name: hyperliquid_perpetual
