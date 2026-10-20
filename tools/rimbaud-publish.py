@@ -70,6 +70,7 @@ TREES = [
     ("docs/print", "docs/print"),
     ("doku", "docs/desk"),
     ("HL_wallet_creator", "tools/wallet-creator"),
+    ("docker-windows", "docker-windows"),
 ]
 
 

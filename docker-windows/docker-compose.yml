@@ -1,0 +1,146 @@
+# Copyright 2026 Laurence Sterne www.rimbaud.io
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Windows Docker Desktop. Linux containers, published ports, no host network.
+# Run from a clone of this repository:  cd docker-windows && docker compose up --build
+
+name: rimbaud
+
+x-hunter: &hunter
+  image: hummingbot/hummingbot:latest
+  restart: unless-stopped
+  tty: true
+  stdin_open: true
+  depends_on:
+    prepare:
+      condition: service_completed_successfully
+  volumes:
+    - conf:/home/hummingbot/conf
+    - ../hunters:/home/hummingbot/scripts:ro
+    - logs:/home/hummingbot/logs
+    - data:/home/hummingbot/data
+
+services:
+  prepare:
+    image: alpine:3.20
+    volumes:
+      - conf:/conf
+      - ./seed:/seed:ro
+    command:
+      - /bin/sh
+      - -c
+      - |
+        mkdir -p /conf/connectors /conf/strategies /conf/controllers /conf/scripts
+        for f in /seed/scripts/*; do
+          base=$$(basename "$$f")
+          if [ ! -f "/conf/scripts/$$base" ]; then
+            cp "$$f" "/conf/scripts/$$base"
+          fi
+        done
+        if [ ! -f /conf/bot_sl.json ]; then
+          cp /seed/bot_sl.json /conf/bot_sl.json
+        fi
+
+  spring:
+    build:
+      context: ..
+      dockerfile: docker-windows/Dockerfile.spring
+    container_name: rimbaud-spring
+    restart: unless-stopped
+    depends_on:
+      prepare:
+        condition: service_completed_successfully
+    ports:
+      - "5004:5004"
+    volumes:
+      - conf:/conf
+
+  desk:
+    build:
+      context: ../apps/matrix/web
+    container_name: rimbaud-desk
+    restart: unless-stopped
+    depends_on:
+      prepare:
+        condition: service_completed_successfully
+      spring:
+        condition: service_started
+    ports:
+      - "5001:5000"
+    environment:
+      HL_COPY_WALLET: ""
+      SPRING_PORT: "5004"
+    volumes:
+      - conf:/conf
+
+  hummingbot-hl:
+    <<: *hunter
+    container_name: hummingbot-hl
+    environment:
+      CONFIG_PASSWORD: ${CONFIG_PASSWORD:?Set CONFIG_PASSWORD in the .env file}
+      SCRIPT_CONFIG: hl_copy_trader.yml
+
+  hummingbot-bn-swing:
+    <<: *hunter
+    container_name: hummingbot-bn-swing
+    environment:
+      CONFIG_PASSWORD: ${CONFIG_PASSWORD:?Set CONFIG_PASSWORD in the .env file}
+      SCRIPT_CONFIG: pmm_simple_trader.yml
+
+  hummingbot-helliot:
+    <<: *hunter
+    container_name: hummingbot-helliot
+    environment:
+      CONFIG_PASSWORD: ${CONFIG_PASSWORD:?Set CONFIG_PASSWORD in the .env file}
+      SCRIPT_CONFIG: helliot_trader.yml
+
+  hummingbot-surfn:
+    <<: *hunter
+    container_name: hummingbot-surfn
+    environment:
+      CONFIG_PASSWORD: ${CONFIG_PASSWORD:?Set CONFIG_PASSWORD in the .env file}
+      SCRIPT_CONFIG: surfn_trader.yml
+
+  hummingbot-shortn:
+    <<: *hunter
+    container_name: hummingbot-shortn
+    environment:
+      CONFIG_PASSWORD: ${CONFIG_PASSWORD:?Set CONFIG_PASSWORD in the .env file}
+      SCRIPT_CONFIG: shortn_trader.yml
+
+  hummingbot-dman:
+    <<: *hunter
+    container_name: hummingbot-dman
+    environment:
+      CONFIG_PASSWORD: ${CONFIG_PASSWORD:?Set CONFIG_PASSWORD in the .env file}
+      SCRIPT_CONFIG: dman_trader.yml
+
+  hummingbot-onlyup:
+    <<: *hunter
+    container_name: hummingbot-onlyup
+    environment:
+      CONFIG_PASSWORD: ${CONFIG_PASSWORD:?Set CONFIG_PASSWORD in the .env file}
+      SCRIPT_CONFIG: onlyup_trader.yml
+
+  hummingbot-dman-maker:
+    <<: *hunter
+    container_name: hummingbot-dman-maker
+    environment:
+      CONFIG_PASSWORD: ${CONFIG_PASSWORD:?Set CONFIG_PASSWORD in the .env file}
+      SCRIPT_CONFIG: dman_maker_v2_trader.yml
+
+volumes:
+  conf:
+  logs:
+  data:

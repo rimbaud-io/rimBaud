@@ -26,6 +26,7 @@
 #include <unistd.h>
 
 #include <atomic>
+#include <cstdlib>
 #include <cstring>
 #include <iostream>
 #include <sstream>
@@ -116,6 +117,12 @@ int run_server(Brain& brain) {
     addr.sin_family = AF_INET;
     addr.sin_port = htons(static_cast<uint16_t>(brain.port));
     addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    // The desk on this machine stays on localhost. A container sets SPRING_BIND
+    // so Docker can publish the port. An unreadable value stays on localhost.
+    if (const char* bind_to = std::getenv("SPRING_BIND")) {
+        in_addr chosen{};
+        if (inet_pton(AF_INET, bind_to, &chosen) == 1) addr.sin_addr = chosen;
+    }
     if (bind(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) < 0) {
         perror("bind");
         close(fd);

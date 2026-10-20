@@ -32,6 +32,7 @@ Around them:
 
 ```
 hunters/         the trader scripts that run inside Hummingbot.
+docker-windows/  Windows download. Docker Desktop runs Hummingbot, the hunters, and Spring.
 install/         the machine installer and the Mint USB image.
 website/         the public pages.
 phone/           the phone page.

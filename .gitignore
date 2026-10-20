@@ -21,3 +21,4 @@ conf/
 secrets.env
 *.db
 *.sqlite
+docker-windows/.env

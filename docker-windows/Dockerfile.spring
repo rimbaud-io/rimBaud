@@ -1,0 +1,31 @@
+# Copyright 2026 Laurence Sterne www.rimbaud.io
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Build context is the repository root. Spring listens on SPRING_BIND so
+# Docker can publish port 5004. springctl is not built.
+FROM debian:bookworm-slim
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends g++ make libsqlite3-0 libsqlite3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+COPY apps/spring /src/apps/spring
+COPY third_party /src/third_party
+WORKDIR /src/apps/spring
+RUN make spring
+
+ENV SPRING_BIND=0.0.0.0
+EXPOSE 5004
+CMD ["./spring", "--debug", "--conf", "/conf", "--port", "5004"]
