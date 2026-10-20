@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2026 rimbaud.io
+# Copyright 2026 Laurence Sterne
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -400,7 +400,7 @@ def build_stage(stage: str, version: str, summary: str) -> None:
     with open(lic_src, "r", encoding="utf-8") as fh:
         lic = fh.read().replace(
             "Copyright 2023 Hummingbot Foundation.",
-            "Copyright 2026 rimbaud.io.",
+            "Copyright 2026 Laurence Sterne.",
         )
     with open(os.path.join(stage, "LICENSE"), "w", encoding="utf-8", newline="\n") as fh:
         fh.write(lic)
