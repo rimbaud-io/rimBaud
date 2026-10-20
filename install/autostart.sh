@@ -29,6 +29,7 @@ STOP_CMD="/usr/bin/docker compose --project-directory $ROOT stop ${SVCS[*]}"
 
 UNIT=$(sed \
   -e "s|@ROOT@|$ROOT|g" \
+  -e "s|@CONFIRM@|$INSTALL_DIR/risk-confirm.sh|g" \
   -e "s|@START@|$START_CMD|g" \
   -e "s|@STOP@|$STOP_CMD|g" \
   -e "s|@USER@|$REAL_USER|g" \

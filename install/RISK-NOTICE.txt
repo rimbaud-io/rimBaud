@@ -1,0 +1,17 @@
+rimBaud risk notice
+Freiquell e.V., Fichtestraße 1-4, 08451 Crimmitschau, GERMANY
+www.rimbaud.io
+
+Deutsch
+
+Dieses Programm kann mit den Schlüsseln auf diesem Rechner echte Aufträge senden.
+Perpetual-Kontrakte können den gesamten Betrag auf dem Konto vernichten. Eine Liquidation kann eine Position auslöschen.
+Freiquell e.V. verwahrt das Geld nicht, verspricht keinen Gewinn und ist nicht die Börse.
+Auf das Konto gehört nur Geld, dessen Verlust verkraftbar ist.
+
+English
+
+This program can send real orders with the keys on this machine.
+Perpetual contracts can lose the whole amount in the account. Liquidation can wipe a position.
+Freiquell e.V. does not hold the money, does not promise a profit, and is not the exchange.
+Only money you can afford to lose belongs in the account.

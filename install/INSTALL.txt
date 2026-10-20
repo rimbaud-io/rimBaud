@@ -21,7 +21,9 @@ USB or folder with the tarball:
 
 That:
   1. unpacks rimbaud-install-*.tar.gz → /opt/rimbaud
-  2. installs Docker, Copy hunter + dashboard, Spring :5004, desk
+  2. installs Docker, then asks for the risk notice before Copy hunter + dashboard, Spring :5004, desk
+     The box starts empty. A terminal asks for I UNDERSTAND or ICH VERSTEHE.
+     The acceptance stays on this computer. It is not sent anywhere.
   3. joins the meta VPN if JOIN.conf is next to install.sh; opens 5004 on wg
   4. opens checkboxes (SPACE = OK, ENTER = finish, s = Copy master 0x)
 

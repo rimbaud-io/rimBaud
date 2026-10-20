@@ -18,6 +18,9 @@ set -euo pipefail
 # shellcheck source=install_new/_common.sh
 . "$(cd "$(dirname "$0")" && pwd)/_common.sh"
 
+# Hunters stay down until this computer has the current risk notice on file.
+bash "$INSTALL_DIR/risk-confirm.sh"
+
 docker_ok || die "Docker engine is down. Start Docker, then retry."
 [ -f "$ROOT/docker-compose.yml" ] || die "missing docker-compose.yml"
 "$INSTALL_DIR/verify.sh"

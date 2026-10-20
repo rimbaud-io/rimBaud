@@ -13,7 +13,9 @@
 # limitations under the License.
 
 # Windows Docker Desktop. Linux containers, published ports, no host network.
-# Run from a clone of this repository:  cd docker-windows && docker compose up --build
+# Run from a clone of this repository:  cd docker-windows && ./up.sh
+# up.bat on Windows. Both ask for the risk notice. A raw compose up refuses
+# to start until that acceptance file is passed in RIMBAUD_RISK_FILE.
 
 name: rimbaud
 
@@ -37,10 +39,24 @@ services:
     volumes:
       - conf:/conf
       - ./seed:/seed:ro
+      - ./RISK-NOTICE.txt:/risk/RISK-NOTICE.txt:ro
+      - ${RIMBAUD_RISK_FILE:?Accept the risk notice with up.sh or up.bat}:/risk/risk-notice.json:ro
     command:
       - /bin/sh
       - -c
       - |
+        notice=/risk/RISK-NOTICE.txt
+        rec=/risk/risk-notice.json
+        if [ ! -f "$$notice" ] || [ ! -f "$$rec" ]; then
+          echo "risk notice was not accepted" >&2
+          exit 1
+        fi
+        want=$$(sha256sum "$$notice" | awk '{print $$1}')
+        got=$$(sed -n 's/.*"notice_sha256"[^"]*"\([0-9a-f]\{64\}\)".*/\1/p' "$$rec" | head -n 1)
+        if [ -z "$$got" ] || [ "$$got" != "$$want" ]; then
+          echo "risk notice was not accepted" >&2
+          exit 1
+        fi
         mkdir -p /conf/connectors /conf/strategies /conf/controllers /conf/scripts
         for f in /seed/scripts/*; do
           base=$$(basename "$$f")

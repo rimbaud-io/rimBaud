@@ -58,6 +58,8 @@ cd /opt/rimbaud
 sudo ./install_new/install.sh
 ```
 
+Hunters stay down until the risk notice is accepted. The box starts empty. A terminal accepts only `I UNDERSTAND` or `ICH VERSTEHE`. The acceptance is a file on this computer. It is not sent anywhere. A later start reuses it while the notice text is unchanged. The Mint image asks again at the first graphical login, because first-boot has no screen for it.
+
 Then `./install_new/setup.sh` with **new** unique subaccounts.
 
 **Meta desk (this hub):** `rimbaud-meta-desk` — HOME lists connected matrices.

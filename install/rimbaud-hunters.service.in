@@ -23,6 +23,7 @@ RemainAfterExit=yes
 WorkingDirectory=@ROOT@
 User=@USER@
 EnvironmentFile=-@ROOT@/.env
+ExecStart=/bin/bash @CONFIRM@
 ExecStart=@START@
 ExecStop=@STOP@
 TimeoutStartSec=240

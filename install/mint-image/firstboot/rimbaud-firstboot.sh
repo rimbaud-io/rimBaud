@@ -55,7 +55,10 @@ fi
 
 rm -f /etc/rimbaud/in-iso /etc/rimbaud/firstboot-pending
 if [ -x /opt/rimbaud/install_new/install.sh ]; then
-  RIMBAUD_BOOTSTRAP=1 /opt/rimbaud/install_new/install.sh || true
+  # No terminal here. up.sh stops until the first graphical login accepts the risk notice.
+  if ! RIMBAUD_BOOTSTRAP=1 /opt/rimbaud/install_new/install.sh; then
+    echo "install stopped before hunters — first graphical login asks for the risk notice, then continues"
+  fi
 fi
 if [ -x /opt/rimbaud/rimbaud_vpn/rimbaud-vpn ]; then
   /opt/rimbaud/rimbaud_vpn/rimbaud-vpn enroll || echo "enroll failed — hub not answering yet"

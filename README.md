@@ -32,8 +32,8 @@ Around them:
 
 ```
 hunters/         the trader scripts that run inside Hummingbot.
-docker-windows/  Windows download. Docker Desktop runs Hummingbot, the hunters, and Spring.
-install/         the machine installer and the Mint USB image.
+docker-windows/  Windows download. Docker Desktop runs Hummingbot, the hunters, and Spring. Start with up.bat or up.sh. That asks for the risk notice first.
+install/         the machine installer and the Mint USB image. Hunters start only after the risk notice is accepted.
 website/         the public pages.
 phone/           the phone page.
 vpn/             the WireGuard link between matrices.

@@ -35,10 +35,18 @@ cd docker-windows
 copy env.example .env
 ```
 
-Edit `.env` and set `CONFIG_PASSWORD` to a password you will remember. Then:
+Edit `.env` and set `CONFIG_PASSWORD` to a password you will remember.
+
+The start asks you to read the risk notice. The box starts empty. Hunters stay down until you tick it. The acceptance is saved on this computer and is not sent anywhere. Then:
 
 ```bat
-docker compose up --build
+up.bat
+```
+
+On Linux, from this same folder:
+
+```bash
+./up.sh
 ```
 
 Open the desk at [http://localhost:5001](http://localhost:5001). Spring answers on port 5004.
@@ -49,13 +57,13 @@ The first time a hunter starts, Hummingbot asks you to confirm that password and
 docker compose run --rm hummingbot-hl
 ```
 
-After the connector exists, `docker compose up -d` brings the stack back. Your password, keys, and conf stay in the Docker volume named `conf`. They are not written into this folder.
+After the connector exists, `up.bat` or `./up.sh` brings the stack back. A saved acceptance of the same notice is reused. Your password, keys, and conf stay in the Docker volume named `conf`. They are not written into this folder. The acceptance file stays in your user config, outside this folder.
 
 ## What starts
 
 | Container | Role |
 | --- | --- |
-| `prepare` | Creates an empty conf and the starter script files, once. |
+| `prepare` | Checks the saved risk notice, then creates an empty conf and the starter script files, once. |
 | `spring` | Brain on port 5004. Built from `apps/spring`. |
 | `desk` | Browser desk on port 5001. Built from `apps/matrix/web`. |
 | `hummingbot-hl` | Copy hunter. Follows nobody until you add addresses in the conf volume, file `scripts/hl_copy_trader.yml`. |

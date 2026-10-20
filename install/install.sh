@@ -18,7 +18,8 @@
 #   sudo bash install.sh
 #
 # Unpacks to /opt/rimbaud, installs Docker/hunters/Spring, joins VPN if JOIN.conf
-# is present, then a checkbox screen (SPACE = OK, ENTER = done).
+# is present. Hunters stay down until the risk notice is accepted.
+# Then a checkbox screen (SPACE = OK, ENTER = done).
 # Never CLOSE/OPEN clips. Unique wallets are a checkbox (s).
 #
 # Fresh Mint from a project archive is the other command (keeps wallets):
