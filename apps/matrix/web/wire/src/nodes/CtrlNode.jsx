@@ -41,7 +41,7 @@ function toStore(field, raw) {
   return n;
 }
 
-export default function CtrlNode({ data, selected }) {
+export default function CtrlNode({ id, data, selected }) {
   const botId = data.botId;
   const color = data.color || "#c084fc";
   const fields = (data.fields && data.fields.length)
@@ -80,7 +80,18 @@ export default function CtrlNode({ data, selected }) {
   return (
     <div className={`wn ctrl${selected ? " selected" : ""}${data.nDirty ? " dirty" : ""}${wouldClose ? " closes" : ""}`} style={{ "--bot": color }}>
       <PortHandle type="source" position={Position.Top} id="ctrl" className="h-ctrl" tip={PORT_TIP.ctrlOut} />
-      <span className="port top gauge" style={{ color }} data-tip={PORT_TIP.ctrlOut}>CTRL</span>
+      <span
+        className="port top gauge nodrag nopan"
+        style={{ color }}
+        data-tip={PORT_TIP.ctrlOut + " Double-click lifts a wire already on this point."}
+        onDoubleClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          window.dispatchEvent(new CustomEvent("wire-lift", {
+            detail: { nodeId: id, handleId: "ctrl", type: "source", clientX: e.clientX, clientY: e.clientY },
+          }));
+        }}
+      >CTRL</span>
       <div className="wn-kicker">SET · CONTROLLER</div>
       <div className="wn-title">
         <span className="icon">{data.icon}</span>

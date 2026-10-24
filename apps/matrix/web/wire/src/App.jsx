@@ -978,6 +978,79 @@ function Board() {
   };
 
   useEffect(() => {
+    const onLift = (ev) => {
+      const d = ev.detail || {};
+      const nodeId = d.nodeId;
+      const handleId = d.handleId == null || d.handleId === "" ? null : String(d.handleId);
+      const type = d.type === "target" ? "target" : "source";
+      if (!nodeId) return;
+      const es = edgesRef.current || [];
+      let idx = -1;
+      for (let i = es.length - 1; i >= 0; i--) {
+        const e = es[i];
+        const sh = e.sourceHandle || null;
+        const th = e.targetHandle || null;
+        if (type === "source" && e.source === nodeId && sh === handleId) { idx = i; break; }
+        if (type === "target" && e.target === nodeId && th === handleId) { idx = i; break; }
+      }
+      if (idx < 0) return;
+      const edge = es[idx];
+      const other = type === "source"
+        ? { nodeId: edge.target, handleId: edge.targetHandle || null, type: "target" }
+        : { nodeId: edge.source, handleId: edge.sourceHandle || null, type: "source" };
+      remember("lift");
+      const next = es.filter((_, i) => i !== idx);
+      setEdges(next);
+      setNodes((ns) => {
+        const stamped = annotateWires(ns, next);
+        persistGraph(stamped, next);
+        return stamped;
+      });
+      ping("wire off the knob — drop it on another point");
+      requestAnimationFrame(() => {
+        const want = other.type === "target" ? "target" : "source";
+        const list = document.querySelectorAll(".react-flow__handle");
+        let el = null;
+        for (const n of list) {
+          if (n.getAttribute("data-nodeid") !== other.nodeId) continue;
+          if ((n.getAttribute("data-handleid") || "") !== (other.handleId || "")) continue;
+          if (!n.classList.contains(want)) continue;
+          el = n;
+          break;
+        }
+        if (!el) return;
+        const rect = el.getBoundingClientRect();
+        const hx = rect.left + rect.width / 2;
+        const hy = rect.top + rect.height / 2;
+        el.dispatchEvent(new MouseEvent("mousedown", {
+          bubbles: true,
+          cancelable: true,
+          view: window,
+          clientX: hx,
+          clientY: hy,
+          button: 0,
+          buttons: 1,
+        }));
+        const px = Number(d.clientX);
+        const py = Number(d.clientY);
+        if (Number.isFinite(px) && Number.isFinite(py)) {
+          document.dispatchEvent(new MouseEvent("mousemove", {
+            bubbles: true,
+            cancelable: true,
+            view: window,
+            clientX: px,
+            clientY: py,
+            button: 0,
+            buttons: 1,
+          }));
+        }
+      });
+    };
+    window.addEventListener("wire-lift", onLift);
+    return () => window.removeEventListener("wire-lift", onLift);
+  }, [persistGraph, remember, setEdges, setNodes]);
+
+  useEffect(() => {
     const onKey = (e) => {
       if (replaceAsk && e.key === "Escape") {
         e.preventDefault();
@@ -2982,6 +3055,7 @@ function Board() {
           onDrop={onDrop}
           nodesConnectable
           edgesReconnectable={false}
+          connectionDragThreshold={8}
           elementsSelectable
           nodesDraggable
           panOnDrag

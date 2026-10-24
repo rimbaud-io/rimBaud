@@ -12,8 +12,31 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Handle } from "@xyflow/react";
+import { Handle, useNodeId } from "@xyflow/react";
 
 export default function PortHandle({ tip, ...rest }) {
-  return <Handle {...rest} data-tip={tip} aria-label={tip} />;
+  const nodeId = useNodeId();
+  const full = tip
+    ? tip + " Double-click lifts a wire already on this point."
+    : "Double-click lifts a wire already on this point.";
+  return (
+    <Handle
+      {...rest}
+      data-tip={full}
+      aria-label={full}
+      onDoubleClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.dispatchEvent(new CustomEvent("wire-lift", {
+          detail: {
+            nodeId,
+            handleId: rest.id == null ? null : String(rest.id),
+            type: rest.type || "source",
+            clientX: e.clientX,
+            clientY: e.clientY,
+          },
+        }));
+      }}
+    />
+  );
 }

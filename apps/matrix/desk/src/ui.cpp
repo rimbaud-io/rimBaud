@@ -741,6 +741,11 @@ struct DeskUi {
     int wire_from = -1;
     std::string wire_handle;
     bool wire_from_src = true;
+    bool wire_lifted = false;
+    int last_port_i = -1;
+    std::string last_port_key;
+    bool last_port_src = false;
+    double last_port_t = 0;
     int edge_sel = -1;
     bool ctx_on = false;
     int ctx_x = 0, ctx_y = 0, ctx_kind = 0, ctx_i = -1, ctx_scroll = 0;
@@ -834,6 +839,12 @@ struct DeskUi {
         snap.compile.ok = false;
     }
 
+    void clear_wire_drag() {
+        wire_from = -1;
+        wire_handle.clear();
+        wire_lifted = false;
+    }
+
     void do_undo() {
         if (undo.empty()) { say("nothing to undo"); return; }
         redo.push_back({snap.wire_nodes, snap.wire_edges});
@@ -841,6 +852,7 @@ struct DeskUi {
         snap.wire_edges = undo.back().second;
         undo.pop_back();
         dirty = true;
+        clear_wire_drag();
         say("undo");
     }
 
@@ -851,6 +863,7 @@ struct DeskUi {
         snap.wire_edges = redo.back().second;
         redo.pop_back();
         dirty = true;
+        clear_wire_drag();
         say("redo");
     }
 
@@ -1374,6 +1387,36 @@ struct DeskUi {
         return true;
     }
 
+    // Take one wire off this point. The other end stays. The free end follows the pointer.
+    bool lift_wire(int node_i, const std::string& handle, bool source) {
+        if (node_i < 0 || node_i >= static_cast<int>(snap.wire_nodes.size())) return false;
+        const std::string& nid = snap.wire_nodes[node_i].id;
+        int found = -1;
+        for (int i = static_cast<int>(snap.wire_edges.size()) - 1; i >= 0; --i) {
+            const auto& e = snap.wire_edges[i];
+            if (source && e.source == nid && e.source_handle == handle) { found = i; break; }
+            if (!source && e.target == nid && e.target_handle == handle) { found = i; break; }
+        }
+        if (found < 0) return false;
+        WireEdge e = snap.wire_edges[found];
+        std::string other_id = source ? e.target : e.source;
+        std::string other_h = source ? e.target_handle : e.source_handle;
+        bool other_src = !source;
+        int oi = find_node(snap, other_id);
+        if (oi < 0) return false;
+        push_hist();
+        snap.wire_edges.erase(snap.wire_edges.begin() + found);
+        if (edge_sel == found) edge_sel = -1;
+        else if (edge_sel > found) edge_sel--;
+        wire_from = oi;
+        wire_handle = other_h;
+        wire_from_src = other_src;
+        wire_lifted = true;
+        wire_sel = oi;
+        say("wire off the knob - drop it on another point");
+        return true;
+    }
+
     void refresh(bool catalog) {
         auto keep_wire_n = snap.wire_nodes;
         auto keep_wire_e = snap.wire_edges;
@@ -1833,7 +1876,8 @@ std::string action_tip(const DeskUi& ui, const Hit& h) {
             }
             return {};
         case Hit::WirePort:
-            return (h.src ? "drag a wire from " : "drop a wire on ") + h.key;
+            return (h.src ? "drag a wire from " : "drop a wire on ") + h.key
+                + "  -  double-click lifts a wire already on this point";
         case Hit::Ctx:
             if (h.i == 0) return "close this menu";
             if (h.i == 1) return "remove this node";
@@ -3995,7 +4039,10 @@ int run_desk(FlaskApi& api) {
                     text(dpy, buf, gc, C.ab_muted, insp.x + 12, insp.y + 72, "right-click to remove  ·  Connect wire then click another clip");
                 }
             } else if (ui.wire_from >= 0) {
-                text(dpy, buf, gc, C.ab_orange, insp.x + 12, insp.y + 40, "click a target clip to finish the wire  (Esc cancels)");
+                text(dpy, buf, gc, C.ab_orange, insp.x + 12, insp.y + 40,
+                     ui.wire_lifted
+                         ? "drop the wire on another point  (Esc leaves it off the knob)"
+                         : "click a target clip to finish the wire  (Esc cancels)");
             } else {
                 text(dpy, buf, gc, C.ab_muted, insp.x + 12, insp.y + 40, "drag a controller onto the one on the canvas — the window asks");
             }
@@ -5818,10 +5865,11 @@ int run_desk(FlaskApi& api) {
                         ui.wire_inspect = -1;
                         redraw();
                     } else if (ui.ctx_on || ui.wire_from >= 0 || ui.tool_drag) {
+                        bool lifted = ui.wire_lifted;
                         ui.ctx_on = false;
-                        ui.wire_from = -1;
-                        ui.wire_handle.clear();
+                        ui.clear_wire_drag();
                         ui.tool_drag = false;
+                        if (lifted) ui.say("wire left off the knob");
                         redraw();
                     } else run = false;
                 } else if (ks == XK_r) { ui.refresh(false); redraw(); }
@@ -6592,15 +6640,26 @@ int run_desk(FlaskApi& api) {
                             }
                             redraw();
                         } else if (h.kind == Hit::WirePort) {
-                            if (ui.wire_from >= 0) {
+                            double tnow = ui.now();
+                            bool dbl = (h.i == ui.last_port_i && h.key == ui.last_port_key
+                                        && h.src == ui.last_port_src
+                                        && (tnow - ui.last_port_t) < 0.45);
+                            ui.last_port_i = h.i;
+                            ui.last_port_key = h.key;
+                            ui.last_port_src = h.src;
+                            ui.last_port_t = tnow;
+                            if (dbl && ui.lift_wire(h.i, h.key, h.src)) {
+                                ui.drag_mx = mx;
+                                ui.drag_my = my;
+                            } else if (ui.wire_from >= 0) {
                                 ui.connect_ports(ui.wire_from, ui.wire_handle, ui.wire_from_src,
                                                  h.i, h.key, h.src);
-                                ui.wire_from = -1;
-                                ui.wire_handle.clear();
+                                ui.clear_wire_drag();
                             } else {
                                 ui.wire_from = h.i;
                                 ui.wire_handle = h.key;
                                 ui.wire_from_src = h.src;
+                                ui.wire_lifted = false;
                                 ui.wire_sel = h.i;
                                 ui.drag_mx = mx;
                                 ui.drag_my = my;
@@ -6629,8 +6688,7 @@ int run_desk(FlaskApi& api) {
                                 } else {
                                     ui.connect_nodes(ui.wire_from, h.i);
                                 }
-                                ui.wire_from = -1;
-                                ui.wire_handle.clear();
+                                ui.clear_wire_drag();
                             } else {
                                 double tnow = ui.now();
                                 bool dbl = (h.i == ui.last_click_i && (tnow - ui.last_click_t) < 0.45);
@@ -6746,8 +6804,9 @@ int run_desk(FlaskApi& api) {
                     }
                     if (!hit && ui.page == PgWire && inside(ui.canvas_r, mx, my)) {
                         if (ui.wire_from >= 0) {
-                            ui.wire_from = -1;
-                            ui.say("wire cancelled");
+                            bool lifted = ui.wire_lifted;
+                            ui.clear_wire_drag();
+                            ui.say(lifted ? "wire left off the knob" : "wire cancelled");
                             redraw();
                         } else if (alt) {
                             ui.panning = true;
@@ -6960,9 +7019,9 @@ int run_desk(FlaskApi& api) {
                             }
                             if (done) break;
                         }
-                        ui.wire_from = -1;
-                        ui.wire_handle.clear();
-                        if (!done) ui.say("wire cancelled");
+                        bool lifted = ui.wire_lifted;
+                        ui.clear_wire_drag();
+                        if (!done) ui.say(lifted ? "wire left off the knob" : "wire cancelled");
                         redraw();
                     }
                 }

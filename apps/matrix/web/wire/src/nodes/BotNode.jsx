@@ -125,7 +125,17 @@ export default function BotNode({ id, data, selected }) {
         <span data-tip={PORT_TIP.botSl}>SL</span>
         <span data-tip={PORT_TIP.botBias}>BIAS</span>
         <span data-tip={PORT_TIP.botMoon}>MOON</span>
-        <span data-tip={PORT_TIP.botCtrl}>CTRL</span>
+        <span
+          className="nodrag nopan"
+          data-tip={PORT_TIP.botCtrl + " Double-click lifts a wire already on this point."}
+          onDoubleClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            window.dispatchEvent(new CustomEvent("wire-lift", {
+              detail: { nodeId: id, handleId: "ctrl", type: "target", clientX: e.clientX, clientY: e.clientY },
+            }));
+          }}
+        >CTRL</span>
         <span data-tip={PORT_TIP.botEclose} className="kill">E-CLOSE</span>
       </div>
       <div className="wn-log">{lastLog}</div>
