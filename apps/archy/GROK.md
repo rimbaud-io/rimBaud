@@ -28,5 +28,5 @@ After any code edit in this repo, bump the grok suffix. Never LEVEL UP.
 
 Do not call `--operator-prepare-github` or `--operator-send-github`. The TO GITHUB button copies, audits, and sends. A bump does not push.
 
-`github_folders.tsv` is the GitHub folder column. `github_files.tsv` is the column beside each root file. Add a row for a new public folder or a new root file. The publisher writes `ABOUT.md` and commits that folder with the row's line. A root file is committed with its own line. The repository banner keeps the Archy version and the change. Do not put the bump sentence on every folder or root file.
+`github_folders.tsv` is the GitHub folder column, including a folder inside a folder. `github_files.tsv` is the column beside each root file. Add a row for a new public folder or a new root file. A folder with no row keeps the old bump line. The publisher writes `ABOUT.md` and commits that folder with the row's line. A root file is committed with its own line. The repository banner keeps the Archy version and the change. Do not put the bump sentence on every folder or root file.
 

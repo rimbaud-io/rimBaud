@@ -24,3 +24,53 @@ tools	Helpers: the publisher, the telegram sender, and the wallet creator.	Tools
 tools/telegram	Sends a short note to Telegram. The bot token is not in this folder.	One sender script. The token stays on the machine that runs it.
 tools/wallet-creator	Creates a Hyperliquid wallet on the user's own machine.	The new key stays where the user creates it. This folder does not contain a key.
 vpn	WireGuard enrollment between matrices. Live keys are not in this folder.	Sets up the link a remote matrix uses. Private keys are created on the machine, not stored here.
+apps/archy/src	Archy window source. The version desk and the GitHub button.	The X11 window. A bump records a code change. LEVEL UP and the send click belong to the operator.
+apps/matrix/desk/src	Desk source for Home, Wire, Hunters, and Funds.	The native screen. It reads Spring. It does not sign an order.
+apps/matrix/web/templates	Flask pages for home, the hunters, and the wire.	HTML the dashboard serves. A key paste stays on the Confiig page.
+apps/matrix/web/wire	Browser wire. Place a controller, a wallet, and a coin.	The canvas in the browser. The same wire idea as the native desk.
+apps/matrix/web/wire/src	Wire page source. Canvas, toolbox, and the wallet window.	The page source. A wallet here is a subaccount name. The key is not in this folder.
+apps/matrix/web/wire/src/lib	Wire helpers for ports, tools, and the sheet text.	Shared pieces for the canvas. They do not send an order.
+apps/matrix/web/wire/src/nodes	One card for each thing you can place on the wire.	Bots, wallets, coins, knobs, and the home cards.
+apps/meta/src	Meta window source. It lists the matrices.	The mothership screen. It shows which matrix is behind. It does not close a clip.
+apps/pettibon/daemon	Install script for the Pettibon collector.	Puts the collector on the machine. It does not place an order.
+apps/pettibon/grafana	Grafana beside the trade book.	A local board for the saved trades. It reads the book. It does not send an order.
+apps/pettibon/grafana/provisioning	Grafana boards and the book connection.	Loaded when Grafana starts. No exchange key is in this folder.
+apps/pettibon/grafana/provisioning/dashboards	Trade-book boards for Grafana.	The board files and the provider that loads them.
+apps/pettibon/grafana/provisioning/dashboards/json	Saved Grafana boards for the trade book.	Two boards: the trades, and the DMan Maker view. They read the local book.
+apps/pettibon/grafana/provisioning/datasources	Grafana connection to the local trade book.	Points Grafana at the book on this machine. No exchange key.
+apps/pettibon/src	Pettibon collector source. It writes the trade book.	Watches one hunter and stores the book. It does not place an order.
+apps/spring/daemon	Spring service install. The brain listens on port 5004.	Unit file and install scripts. Spring writes hunter files. It does not sign an order.
+apps/spring/src	Spring source. Home, the wire, and the hunter brain.	The daemon the desk talks to. A bias change does not close a clip.
+docker-windows/seed	Starter files for a new Windows stack.	Stop levels and the hunter script names. Wallets are not in this folder.
+docker-windows/seed/scripts	Script names the Windows stack can start.	Config names only. The engine is the Hummingbot image, not these files.
+install/mint-image/firstboot	First boot of the Mint image. It asks for a new password.	Runs once. The install password is not stored here.
+install/mint-image/overlay	Files copied onto the Mint image.	The look, the menu, and the first-boot pieces. Live keys are not here.
+install/mint-image/overlay/etc	System settings the Mint image ships.	Package source, boot menu, login screen, and the programs that start after login.
+install/mint-image/overlay/etc/apt	Package source for the Mint image.	One list folder. It does not contain a password.
+install/mint-image/overlay/etc/apt/sources.list.d	Package list used by the Mint image.	The rimBaud package source entry.
+install/mint-image/overlay/etc/default	Boot menu defaults for the Mint image.	GRUB pieces for the rimBaud look.
+install/mint-image/overlay/etc/default/grub.d	GRUB snippet for the rimBaud boot menu.	Sets the boot look. It does not contain a password.
+install/mint-image/overlay/etc/gtk-3.0	GTK settings for the Mint desktop.	Theme settings for the installed system.
+install/mint-image/overlay/etc/lightdm	Login screen settings for the Mint image.	The greeter look. The install password is not here.
+install/mint-image/overlay/etc/xdg	Desktop autostart for the Mint image.	Programs that open after a user logs in.
+install/mint-image/overlay/etc/xdg/autostart	What opens after login on the Mint image.	The look, Meta, restore, and the risk notice.
+install/mint-image/overlay/usr	Programs and shared files on the Mint image.	Local commands and the desktop files.
+install/mint-image/overlay/usr/local	Local commands on the Mint image.	The Meta launcher and the look script.
+install/mint-image/overlay/usr/local/bin	Meta desk launcher on the Mint image.	Starts the mothership window. It does not contain a key.
+install/mint-image/overlay/usr/local/sbin	Desktop look script for the Mint image.	Applies the rimBaud look after install.
+install/mint-image/overlay/usr/share	Shared desktop files for the Mint image.	Menu entry, pictures, theme, and boot art.
+install/mint-image/overlay/usr/share/applications	Menu entry for Meta on the Mint image.	One desktop file. It opens the mothership window.
+install/mint-image/overlay/usr/share/backgrounds	Desktop pictures for the Mint image.	Pictures for the desktop and the login screen.
+install/mint-image/overlay/usr/share/backgrounds/rimbaud	Desktop and login pictures.	Two pictures for the rimBaud look.
+install/mint-image/overlay/usr/share/cinnamon	Cinnamon desktop piece for the Mint image.	Points the desktop at the rimBaud background.
+install/mint-image/overlay/usr/share/cinnamon/backgrounds	Cinnamon background list.	Names the rimBaud desktop picture.
+install/mint-image/overlay/usr/share/glib-2.0	Desktop setting overrides for the Mint image.	The schema override for the rimBaud look.
+install/mint-image/overlay/usr/share/glib-2.0/schemas	Desktop setting values for the rimBaud look.	Colors and the theme name. No password.
+install/mint-image/overlay/usr/share/grub	Boot menu picture for the Mint image.	One picture beside the GRUB menu.
+install/mint-image/overlay/usr/share/pixmaps	Menu icons for the Mint image.	Two rimBaud icons.
+install/mint-image/overlay/usr/share/themes	Desktop theme for the Mint image.	The rimBaud theme folder.
+install/mint-image/overlay/usr/share/themes/rimBaud	rimBaud theme for Cinnamon and GTK.	Overrides on top of the Mint theme.
+install/mint-image/overlay/usr/share/themes/rimBaud/cinnamon	Cinnamon colors for the rimBaud theme.	One stylesheet.
+install/mint-image/overlay/usr/share/themes/rimBaud/gtk-3.0	GTK colors for the rimBaud theme.	One stylesheet.
+install/mint-image/preseed	Installer answers for the Mint image.	The password line is a placeholder. First boot asks for a new password.
+install/templates	Connector example for a new install.	A blank Hyperliquid connector file. No key and no wallet.
