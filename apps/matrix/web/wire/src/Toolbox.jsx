@@ -58,6 +58,7 @@ export default function Toolbox({
   inspect,
   onRemoveSelected,
   onWalletsHeaderMenu,
+  onReplace,
   board = "desk",
 }) {
   const [prefs, setPrefs] = useState(loadPrefs);
@@ -86,6 +87,23 @@ export default function Toolbox({
     window.addEventListener("wire-catalog", loadCatalog);
     return () => window.removeEventListener("wire-catalog", loadCatalog);
   }, [loadCatalog]);
+
+  useEffect(() => {
+    const end = () => document.body.classList.remove("wire-tool-drag");
+    const over = (e) => {
+      if (!document.body.classList.contains("wire-tool-drag")) return;
+      e.preventDefault();
+    };
+    window.addEventListener("dragend", end);
+    window.addEventListener("drop", end);
+    window.addEventListener("dragover", over);
+    return () => {
+      window.removeEventListener("dragend", end);
+      window.removeEventListener("drop", end);
+      window.removeEventListener("dragover", over);
+      document.body.classList.remove("wire-tool-drag");
+    };
+  }, []);
 
   const setP = useCallback((patch) => {
     setPrefs((p) => {
@@ -268,7 +286,8 @@ export default function Toolbox({
             placeholder="search hummingbots, gauges…"
           />
           <p className="tb-hint">
-            Click a tool to read it. Drag it onto the canvas to place it.
+            Click a tool to read it. Drag it onto the canvas to place it, even on top of a card.
+            Right-click a hummingbot or controller to replace the one on the wire and keep its wallet, log, risk, and the other wires.
           </p>
 
           <div className="tb-tools">
@@ -322,6 +341,7 @@ export default function Toolbox({
                     items.map((t) => {
                       const on = t.unique && existingIds.has(t.toolId);
                       const itemHidden = hiddenItems.has(t.toolId);
+                      const controller = t.type === "bot" || t.type === "ctrl";
                       return (
                         <div key={t.toolId} className={`tb-row${itemHidden ? " dim" : ""}`}>
                           <button
@@ -331,9 +351,20 @@ export default function Toolbox({
                             onDragStart={(e) => {
                               e.dataTransfer.setData("application/x-wire-tool", t.toolId);
                               e.dataTransfer.effectAllowed = "copy";
+                              document.body.classList.add("wire-tool-drag");
                             }}
+                            onDragEnd={() => document.body.classList.remove("wire-tool-drag")}
+                            onContextMenu={controller ? (e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              if (onReplace) onReplace(t);
+                            } : undefined}
                             onClick={() => (onPick ? onPick(t) : onAdd(t))}
-                            title={on ? "Already on canvas — click to read" : (t.menu || t.hint)}
+                            title={controller
+                              ? (on
+                                ? "Already on canvas — click to read. Right-click replaces the controller on the wire and keeps its wires."
+                                : "Drag onto the canvas. Right-click replaces the controller on the wire and keeps wallet, log, risk, and the other wires.")
+                              : (on ? "Already on canvas — click to read" : (t.menu || t.hint))}
                           >
                             <i className="dot" style={{ background: t.color }} />
                             <span className="ico">{t.icon}</span>

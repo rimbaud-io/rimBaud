@@ -61,9 +61,11 @@ import {
   graphToXml,
   isValidConnection,
   loadSavedGraph,
+  isControllerTool,
   makeEdge,
   makeNode,
   refreshTools,
+  rewireEdges,
   restoreSaved,
   saveSavedGraph,
   slimGraph,
@@ -638,11 +640,13 @@ function Board() {
   const baselineRef = useRef(null);
   const nodesRef = useRef(nodes);
   const edgesRef = useRef(edges);
+  const selectedRef = useRef(null);
   const undoRef = useRef([]);
   const redoRef = useRef([]);
   const dragHist = useRef(false);
   nodesRef.current = nodes;
   edgesRef.current = edges;
+  selectedRef.current = selected;
   const { fitView, screenToFlowPosition, setCenter, getNode } = useReactFlow();
 
   const persistGraph = useCallback((ns, es) => {
@@ -1066,6 +1070,59 @@ function Board() {
       }
     },
     [edges, existingIds, getNode, persistGraph, postSleeper, remember, screenToFlowPosition, setCenter, setEdges, setNodes]
+  );
+
+  const replaceController = useCallback(
+    (tool) => {
+      setMenu(null);
+      if (!isControllerTool(tool)) {
+        ping("right-click replaces a controller");
+        return;
+      }
+      const cur = nodesRef.current || [];
+      if (tool.unique && cur.some((n) => n.id === tool.toolId)) {
+        const n = getNode(tool.toolId);
+        if (n) setCenter(n.position.x + 140, n.position.y + 80, { zoom: 0.95, duration: 280 });
+        ping(tool.label + " already on canvas");
+        return;
+      }
+      const same = cur.filter((n) => n.type === tool.type);
+      const sel = selectedRef.current;
+      let target = null;
+      if (sel && sel.type === tool.type) target = cur.find((n) => n.id === sel.id) || null;
+      if (!target && same.length === 1) target = same[0];
+      if (!target) {
+        ping(same.length
+          ? "select the controller on the canvas, then right-click the new one"
+          : "no controller on the canvas — drag one on first");
+        return;
+      }
+      const oldName = (target.data && (target.data.name || target.data.label)) || target.id;
+      remember("replace " + oldName);
+      const pos = target.position || { x: 80, y: 80 };
+      const node = makeNode(tool, { x: pos.x, y: pos.y });
+      const oldId = target.id;
+      const nextNodes = cur.map((n) => (n.id === oldId ? node : n));
+      const nextEdges = rewireEdges(edgesRef.current, oldId, node.id);
+      const shown = annotateWires(nextNodes, nextEdges);
+      setNodes(shown);
+      setEdges(nextEdges);
+      setSelected(shown.find((n) => n.id === node.id) || node);
+      setToolPick(null);
+      persistGraph(shown, nextEdges);
+      const v2 = (id) => String(id || "").startsWith("hummingbot-v2-");
+      const quietSleeper = (id, op) => {
+        fetch("/api/wire/sleeper", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, op }),
+        }).catch(() => {});
+      };
+      if (tool.type === "bot" && v2(oldId) && oldId !== node.id) quietSleeper(oldId, "stop");
+      if (tool.type === "bot" && v2(node.id)) quietSleeper(node.id, "start");
+      ping("replaced " + oldName + " with " + tool.label + " — wallet, log, risk, and the other wires kept");
+    },
+    [getNode, persistGraph, remember, setCenter, setEdges, setNodes]
   );
 
   const removeNode = useCallback(
@@ -2912,6 +2969,7 @@ function Board() {
           inspect={inspect}
           onRemoveSelected={() => selected && removeNode(selected.id)}
           onWalletsHeaderMenu={(e) => openMenu(e, { kind: "wallets-header" })}
+          onReplace={replaceController}
           board={board}
         />
       </div>

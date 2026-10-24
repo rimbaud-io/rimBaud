@@ -964,6 +964,87 @@ struct DeskUi {
         return true;
     }
 
+    // Swap the controller card. Position stays. Every wire that touched the old
+    // card now touches the new one. Wallet, log, and risk nodes are not removed.
+    bool replace_controller(const ToolItem& t) {
+        if (t.type != "bot" && t.type != "ctrl") {
+            say("right-click replaces a controller");
+            return false;
+        }
+        int same_here = find_node(snap, t.id);
+        if (t.unique && same_here >= 0) {
+            wire_sel = same_here;
+            say(t.label + " already on canvas");
+            return false;
+        }
+        int target = -1;
+        if (wire_sel >= 0 && wire_sel < static_cast<int>(snap.wire_nodes.size())
+            && snap.wire_nodes[wire_sel].type == t.type)
+            target = wire_sel;
+        if (target < 0) {
+            int nmatch = 0, only = -1;
+            for (int i = 0; i < static_cast<int>(snap.wire_nodes.size()); ++i) {
+                if (snap.wire_nodes[i].type != t.type) continue;
+                nmatch++;
+                only = i;
+            }
+            if (nmatch == 1) target = only;
+            else if (nmatch == 0) {
+                say("no controller on the canvas — drag one on first");
+                return false;
+            } else {
+                say("select the controller on the canvas, then right-click the new one");
+                return false;
+            }
+        }
+        push_hist();
+        WireNode old = snap.wire_nodes[target];
+        WireNode n;
+        n.id = t.unique ? t.id : uniq_id(snap, t.id);
+        n.type = t.type;
+        n.label = t.label;
+        n.color = t.color;
+        n.kind = t.kind;
+        n.x = old.x;
+        n.y = old.y;
+        if (n.id.rfind("ctrl-", 0) == 0) n.bot_id = n.id.substr(5);
+        else if (n.type == "bot") n.bot_id = n.id;
+        std::string oid = old.id;
+        snap.wire_nodes[target] = n;
+        std::vector<WireEdge> kept;
+        kept.reserve(snap.wire_edges.size());
+        for (auto& e : snap.wire_edges) {
+            WireEdge ne = e;
+            if (ne.source == oid) ne.source = n.id;
+            if (ne.target == oid) ne.target = n.id;
+            if (ne.source == ne.target) continue;
+            bool dup = false;
+            for (auto& k : kept) {
+                if (k.source == ne.source && k.target == ne.target
+                    && k.source_handle == ne.source_handle && k.target_handle == ne.target_handle) {
+                    dup = true;
+                    break;
+                }
+            }
+            if (!dup) kept.push_back(ne);
+        }
+        snap.wire_edges.swap(kept);
+        wire_marked.erase(oid);
+        wire_marked.insert(n.id);
+        wire_sel = target;
+        edge_sel = -1;
+        std::string extra;
+        if (old.type == "bot" && is_v2_sleeper_id(oid) && oid != n.id && api)
+            extra = api->sleeper_stop(oid);
+        if (n.type == "bot" && is_v2_sleeper_id(n.id) && api) {
+            std::string st = api->sleeper_start(n.id);
+            extra = extra.empty() ? st : (extra + " · " + st);
+        }
+        say("replaced " + old.label + " with " + n.label + " · wires kept"
+            + (extra.empty() ? "" : (" · " + extra)));
+        return true;
+    }
+
     void snap_loaded_nodes() {
         if (!wire_snap) return;
         for (auto& n : snap.wire_nodes) {
@@ -3371,6 +3452,16 @@ int run_desk(FlaskApi& api) {
             if (!ui.wire_fitted) ui.fit_wire(canvas);
             auto sx = [&](double x) { return canvas.x + static_cast<int>((x - ui.pan_x) * ui.zoom); };
             auto sy = [&](double y) { return canvas.y + static_cast<int>((y - ui.pan_y) * ui.zoom); };
+            // A card panned under the toolbox is clipped when drawn. Its hit box
+            // must be clipped too, or the hidden part steals the toolbox click.
+            auto hit_on_canvas = [&](Hit::Kind kind, int idx, Rect r, const std::string& key = "", bool src = false) {
+                int x1 = std::max(r.x, canvas.x);
+                int y1 = std::max(r.y, canvas.y);
+                int x2 = std::min(r.x + r.w, canvas.x + canvas.w);
+                int y2 = std::min(r.y + r.h, canvas.y + canvas.h);
+                if (x2 - x1 < 1 || y2 - y1 < 1) return;
+                ui.hits.push_back({kind, idx, {x1, y1, x2 - x1, y2 - y1}, key, src});
+            };
             set_clip(dpy, gc, canvas);
             int step = std::max(12, static_cast<int>(48 * ui.zoom));
             XSetForeground(dpy, gc, C.ab_grid);
@@ -3407,7 +3498,7 @@ int run_desk(FlaskApi& api) {
                 XFillArc(dpy, buf, gc, x2 - 3, y2 - 3, 6, 6, 0, 360 * 64);
                 if (hit) {
                     int mx = (x1 + dx1 + x2 + dx2) / 2, my = (y1 + dy1 + y2 + dy2) / 2;
-                    ui.hits.push_back({Hit::WireEdge, ei, {mx - 8, my - 8, 16, 16}});
+                    hit_on_canvas(Hit::WireEdge, ei, {mx - 8, my - 8, 16, 16});
                 }
             };
             for (int ei = 0; ei < static_cast<int>(ui.snap.wire_edges.size()); ++ei)
@@ -3458,7 +3549,7 @@ int run_desk(FlaskApi& api) {
                             stroke(dpy, buf, gc, col, inner);
                         }
                     }
-                    ui.hits.push_back({Hit::WireNode, i, r});
+                    hit_on_canvas(Hit::WireNode, i, r);
                     std::string cap = n.label.empty() ? (n.type == "circle" ? "NOTE" : "GROUP") : n.label;
                     if (i == ui.wire_inspect) cap += "_";
                     int tw = static_cast<int>(cap.size()) * CHAR_W;
@@ -3468,7 +3559,7 @@ int run_desk(FlaskApi& api) {
                     if (i == ui.wire_sel || i == ui.wire_inspect || ui.is_marked(i)) {
                         Rect sz{r.x + r.w - 14, r.y + r.h - 14, 12, 12};
                         fill(dpy, buf, gc, C.gold, sz);
-                        ui.hits.push_back({Hit::AnnotSize, i, sz});
+                        hit_on_canvas(Hit::AnnotSize, i, sz);
                     }
                     continue;
                 }
@@ -3616,7 +3707,7 @@ int run_desk(FlaskApi& api) {
                 }
                 if (exp && line_ok(0))
                     put(C.ab_muted, "click canvas to shrink  ·  ports stay for wiring");
-                ui.hits.push_back({Hit::WireNode, i, r});
+                hit_on_canvas(Hit::WireNode, i, r);
                 if (ui.zoom >= 0.18 || fat || exp) {
                     for (auto& p : layout_ports(n, r)) {
                         unsigned long pc = handle_col(C, p.handle);
@@ -3650,7 +3741,7 @@ int run_desk(FlaskApi& api) {
                             }
                             draw_port_tag(dpy, buf, gc, C.ab_bg, pc, ax, ay, lab);
                         }
-                        ui.hits.push_back({Hit::WirePort, i, p.r, p.handle, p.source});
+                        hit_on_canvas(Hit::WirePort, i, p.r, p.handle, p.source);
                     }
                 }
             }
@@ -3707,7 +3798,7 @@ int run_desk(FlaskApi& api) {
                          ? ascii("MARKED " + std::to_string((int)ui.wire_marked.size())
                                  + "  -  drag any marked node to move the group  -  click empty to clear", 90)
                          : (picked
-                                ? "click reads the tool  -  drag onto the canvas to place"
+                                ? "drag onto the canvas  -  right-click a controller keeps the wires"
                                 : "Save = boxes/layout only  -  Compile = real wires (confirm)  -  clips untouched"));
             if (!picked && !ui.snap.compile.message.empty())
                 text(dpy, buf, gc, ui.snap.compile.can_integrate ? C.green : C.amber,
@@ -3743,7 +3834,7 @@ int run_desk(FlaskApi& api) {
             } else if (ui.wire_from >= 0) {
                 text(dpy, buf, gc, C.ab_orange, insp.x + 12, insp.y + 40, "click a target clip to finish the wire  (Esc cancels)");
             } else {
-                text(dpy, buf, gc, C.ab_muted, insp.x + 12, insp.y + 40, "right-click empty canvas to add  -  click a tool to read it  -  drag onto the canvas to place");
+                text(dpy, buf, gc, C.ab_muted, insp.x + 12, insp.y + 40, "right-click canvas to add  -  right-click a controller to replace and keep wires");
             }
 
             if (ui.ctx_on) {
@@ -5736,6 +5827,28 @@ int run_desk(FlaskApi& api) {
                 } else if (e.xbutton.button == 3 && ui.compile_win) {
                     redraw();
                 } else if (e.xbutton.button == 3 && ui.page == PgWire) {
+                    int tool_i = -1;
+                    bool canvas_top = false;
+                    for (int hi = static_cast<int>(ui.hits.size()) - 1; hi >= 0; --hi) {
+                        auto& h = ui.hits[hi];
+                        if (!inside(h.r, mx, my)) continue;
+                        if (h.kind == Hit::ToolItem) { tool_i = h.i; break; }
+                        if (h.kind == Hit::WireNode || h.kind == Hit::WirePort || h.kind == Hit::WireEdge
+                            || h.kind == Hit::AnnotSize) {
+                            canvas_top = true;
+                            break;
+                        }
+                    }
+                    if (tool_i >= 0 && !canvas_top && tool_i < static_cast<int>(ui.snap.tools.size())) {
+                        auto& t = ui.snap.tools[tool_i];
+                        ui.tool_pick_id = t.id;
+                        if (t.type == "bot" || t.type == "ctrl") ui.replace_controller(t);
+                        else ui.say("right-click a controller to replace the one on the wire");
+                        redraw();
+                    } else if (inside(ui.tb_r, mx, my) && !canvas_top) {
+                        ui.say("right-click a controller to replace the one on the wire");
+                        redraw();
+                    } else {
                     ui.ctx_on = true;
                     ui.ctx_x = mx;
                     ui.ctx_y = my;
@@ -5774,6 +5887,7 @@ int run_desk(FlaskApi& api) {
                         }
                     }
                     redraw();
+                    }
                 } else if (e.xbutton.button == 1) {
                     bool hit = false;
                     bool shift = (e.xbutton.state & ShiftMask) || (e.xbutton.state & ControlMask);

@@ -774,6 +774,22 @@ header {
 .chip.closes { border-color: var(--rose); color: var(--rose); }
 .react-flow__nodes { z-index: 1 !important; }
 
+/* While a toolbox tool is dragged, nodes and edges must not eat the drop.
+   A card sitting under the cursor would otherwise cancel the HTML5 drop. */
+body.wire-tool-drag .react-flow__node,
+body.wire-tool-drag .react-flow__edge,
+body.wire-tool-drag .react-flow__edgelabel-renderer,
+body.wire-tool-drag .react-flow__connectionline,
+body.wire-tool-drag .react-flow__handle,
+body.wire-tool-drag .react-flow__resize-control,
+body.wire-tool-drag .react-flow__node-toolbar,
+body.wire-tool-drag .react-flow__attribution,
+body.wire-tool-drag .react-flow__minimap,
+body.wire-tool-drag .react-flow__controls,
+body.wire-tool-drag .react-flow__panel {
+  pointer-events: none !important;
+}
+
 .wn {
   position: relative;
   width: 300px;

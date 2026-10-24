@@ -617,6 +617,28 @@ export function makeEdge(id, source, sourceHandle, target, targetHandle) {
   };
 }
 
+export function isControllerTool(tool) {
+  return !!tool && (tool.type === "bot" || tool.type === "ctrl");
+}
+
+// Point every wire that touched oldId at newId. Handles stay. A wire that
+// would loop back onto itself is dropped. The wallet, log, and risk nodes stay.
+export function rewireEdges(edges, oldId, newId) {
+  const seen = new Set();
+  const out = [];
+  for (const e of edges || []) {
+    const source = e.source === oldId ? newId : e.source;
+    const target = e.target === oldId ? newId : e.target;
+    if (!source || !target || source === target) continue;
+    const key = [source, e.sourceHandle || "", target, e.targetHandle || ""].join("\0");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (source === e.source && target === e.target) out.push(e);
+    else out.push({ ...e, source, target });
+  }
+  return out;
+}
+
 export function autoEdgesFor(node, existing) {
   const has = (id) => existing.some((n) => n.id === id);
   const out = [];
