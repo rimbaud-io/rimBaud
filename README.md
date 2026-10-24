@@ -16,7 +16,7 @@ limitations under the License.
 
 # rimBaud
 
-rimBaud is the desk for automatic trading. Hummingbot is the engine underneath. This tree is only the rimBaud source.
+rimBaud is the desk for automatic trading. Hummingbot is the engine underneath. This tree is only the rimBaud source. Wallets stay on the machine that runs the hunters.
 
 Five applications:
 
