@@ -38,6 +38,7 @@ vpn/             the WireGuard link between matrices.
 services/        condor (telegram gauge) and the version page.
 tools/           wallet creator and the telegram sender.
 third_party/     nlohmann JSON, MIT.
+website/         the public pages for rimbaud.io. The forum is not in this folder.
 ```
 
 ## Where it runs
@@ -54,12 +55,13 @@ This folder is the copy for GitHub. The running machine still uses the live fold
 | `apps/archy` | `rimbaud-archy` |
 | `hunters` | `scripts` (rimBaud scripts only) |
 | `install` | `install_new` |
+| `website` | `website/rimbaud-site` |
 
 The installer scripts still name those live folders, because that is where a machine runs them.
 
 ## What is not in this tree
 
-Hummingbot itself, `conf/`, wallets, secrets, logs, and databases. The install password is not in the preseed. Build output and `node_modules` are not here.
+Hummingbot itself, `conf/`, wallets, secrets, logs, and databases. The install password is not in the preseed. Build output and `node_modules` are not here. The forum and the website gate hash are not in this tree.
 
 ## License
 
