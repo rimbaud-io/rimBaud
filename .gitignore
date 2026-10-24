@@ -1,3 +1,5 @@
+# Public tree. Secrets, wallets, logs, and build output stay off GitHub.
+
 # built binaries
 apps/matrix/desk/rimbaud-desk
 apps/matrix/desk/rimbaud-chart
