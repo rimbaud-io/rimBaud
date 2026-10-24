@@ -286,8 +286,9 @@ export default function Toolbox({
             placeholder="search hummingbots, gauges…"
           />
           <p className="tb-hint">
-            Click a tool to read it. Drag it onto the canvas to place it, even on top of a card.
-            Right-click a hummingbot or controller to replace the one on the wire and keep its wallet, log, risk, and the other wires.
+            Click a tool to read it. Drag it onto empty canvas to place it.
+            Drag a controller onto the one on the canvas and the window asks “replace the active controller”.
+            Wallet, log, risk, and the other wires stay.
           </p>
 
           <div className="tb-tools">
@@ -362,8 +363,8 @@ export default function Toolbox({
                             onClick={() => (onPick ? onPick(t) : onAdd(t))}
                             title={controller
                               ? (on
-                                ? "Already on canvas — click to read. Right-click replaces the controller on the wire and keeps its wires."
-                                : "Drag onto the canvas. Right-click replaces the controller on the wire and keeps wallet, log, risk, and the other wires.")
+                                ? "Already on canvas — click to read. Drag another controller onto this one to replace it."
+                                : "Drag onto the controller on the canvas. The window asks before it replaces the active controller.")
                               : (on ? "Already on canvas — click to read" : (t.menu || t.hint))}
                           >
                             <i className="dot" style={{ background: t.color }} />

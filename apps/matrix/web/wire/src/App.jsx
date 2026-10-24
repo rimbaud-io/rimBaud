@@ -56,16 +56,20 @@ import { closeHits, liveKeySet, markEdges } from "./lib/impact.js";
 import { HISTORY_KEEP, packStep, persistHistory, replayConfig } from "./lib/history.js";
 import { clsPnl, fmtSecs, money } from "./lib/format.js";
 import {
+  activeV2Controller,
+  applyControllerSwap,
   autoEdgesFor,
   clearSavedGraph,
   graphToXml,
   isValidConnection,
+  controllerParentId,
+  isV2SleeperId,
   loadSavedGraph,
   isControllerTool,
   makeEdge,
   makeNode,
   refreshTools,
-  rewireEdges,
+  replaceDropTarget,
   restoreSaved,
   saveSavedGraph,
   slimGraph,
@@ -518,6 +522,10 @@ function clampMenu(x, y) {
   };
 }
 
+function nodeTitle(n) {
+  return (n && n.data && (n.data.name || n.data.label)) || (n && n.id) || "";
+}
+
 function Board() {
   const seed = useMemo(() => initialGraph(), []);
   const [nodes, setNodes, onNodesChange] = useNodesState(seed.nodes);
@@ -545,6 +553,7 @@ function Board() {
   const [walletBusy, setWalletBusy] = useState(false);
   const [walletErr, setWalletErr] = useState("");
   const [fitOnce, setFitOnce] = useState(null);
+  const [replaceAsk, setReplaceAsk] = useState(null);
   const [board, setBoard] = useState("desk");
   const [topScale, setTopScale] = useState(0.7);
   const topScaleRef = useRef(0.7);
@@ -647,7 +656,7 @@ function Board() {
   nodesRef.current = nodes;
   edgesRef.current = edges;
   selectedRef.current = selected;
-  const { fitView, screenToFlowPosition, setCenter, getNode } = useReactFlow();
+  const { fitView, screenToFlowPosition, setCenter, getNode, getNodes } = useReactFlow();
 
   const persistGraph = useCallback((ns, es) => {
     const annotated = annotateWires(ns, es);
@@ -970,6 +979,11 @@ function Board() {
 
   useEffect(() => {
     const onKey = (e) => {
+      if (replaceAsk && e.key === "Escape") {
+        e.preventDefault();
+        setReplaceAsk(null);
+        return;
+      }
       const t = e.target;
       if (t && (t.tagName === "INPUT" || t.tagName === "SELECT" || t.tagName === "TEXTAREA")) return;
       const z = e.key === "z" || e.key === "Z";
@@ -987,7 +1001,7 @@ function Board() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [undo, redo]);
+  }, [undo, redo, replaceAsk]);
 
   const existingIds = useMemo(() => new Set(nodes.map((n) => n.id)), [nodes]);
 
@@ -1072,7 +1086,51 @@ function Board() {
     [edges, existingIds, getNode, persistGraph, postSleeper, remember, screenToFlowPosition, setCenter, setEdges, setNodes]
   );
 
-  const replaceController = useCallback(
+  const performReplace = useCallback(
+    (tool, targetId) => {
+      setMenu(null);
+      const cur = nodesRef.current || [];
+      let target = cur.find((n) => n.id === targetId) || null;
+      if (tool && tool.type === "bot" && isV2SleeperId(tool.toolId) && target && target.type === "ctrl") {
+        const parent = controllerParentId(target);
+        if (isV2SleeperId(parent)) target = cur.find((n) => n.id === parent && n.type === "bot") || null;
+      }
+      if (!tool || !isControllerTool(tool) || !target) {
+        ping("no controller on the canvas — drag one on first");
+        return;
+      }
+      if (tool.unique && cur.some((n) => n.id === tool.toolId)) {
+        const n = getNode(tool.toolId);
+        if (n) setCenter(n.position.x + 140, n.position.y + 80, { zoom: 0.95, duration: 280 });
+        ping(tool.label + " already on canvas");
+        return;
+      }
+      const oldName = nodeTitle(target);
+      remember("replace " + oldName);
+      const swapped = applyControllerSwap(cur, edgesRef.current, tool, target);
+      const shown = annotateWires(swapped.nodes, swapped.edges);
+      setNodes(shown);
+      setEdges(swapped.edges);
+      setSelected(shown.find((n) => n.id === swapped.node.id) || swapped.node);
+      setToolPick(null);
+      persistGraph(shown, swapped.edges);
+      const quietSleeper = (id, op) => {
+        fetch("/api/wire/sleeper", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, op }),
+        }).catch(() => {});
+      };
+      if (tool.type === "bot" && isV2SleeperId(swapped.oldId) && swapped.oldId !== swapped.node.id) {
+        quietSleeper(swapped.oldId, "stop");
+      }
+      if (tool.type === "bot" && isV2SleeperId(swapped.node.id)) quietSleeper(swapped.node.id, "start");
+      ping("replaced " + oldName + " with " + tool.label + " — wallet, log, risk, and the other wires kept");
+    },
+    [getNode, persistGraph, remember, setCenter, setEdges, setNodes]
+  );
+
+  const askReplace = useCallback(
     (tool) => {
       setMenu(null);
       if (!isControllerTool(tool)) {
@@ -1086,44 +1144,39 @@ function Board() {
         ping(tool.label + " already on canvas");
         return;
       }
-      const same = cur.filter((n) => n.type === tool.type);
-      const sel = selectedRef.current;
       let target = null;
-      if (sel && sel.type === tool.type) target = cur.find((n) => n.id === sel.id) || null;
-      if (!target && same.length === 1) target = same[0];
-      if (!target) {
-        ping(same.length
-          ? "select the controller on the canvas, then right-click the new one"
-          : "no controller on the canvas — drag one on first");
-        return;
+      if (tool.type === "bot" && isV2SleeperId(tool.toolId)) {
+        const found = activeV2Controller(cur, selectedRef.current);
+        if (!found.node) {
+          ping(found.reason === "many"
+            ? "drop it on the controller to replace"
+            : "no controller on the canvas — drag one on first");
+          return;
+        }
+        target = found.node;
+      } else {
+        const same = cur.filter((n) => n.type === tool.type);
+        const sel = selectedRef.current;
+        if (sel && sel.type === tool.type) target = cur.find((n) => n.id === sel.id) || null;
+        if (!target && same.length === 1) target = same[0];
+        if (!target) {
+          ping(same.length
+            ? "select the controller on the canvas, then right-click the new one"
+            : "no controller on the canvas — drag one on first");
+          return;
+        }
       }
-      const oldName = (target.data && (target.data.name || target.data.label)) || target.id;
-      remember("replace " + oldName);
-      const pos = target.position || { x: 80, y: 80 };
-      const node = makeNode(tool, { x: pos.x, y: pos.y });
-      const oldId = target.id;
-      const nextNodes = cur.map((n) => (n.id === oldId ? node : n));
-      const nextEdges = rewireEdges(edgesRef.current, oldId, node.id);
-      const shown = annotateWires(nextNodes, nextEdges);
-      setNodes(shown);
-      setEdges(nextEdges);
-      setSelected(shown.find((n) => n.id === node.id) || node);
-      setToolPick(null);
-      persistGraph(shown, nextEdges);
-      const v2 = (id) => String(id || "").startsWith("hummingbot-v2-");
-      const quietSleeper = (id, op) => {
-        fetch("/api/wire/sleeper", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id, op }),
-        }).catch(() => {});
-      };
-      if (tool.type === "bot" && v2(oldId) && oldId !== node.id) quietSleeper(oldId, "stop");
-      if (tool.type === "bot" && v2(node.id)) quietSleeper(node.id, "start");
-      ping("replaced " + oldName + " with " + tool.label + " — wallet, log, risk, and the other wires kept");
+      setReplaceAsk({ tool, targetId: target.id });
     },
-    [getNode, persistGraph, remember, setCenter, setEdges, setNodes]
+    [getNode, setCenter]
   );
+
+  const commitReplace = useCallback(() => {
+    const ask = replaceAsk;
+    if (!ask) return;
+    setReplaceAsk(null);
+    performReplace(ask.tool, ask.targetId);
+  }, [performReplace, replaceAsk]);
 
   const removeNode = useCallback(
     (id) => {
@@ -1201,9 +1254,25 @@ function Board() {
       const id = ev.dataTransfer.getData("application/x-wire-tool");
       const tool = toolById(id);
       if (!tool) return;
-      addTool(tool, screenToFlowPosition({ x: ev.clientX, y: ev.clientY }));
+      const flow = screenToFlowPosition({ x: ev.clientX, y: ev.clientY });
+      if (isControllerTool(tool)) {
+        const cur = getNodes();
+        if (tool.unique && cur.some((n) => n.id === tool.toolId)) {
+          const n = getNode(tool.toolId);
+          if (n) setCenter(n.position.x + 140, n.position.y + 80, { zoom: 0.95, duration: 280 });
+          ping(tool.label + " already on canvas");
+          return;
+        }
+        const hit = replaceDropTarget(tool, cur, flow.x, flow.y);
+        if (hit) {
+          setMenu(null);
+          setReplaceAsk({ tool, targetId: hit.id });
+          return;
+        }
+      }
+      addTool(tool, flow);
     },
-    [addTool, screenToFlowPosition]
+    [addTool, getNode, getNodes, screenToFlowPosition, setCenter]
   );
 
   const openMenu = (ev, extra) => {
@@ -2969,7 +3038,7 @@ function Board() {
           inspect={inspect}
           onRemoveSelected={() => selected && removeNode(selected.id)}
           onWalletsHeaderMenu={(e) => openMenu(e, { kind: "wallets-header" })}
-          onReplace={replaceController}
+          onReplace={askReplace}
           board={board}
         />
       </div>
@@ -2992,6 +3061,28 @@ function Board() {
         onClose={() => setWalletForm(null)}
         onSave={saveWallet}
       />
+      {replaceAsk ? (
+        <div className="repl-back" onMouseDown={() => setReplaceAsk(null)}>
+          <div
+            className="wallet-modal repl-ask"
+            role="dialog"
+            aria-label="replace the active controller"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <h3>Replace the active controller?</h3>
+            <p className="repl-names">
+              {nodeTitle(nodes.find((n) => n.id === replaceAsk.targetId))}
+              {" → "}
+              {replaceAsk.tool.label}
+            </p>
+            <p className="repl-note">Wallet, log, risk, and the other wires stay.</p>
+            <div className="wallet-actions">
+              <button type="button" onClick={() => setReplaceAsk(null)}>Cancel</button>
+              <button type="button" className="go" onClick={commitReplace}>Replace</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

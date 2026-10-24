@@ -171,7 +171,7 @@ enum Page { PgHome, PgWire, PgCondor, PgHunters, PgFunds, PgStrategy, PgSystem, 
 const char* PAGE_NAME[] = {"HOME", "WIRE", "CONDOR", "HUNTERS", "FUNDS", "STRATEGY", "SYSTEM"};
 
 struct Hit {
-    enum Kind { Idle, Nav, Hunter, NotWired, WireNode, WireEdge, WirePort, ToolCat, ToolItem, WireBoard, WireAct, Ctx, Backend, Chart, Sl, Lev, Restart, HunterGate, DeskBias, CoinBias, CoinClose, CoinOpen100, CtrlBool, CtrlKnob, CtrlSel, CtrlStd, CopyMute, CopySlots, CopyAudit, AuditClose, AuditRun, Quit, PackSave, PackRestore, WireSnap, AnnotColor, AnnotSize, InspectBack, CompileClose, CompileWork, CompileGo, PresetDrop, PresetPick, PresetSave, ApiKey } kind = Idle;
+    enum Kind { Idle, Nav, Hunter, NotWired, WireNode, WireEdge, WirePort, ToolCat, ToolItem, WireBoard, WireAct, Ctx, Backend, Chart, Sl, Lev, Restart, HunterGate, DeskBias, CoinBias, CoinClose, CoinOpen100, CtrlBool, CtrlKnob, CtrlSel, CtrlStd, CopyMute, CopySlots, CopyAudit, AuditClose, AuditRun, Quit, PackSave, PackRestore, WireSnap, AnnotColor, AnnotSize, InspectBack, CompileClose, CompileWork, CompileGo, PresetDrop, PresetPick, PresetSave, ApiKey, ReplYes, ReplNo } kind = Idle;
     int i = -1;
     Rect r{};
     std::string key;
@@ -734,6 +734,10 @@ struct DeskUi {
     bool tool_drag = false;
     bool tool_drag_moved = false;
     int tool_drag_i = -1;
+    bool repl_on = false;
+    std::string repl_tool_id;
+    std::string repl_target_id;
+    Rect repl_win_r{};
     int wire_from = -1;
     std::string wire_handle;
     bool wire_from_src = true;
@@ -964,38 +968,180 @@ struct DeskUi {
         return true;
     }
 
-    // Swap the controller card. Position stays. Every wire that touched the old
-    // card now touches the new one. Wallet, log, and risk nodes are not removed.
-    bool replace_controller(const ToolItem& t) {
+    void retarget_id(const std::string& oid, const std::string& nid) {
+        if (oid.empty() || nid.empty() || oid == nid) return;
+        std::vector<WireEdge> kept;
+        kept.reserve(snap.wire_edges.size());
+        for (auto& e : snap.wire_edges) {
+            WireEdge ne = e;
+            if (ne.source == oid) ne.source = nid;
+            if (ne.target == oid) ne.target = nid;
+            if (ne.source.empty() || ne.target.empty() || ne.source == ne.target) continue;
+            bool dup = false;
+            for (auto& k : kept) {
+                if (k.source == ne.source && k.target == ne.target
+                    && k.source_handle == ne.source_handle && k.target_handle == ne.target_handle) {
+                    dup = true;
+                    break;
+                }
+            }
+            if (!dup) kept.push_back(ne);
+        }
+        snap.wire_edges.swap(kept);
+    }
+
+    // Topmost card under the pointer. Frames sit behind the other nodes.
+    int node_under_canvas(int mx, int my) const {
+        if (!inside(canvas_r, mx, my)) return -1;
+        int found = -1;
+        auto consider = [&](int i) {
+            const auto& n = snap.wire_nodes[i];
+            int ox = canvas_r.x + static_cast<int>((n.x - pan_x) * zoom);
+            int oy = canvas_r.y + static_cast<int>((n.y - pan_y) * zoom);
+            Rect nr = node_view_box(n, false, zoom, ox, oy);
+            if (inside(nr, mx, my)) found = i;
+        };
+        for (int i = 0; i < static_cast<int>(snap.wire_nodes.size()); ++i)
+            if (snap.wire_nodes[i].type == "frame" || snap.wire_nodes[i].type == "circle") consider(i);
+        for (int i = 0; i < static_cast<int>(snap.wire_nodes.size()); ++i)
+            if (snap.wire_nodes[i].type != "frame" && snap.wire_nodes[i].type != "circle") consider(i);
+        return found;
+    }
+
+    static std::string ctrl_parent_id(const WireNode& n) {
+        if (!n.bot_id.empty()) return n.bot_id;
+        if (n.id.rfind("ctrl-", 0) == 0) return n.id.substr(5);
+        if (n.type == "bot") return n.id;
+        return "";
+    }
+
+    // Bot or ctrl under the cursor. A v2 bot dropped on its ctrl card targets that bot.
+    int drop_replace_target(const ToolItem& t, int hit) const {
+        if (hit < 0 || hit >= static_cast<int>(snap.wire_nodes.size())) return -1;
+        if (t.type != "bot" && t.type != "ctrl") return -1;
+        const auto& n = snap.wire_nodes[hit];
+        if (n.type != "bot" && n.type != "ctrl") return -1;
+        if (t.type == "bot" && is_v2_sleeper_id(t.id) && n.type == "ctrl") {
+            std::string parent = ctrl_parent_id(n);
+            if (!is_v2_sleeper_id(parent)) return -1;
+            int bi = find_node(snap, parent);
+            if (bi < 0 || snap.wire_nodes[bi].type != "bot") return -1;
+            if (snap.wire_nodes[bi].id == t.id) return -1;
+            return bi;
+        }
+        if (n.type != t.type || n.id == t.id) return -1;
+        return hit;
+    }
+
+    void open_replace(const ToolItem& t, int target) {
+        if (target < 0 || target >= static_cast<int>(snap.wire_nodes.size())) return;
+        int here = find_node(snap, t.id);
+        if (t.unique && here >= 0) {
+            wire_sel = here;
+            say(t.label + " already on canvas");
+            return;
+        }
+        repl_on = true;
+        repl_tool_id = t.id;
+        repl_target_id = snap.wire_nodes[target].id;
+        ctx_on = false;
+    }
+
+    // Right-click. A standard hummingbots_v2 row uses the v2 controller, not a live hunter.
+    void ask_replace(const ToolItem& t) {
         if (t.type != "bot" && t.type != "ctrl") {
             say("right-click replaces a controller");
-            return false;
+            return;
         }
-        int same_here = find_node(snap, t.id);
-        if (t.unique && same_here >= 0) {
-            wire_sel = same_here;
+        int here = find_node(snap, t.id);
+        if (t.unique && here >= 0) {
+            wire_sel = here;
             say(t.label + " already on canvas");
-            return false;
+            return;
         }
         int target = -1;
-        if (wire_sel >= 0 && wire_sel < static_cast<int>(snap.wire_nodes.size())
-            && snap.wire_nodes[wire_sel].type == t.type)
-            target = wire_sel;
-        if (target < 0) {
-            int nmatch = 0, only = -1;
-            for (int i = 0; i < static_cast<int>(snap.wire_nodes.size()); ++i) {
-                if (snap.wire_nodes[i].type != t.type) continue;
-                nmatch++;
-                only = i;
+        if (t.type == "bot" && is_v2_sleeper_id(t.id)) {
+            if (wire_sel >= 0 && wire_sel < static_cast<int>(snap.wire_nodes.size())) {
+                auto& sel = snap.wire_nodes[wire_sel];
+                if (sel.type == "bot" && is_v2_sleeper_id(sel.id)) target = wire_sel;
+                else if (sel.type == "ctrl") {
+                    std::string parent = ctrl_parent_id(sel);
+                    if (is_v2_sleeper_id(parent)) {
+                        int bi = find_node(snap, parent);
+                        if (bi >= 0 && snap.wire_nodes[bi].type == "bot") target = bi;
+                    }
+                }
             }
-            if (nmatch == 1) target = only;
-            else if (nmatch == 0) {
-                say("no controller on the canvas — drag one on first");
-                return false;
-            } else {
-                say("select the controller on the canvas, then right-click the new one");
-                return false;
+            if (target < 0) {
+                int nmatch = 0, only = -1;
+                for (int i = 0; i < static_cast<int>(snap.wire_nodes.size()); ++i) {
+                    if (snap.wire_nodes[i].type == "bot" && is_v2_sleeper_id(snap.wire_nodes[i].id)) {
+                        nmatch++;
+                        only = i;
+                    }
+                }
+                if (nmatch == 1) target = only;
+                else if (nmatch == 0) {
+                    say("no controller on the canvas — drag one on first");
+                    return;
+                } else {
+                    say("drop it on the controller to replace");
+                    return;
+                }
             }
+        } else {
+            if (wire_sel >= 0 && wire_sel < static_cast<int>(snap.wire_nodes.size())
+                && snap.wire_nodes[wire_sel].type == t.type)
+                target = wire_sel;
+            if (target < 0) {
+                int nmatch = 0, only = -1;
+                for (int i = 0; i < static_cast<int>(snap.wire_nodes.size()); ++i) {
+                    if (snap.wire_nodes[i].type != t.type) continue;
+                    nmatch++;
+                    only = i;
+                }
+                if (nmatch == 1) target = only;
+                else if (nmatch == 0) {
+                    say("no controller on the canvas — drag one on first");
+                    return;
+                } else {
+                    say("select the controller on the canvas, then right-click the new one");
+                    return;
+                }
+            }
+        }
+        open_replace(t, target);
+    }
+
+    // Position stays. Wires follow. The ctrl card becomes the new controller.
+    // Wallet, log, risk, and bias nodes are not removed.
+    void commit_replace() {
+        repl_on = false;
+        std::string tid = repl_tool_id;
+        std::string want = repl_target_id;
+        repl_tool_id.clear();
+        repl_target_id.clear();
+        const ToolItem* tp = nullptr;
+        for (auto& tool : snap.tools)
+            if (tool.id == tid) { tp = &tool; break; }
+        int target = find_node(snap, want);
+        if (!tp || target < 0) {
+            say("no controller on the canvas — drag one on first");
+            return;
+        }
+        ToolItem t = *tp;
+        if (t.type == "bot" && is_v2_sleeper_id(t.id) && snap.wire_nodes[target].type == "ctrl") {
+            std::string parent = ctrl_parent_id(snap.wire_nodes[target]);
+            if (is_v2_sleeper_id(parent)) {
+                int bi = find_node(snap, parent);
+                if (bi >= 0 && snap.wire_nodes[bi].type == "bot") target = bi;
+            }
+        }
+        int here = find_node(snap, t.id);
+        if (t.unique && here >= 0) {
+            wire_sel = here;
+            say(t.label + " already on canvas");
+            return;
         }
         push_hist();
         WireNode old = snap.wire_nodes[target];
@@ -1011,27 +1157,36 @@ struct DeskUi {
         else if (n.type == "bot") n.bot_id = n.id;
         std::string oid = old.id;
         snap.wire_nodes[target] = n;
-        std::vector<WireEdge> kept;
-        kept.reserve(snap.wire_edges.size());
-        for (auto& e : snap.wire_edges) {
-            WireEdge ne = e;
-            if (ne.source == oid) ne.source = n.id;
-            if (ne.target == oid) ne.target = n.id;
-            if (ne.source == ne.target) continue;
-            bool dup = false;
-            for (auto& k : kept) {
-                if (k.source == ne.source && k.target == ne.target
-                    && k.source_handle == ne.source_handle && k.target_handle == ne.target_handle) {
-                    dup = true;
-                    break;
+        retarget_id(oid, n.id);
+        if (old.type == "bot" && n.type == "bot" && oid != n.id) {
+            std::string coid = "ctrl-" + oid;
+            std::string cnid = "ctrl-" + n.id;
+            int cs = find_node(snap, coid);
+            if (cs >= 0 && coid != cnid && find_node(snap, cnid) < 0) {
+                const ToolItem* ct = nullptr;
+                for (auto& tool : snap.tools)
+                    if (tool.id == cnid) { ct = &tool; break; }
+                if (ct) {
+                    WireNode cold = snap.wire_nodes[cs];
+                    WireNode cn;
+                    cn.id = cnid;
+                    cn.type = "ctrl";
+                    cn.label = ct->label;
+                    cn.color = ct->color.empty() ? n.color : ct->color;
+                    cn.kind = ct->kind;
+                    cn.x = cold.x;
+                    cn.y = cold.y;
+                    cn.bot_id = n.id;
+                    snap.wire_nodes[cs] = cn;
+                    retarget_id(coid, cnid);
+                    wire_marked.erase(coid);
+                    wire_marked.insert(cnid);
                 }
             }
-            if (!dup) kept.push_back(ne);
         }
-        snap.wire_edges.swap(kept);
         wire_marked.erase(oid);
         wire_marked.insert(n.id);
-        wire_sel = target;
+        wire_sel = find_node(snap, n.id);
         edge_sel = -1;
         std::string extra;
         if (old.type == "bot" && is_v2_sleeper_id(oid) && oid != n.id && api)
@@ -1042,7 +1197,6 @@ struct DeskUi {
         }
         say("replaced " + old.label + " with " + n.label + " · wires kept"
             + (extra.empty() ? "" : (" · " + extra)));
-        return true;
     }
 
     void snap_loaded_nodes() {
@@ -3772,9 +3926,12 @@ int run_desk(FlaskApi& api) {
             if (ui.tool_drag && ui.tool_drag_i >= 0 && ui.tool_drag_i < static_cast<int>(ui.snap.tools.size())) {
                 auto& t = ui.snap.tools[ui.tool_drag_i];
                 unsigned long col = parse_hex(dpy, cm, t.color, C.ab_orange);
+                bool on_canvas = inside(canvas, ui.mx_last, ui.my_last);
+                int under = on_canvas ? ui.node_under_canvas(ui.mx_last, ui.my_last) : -1;
+                bool repl = on_canvas && ui.drop_replace_target(t, under) >= 0;
                 Rect g{ui.mx_last - 70, ui.my_last - 16, 140, 36};
                 fill(dpy, buf, gc, C.ab_clip, g);
-                stroke(dpy, buf, gc, inside(canvas, ui.mx_last, ui.my_last) ? C.ab_orange : C.rose, g);
+                stroke(dpy, buf, gc, repl ? C.gold : (on_canvas ? C.ab_orange : C.rose), g);
                 fill(dpy, buf, gc, col, {g.x, g.y, 6, g.h});
                 text(dpy, buf, gc, C.ab_text, g.x + 12, g.y + 22, ascii(t.label, 14));
             }
@@ -3798,7 +3955,7 @@ int run_desk(FlaskApi& api) {
                          ? ascii("MARKED " + std::to_string((int)ui.wire_marked.size())
                                  + "  -  drag any marked node to move the group  -  click empty to clear", 90)
                          : (picked
-                                ? "drag onto the canvas  -  right-click a controller keeps the wires"
+                                ? "drag onto a controller — the window asks before replace"
                                 : "Save = boxes/layout only  -  Compile = real wires (confirm)  -  clips untouched"));
             if (!picked && !ui.snap.compile.message.empty())
                 text(dpy, buf, gc, ui.snap.compile.can_integrate ? C.green : C.amber,
@@ -3834,7 +3991,7 @@ int run_desk(FlaskApi& api) {
             } else if (ui.wire_from >= 0) {
                 text(dpy, buf, gc, C.ab_orange, insp.x + 12, insp.y + 40, "click a target clip to finish the wire  (Esc cancels)");
             } else {
-                text(dpy, buf, gc, C.ab_muted, insp.x + 12, insp.y + 40, "right-click canvas to add  -  right-click a controller to replace and keep wires");
+                text(dpy, buf, gc, C.ab_muted, insp.x + 12, insp.y + 40, "drag a controller onto the one on the canvas — the window asks");
             }
 
             if (ui.ctx_on) {
@@ -3874,6 +4031,39 @@ int run_desk(FlaskApi& api) {
                     shown++;
                 }
                 item(0, "close", C.ab_muted);
+            }
+
+            if (ui.repl_on) {
+                const ToolItem* tool = nullptr;
+                for (auto& t : ui.snap.tools)
+                    if (t.id == ui.repl_tool_id) { tool = &t; break; }
+                int ti = find_node(ui.snap, ui.repl_target_id);
+                if (!tool || ti < 0) {
+                    ui.repl_on = false;
+                } else {
+                    auto& old = ui.snap.wire_nodes[ti];
+                    int ww = std::min(480, std::max(280, canvas.w - 16));
+                    int hh = 132;
+                    int x = canvas.x + std::max(4, (canvas.w - ww) / 2);
+                    int y = canvas.y + std::max(4, (canvas.h - hh) / 2);
+                    Rect box{x, y, ww, hh};
+                    ui.repl_win_r = box;
+                    fill(dpy, buf, gc, C.ab_bg, box);
+                    stroke(dpy, buf, gc, C.gold, box);
+                    text(dpy, buf, gc, C.gold, box.x + 16, box.y + 24, "Replace the active controller?");
+                    text(dpy, buf, gc, C.ab_text, box.x + 16, box.y + 48,
+                         ascii(old.label + " -> " + tool->label, std::max(8, (ww - 32) / CHAR_W)));
+                    text(dpy, buf, gc, C.ab_muted, box.x + 16, box.y + 70,
+                         "Wallet, log, risk, and the other wires stay.");
+                    Rect no{box.x + 16, box.y + box.h - 36, 100, 24};
+                    Rect yes{box.x + box.w - 120, box.y + box.h - 36, 104, 24};
+                    stroke(dpy, buf, gc, C.ab_muted, no);
+                    text(dpy, buf, gc, C.ab_muted, no.x + 22, no.y + 16, "Cancel");
+                    stroke(dpy, buf, gc, C.gold, yes);
+                    text(dpy, buf, gc, C.gold, yes.x + 18, yes.y + 16, "Replace");
+                    ui.hits.push_back({Hit::ReplNo, 0, no});
+                    ui.hits.push_back({Hit::ReplYes, 0, yes});
+                }
             }
         };
 
@@ -5599,7 +5789,12 @@ int run_desk(FlaskApi& api) {
                 }
                 else if (ks == XK_q) run = false;
                 else if (ks == XK_Escape) {
-                    if (ui.compile_win) {
+                    if (ui.repl_on) {
+                        ui.repl_on = false;
+                        ui.repl_tool_id.clear();
+                        ui.repl_target_id.clear();
+                        redraw();
+                    } else if (ui.compile_win) {
                         ui.compile_win = false;
                         redraw();
                     } else if (ui.audit_win) {
@@ -5817,7 +6012,7 @@ int run_desk(FlaskApi& api) {
                         ui.scroll = std::min(std::max(0, ui.content_h - (H - 80)), ui.scroll + 48);
                     }
                     redraw();
-                } else if (e.xbutton.button == 2 && ui.page == PgWire && !ui.compile_win) {
+                } else if (e.xbutton.button == 2 && ui.page == PgWire && !ui.compile_win && !ui.repl_on) {
                     ui.panning = true;
                     ui.pan_mx = mx;
                     ui.pan_my = my;
@@ -5827,6 +6022,12 @@ int run_desk(FlaskApi& api) {
                 } else if (e.xbutton.button == 3 && ui.compile_win) {
                     redraw();
                 } else if (e.xbutton.button == 3 && ui.page == PgWire) {
+                    if (ui.repl_on) {
+                        ui.repl_on = false;
+                        ui.repl_tool_id.clear();
+                        ui.repl_target_id.clear();
+                        redraw();
+                    } else {
                     int tool_i = -1;
                     bool canvas_top = false;
                     for (int hi = static_cast<int>(ui.hits.size()) - 1; hi >= 0; --hi) {
@@ -5842,7 +6043,7 @@ int run_desk(FlaskApi& api) {
                     if (tool_i >= 0 && !canvas_top && tool_i < static_cast<int>(ui.snap.tools.size())) {
                         auto& t = ui.snap.tools[tool_i];
                         ui.tool_pick_id = t.id;
-                        if (t.type == "bot" || t.type == "ctrl") ui.replace_controller(t);
+                        if (t.type == "bot" || t.type == "ctrl") ui.ask_replace(t);
                         else ui.say("right-click a controller to replace the one on the wire");
                         redraw();
                     } else if (inside(ui.tb_r, mx, my) && !canvas_top) {
@@ -5888,6 +6089,7 @@ int run_desk(FlaskApi& api) {
                     }
                     redraw();
                     }
+                    }
                 } else if (e.xbutton.button == 1) {
                     bool hit = false;
                     bool shift = (e.xbutton.state & ShiftMask) || (e.xbutton.state & ControlMask);
@@ -5921,7 +6123,23 @@ int run_desk(FlaskApi& api) {
                             ui.knob_focus_key.clear();
                         }
                     }
-                    if (ui.audit_win) {
+                    if (ui.repl_on) {
+                        bool yes = false;
+                        bool no = false;
+                        for (int hi = static_cast<int>(ui.hits.size()) - 1; hi >= 0; --hi) {
+                            auto& h = ui.hits[hi];
+                            if (!inside(h.r, mx, my)) continue;
+                            if (h.kind == Hit::ReplYes) { yes = true; break; }
+                            if (h.kind == Hit::ReplNo) { no = true; break; }
+                        }
+                        if (yes) ui.commit_replace();
+                        else if (no || !inside(ui.repl_win_r, mx, my)) {
+                            ui.repl_on = false;
+                            ui.repl_tool_id.clear();
+                            ui.repl_target_id.clear();
+                        }
+                        redraw();
+                    } else if (ui.audit_win) {
                         bool on_btn = false;
                         for (int hi = static_cast<int>(ui.hits.size()) - 1; hi >= 0; --hi) {
                             auto& h = ui.hits[hi];
@@ -6690,15 +6908,21 @@ int run_desk(FlaskApi& api) {
                         auto& t = ui.snap.tools[ui.tool_drag_i];
                         ui.tool_pick_id = t.id;
                         int found = find_node(ui.snap, t.id);
-                        // A still click reads the tool. A drag onto the canvas places it.
+                        // A still click reads the tool. A drag onto a controller asks.
+                        // A drag onto empty canvas places it.
                         if (inside(ui.canvas_r, mx, my) && ui.tool_drag_moved) {
                             if (t.unique && found >= 0) {
                                 ui.wire_sel = found;
                                 ui.say(t.label + " already on canvas");
                             } else {
-                                double wx = ui.pan_x + (mx - ui.canvas_r.x) / std::max(0.08, ui.zoom);
-                                double wy = ui.pan_y + (my - ui.canvas_r.y) / std::max(0.08, ui.zoom);
-                                ui.add_tool_at(t, wx, wy);
+                                int under = ui.node_under_canvas(mx, my);
+                                int tgt = ui.drop_replace_target(t, under);
+                                if (tgt >= 0) ui.open_replace(t, tgt);
+                                else {
+                                    double wx = ui.pan_x + (mx - ui.canvas_r.x) / std::max(0.08, ui.zoom);
+                                    double wy = ui.pan_y + (my - ui.canvas_r.y) / std::max(0.08, ui.zoom);
+                                    ui.add_tool_at(t, wx, wy);
+                                }
                             }
                         } else if (!ui.tool_drag_moved && found >= 0) {
                             ui.wire_sel = found;

@@ -639,6 +639,103 @@ export function rewireEdges(edges, oldId, newId) {
   return out;
 }
 
+export function isV2SleeperId(id) {
+  return String(id || "").startsWith("hummingbot-v2-");
+}
+
+export function controllerParentId(node) {
+  if (!node) return "";
+  if (node.data && node.data.botId) return String(node.data.botId);
+  const id = String(node.id || "");
+  if (id.startsWith("ctrl-")) return id.slice(5);
+  if (node.type === "bot") return id;
+  return "";
+}
+
+export function nodeAtPoint(nodes, x, y) {
+  const list = nodes || [];
+  let best = null;
+  let bestZ = -Infinity;
+  let bestI = -1;
+  for (let i = 0; i < list.length; i++) {
+    const n = list[i];
+    if (!n || !n.position) continue;
+    const w = (n.measured && n.measured.width) || n.width || (n.type === "bot" ? 292 : 220);
+    const h = (n.measured && n.measured.height) || n.height || 96;
+    const nx = n.position.x;
+    const ny = n.position.y;
+    if (x < nx || y < ny || x > nx + w || y > ny + h) continue;
+    const z = Number.isFinite(n.zIndex) ? n.zIndex : 0;
+    if (!best || z > bestZ || (z === bestZ && i >= bestI)) {
+      best = n;
+      bestZ = z;
+      bestI = i;
+    }
+  }
+  return best;
+}
+
+// A controller dropped on a bot or ctrl card. A v2 bot dropped on its ctrl
+// card targets that v2 bot. Wallet, log, coin, and risk cards are not a hit.
+export function replaceDropTarget(tool, nodes, x, y) {
+  if (!isControllerTool(tool)) return null;
+  const hit = nodeAtPoint(nodes, x, y);
+  if (!hit || (hit.type !== "bot" && hit.type !== "ctrl")) return null;
+  if (tool.type === "bot" && isV2SleeperId(tool.toolId) && hit.type === "ctrl") {
+    const parent = controllerParentId(hit);
+    if (!isV2SleeperId(parent)) return null;
+    const bot = (nodes || []).find((n) => n.id === parent && n.type === "bot") || null;
+    if (!bot || bot.id === tool.toolId) return null;
+    return bot;
+  }
+  if (hit.type !== tool.type || hit.id === tool.toolId) return null;
+  return hit;
+}
+
+// Right-click target for a standard hummingbots_v2 tool. Live hunters are skipped.
+export function activeV2Controller(nodes, selected) {
+  const list = nodes || [];
+  const sel = selected ? list.find((n) => n.id === selected.id) : null;
+  if (sel && sel.type === "bot" && isV2SleeperId(sel.id)) return { node: sel };
+  if (sel && sel.type === "ctrl") {
+    const parent = controllerParentId(sel);
+    if (isV2SleeperId(parent)) {
+      const bot = list.find((n) => n.id === parent && n.type === "bot");
+      if (bot) return { node: bot };
+    }
+  }
+  const v2s = list.filter((n) => n.type === "bot" && isV2SleeperId(n.id));
+  if (v2s.length === 1) return { node: v2s[0] };
+  if (!v2s.length) return { reason: "none" };
+  return { reason: "many" };
+}
+
+// Swap the controller in place. The ctrl card becomes the new controller.
+// Wallet, log, risk, and bias nodes stay. Their wires follow the new id.
+export function applyControllerSwap(nodes, edges, tool, target) {
+  const oldId = target.id;
+  const pos = target.position || { x: 80, y: 80 };
+  const node = makeNode(tool, { x: pos.x, y: pos.y });
+  let nextNodes = (nodes || []).map((n) => (n.id === oldId ? node : n));
+  let nextEdges = rewireEdges(edges, oldId, node.id);
+  if (tool.type === "bot" && oldId !== node.id) {
+    const oldCtrlId = "ctrl-" + oldId;
+    const newCtrlId = "ctrl-" + node.id;
+    const ctrlNode = nextNodes.find((n) => n.id === oldCtrlId);
+    const ctrlTool = toolById(newCtrlId);
+    const taken = nextNodes.some((n) => n.id === newCtrlId);
+    if (ctrlNode && ctrlTool && !taken && oldCtrlId !== newCtrlId) {
+      const swapped = makeNode(ctrlTool, {
+        x: (ctrlNode.position && ctrlNode.position.x) || 0,
+        y: (ctrlNode.position && ctrlNode.position.y) || 0,
+      });
+      nextNodes = nextNodes.map((n) => (n.id === oldCtrlId ? swapped : n));
+      nextEdges = rewireEdges(nextEdges, oldCtrlId, swapped.id);
+    }
+  }
+  return { nodes: nextNodes, edges: nextEdges, node, oldId };
+}
+
 export function autoEdgesFor(node, existing) {
   const has = (id) => existing.some((n) => n.id === id);
   const out = [];

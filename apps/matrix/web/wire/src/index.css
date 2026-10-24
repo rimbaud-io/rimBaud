@@ -687,6 +687,20 @@ header {
 }
 .wallet-actions button.go { border-color: var(--gold); color: var(--gold); }
 .wallet-actions button:disabled { opacity: 0.4; cursor: default; }
+.repl-back {
+  position: fixed;
+  inset: 0;
+  z-index: 109;
+  background: rgba(2, 8, 4, 0.45);
+}
+.repl-ask h3 {
+  margin: 0 0 8px;
+  color: var(--gold);
+  font-size: 15px;
+  font-weight: 600;
+}
+.repl-names { color: var(--text); margin: 0 0 6px; font-size: 13px; }
+.repl-note { color: var(--muted); margin: 0; font-size: 12px; }
 .ins-kicker, .wn-kicker {
   font-size: 10px;
   letter-spacing: 1.8px;
