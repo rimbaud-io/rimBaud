@@ -64,8 +64,6 @@ TREES = [
     ("pettibon_c++", "apps/pettibon"),
     ("rimbaud-archy", "apps/archy"),
     ("install_new", "install"),
-    ("website", "website"),
-    ("iphone", "phone"),
     ("rimbaud_vpn", "vpn"),
     ("condor", "services/condor"),
     ("version", "services/version"),
@@ -645,7 +643,7 @@ def commit(dest: str, version: str, summary: str) -> bool:
         print(f"file {name}", file=sys.stderr)
         made = True
     if _staged(dest):
-        names = git(dest, "diff", "--cached", "--name-only", check=False).stdout or ""
+        names = git(dest, "diff", "--cached", "--name-only", "--diff-filter=A", check=False).stdout or ""
         known = {row[0].split("/")[0] for row in rows}
         missing = sorted({
             line.split("/")[0]
@@ -728,12 +726,26 @@ def latest_archy() -> tuple[str, str]:
     return version, _archy_summary(version)
 
 
+def _drop_retired(stage: str, dest: str) -> None:
+    """rsync leaves ABOUT.md behind, so a folder that left the tree would remain."""
+    for dirpath, dirnames, _filenames in os.walk(dest, topdown=True):
+        dirnames[:] = [d for d in dirnames if d != ".git"]
+        rel = os.path.relpath(dirpath, dest)
+        if rel == ".":
+            continue
+        if os.path.isdir(os.path.join(stage, rel)):
+            continue
+        shutil.rmtree(dirpath, ignore_errors=True)
+        dirnames[:] = []
+
+
 def _copy_stage(stage: str) -> None:
     os.makedirs(DEST, exist_ok=True)
     subprocess.run(
         ["rsync", "-a", "--delete", "--exclude", ".git", "--exclude", "ABOUT.md", f"{stage}/", f"{DEST}/"],
         check=True,
     )
+    _drop_retired(stage, DEST)
     shutil.rmtree(stage, ignore_errors=True)
 
 
