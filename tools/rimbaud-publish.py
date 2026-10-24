@@ -581,6 +581,31 @@ def _staged(dest: str, path: str = "") -> bool:
     return git(dest, *args, check=False).returncode != 0
 
 
+def _has_publish_file(path: str) -> bool:
+    """An empty directory does not show on GitHub, so it needs no folder line."""
+    for dirpath, dirnames, filenames in os.walk(path):
+        dirnames[:] = [name for name in dirnames if name != ".git"]
+        for name in filenames:
+            if name != "ABOUT.md":
+                return True
+    return False
+
+
+def unlisted_folders(dest: str, rows: list[tuple[str, str, str]]) -> list[str]:
+    """Every public folder needs a line, including a folder inside a folder."""
+    known = {rel for rel, _subject, _detail in rows}
+    missing = []
+    if not os.path.isdir(dest):
+        return missing
+    for dirpath, dirnames, _filenames in os.walk(dest):
+        dirnames[:] = [name for name in dirnames if name != ".git"]
+        rel = os.path.relpath(dirpath, dest)
+        if rel == "." or rel in known or not _has_publish_file(dirpath):
+            continue
+        missing.append(rel)
+    return sorted(missing)
+
+
 def commit(dest: str, version: str, summary: str) -> bool:
     """One commit per listed folder, then one per listed root file.
 
@@ -596,6 +621,9 @@ def commit(dest: str, version: str, summary: str) -> bool:
         folder = os.path.join(dest, rel)
         if os.path.isdir(folder):
             place_about(folder, rel, subject, detail)
+    missing_dirs = unlisted_folders(dest, rows)
+    if missing_dirs:
+        print("add a github folder line for: " + ", ".join(missing_dirs), file=sys.stderr)
     git(dest, "add", "-A")
     if not _staged(dest):
         print(f"github tree already at this content ({version})", file=sys.stderr)
