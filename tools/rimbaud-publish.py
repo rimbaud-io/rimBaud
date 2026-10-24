@@ -26,6 +26,7 @@ import json
 import os
 import re
 import shutil
+import sqlite3
 import subprocess
 import sys
 
@@ -469,6 +470,11 @@ def build_stage(stage: str, version: str, summary: str) -> list[dict]:
             "Copyright 2023 Hummingbot Foundation.",
             "Copyright 2026 Freiquell e.V., Fichtestraße 1-4, 08451 Crimmitschau, GERMANY www.rimbaud.io.",
         )
+    cover = "This license covers the rimBaud source in this repository.\n"
+    if cover.strip() not in lic:
+        if not lic.endswith("\n"):
+            lic += "\n"
+        lic += "\n" + cover
     with open(os.path.join(stage, "LICENSE"), "w", encoding="utf-8", newline="\n") as fh:
         fh.write(lic)
     with open(os.path.join(stage, "VERSION"), "w", encoding="utf-8", newline="\n") as fh:
@@ -478,9 +484,9 @@ def build_stage(stage: str, version: str, summary: str) -> list[dict]:
     return audit_tree(stage)
 
 
-def folder_catalog() -> list[tuple[str, str, str]]:
+def _catalog(name: str, kind: str) -> list[tuple[str, str, str]]:
     """Path, the GitHub column line, and the longer note. Archy owns the file."""
-    path = os.path.join(LIVE, "rimbaud-archy", "github_folders.tsv")
+    path = os.path.join(LIVE, "rimbaud-archy", name)
     rows = []
     with open(path, "r", encoding="utf-8") as fh:
         for raw in fh:
@@ -489,9 +495,19 @@ def folder_catalog() -> list[tuple[str, str, str]]:
                 continue
             parts = line.split("\t")
             if len(parts) != 3 or not parts[0] or not parts[1] or not parts[2]:
-                raise SystemExit("github folder line needs a path, a line, and a note")
+                raise SystemExit(f"github {kind} line needs a path, a line, and a note")
+            if len(parts[1]) > 78:
+                raise SystemExit(f"github {kind} line is longer than 78: {parts[0]}")
             rows.append((parts[0], parts[1], parts[2]))
     return rows
+
+
+def folder_catalog() -> list[tuple[str, str, str]]:
+    return _catalog("github_folders.tsv", "folder")
+
+
+def file_catalog() -> list[tuple[str, str, str]]:
+    return _catalog("github_files.tsv", "file")
 
 
 def about_page(rel: str, subject: str, detail: str, stamp: str = "") -> str:
@@ -570,11 +586,12 @@ def _staged(dest: str, path: str = "") -> bool:
 
 
 def commit(dest: str, version: str, summary: str) -> bool:
-    """One commit per listed folder, then the version banner for the files at the root.
+    """One commit per listed folder, then one per listed root file.
 
-    GitHub shows the last commit subject beside each folder. The subject is the
-    folder line from rimbaud-archy/github_folders.tsv. The banner at the top of
-    the repository stays the Archy version and this change.
+    GitHub shows the last commit subject beside each path. That subject is the
+    line from github_folders.tsv or github_files.tsv. A last empty commit keeps
+    the repository banner as the Archy version and this change, and it does not
+    replace those lines.
     """
     ensure_repo(dest)
     rows = sorted(folder_catalog(), key=lambda row: (-row[0].count("/"), row[0]))
@@ -617,6 +634,16 @@ def commit(dest: str, version: str, summary: str) -> bool:
         git(dest, "commit", "-m", subject, "-m", detail + "\n\n" + note, "--", rel)
         print(f"folder {rel}", file=sys.stderr)
         made = True
+    known_files = set()
+    for name, subject, detail in file_catalog():
+        known_files.add(name)
+        if not _staged(dest, name):
+            continue
+        if not os.path.isfile(os.path.join(dest, name)):
+            continue
+        git(dest, "commit", "-m", subject, "-m", detail + "\n\n" + note, "--", name)
+        print(f"file {name}", file=sys.stderr)
+        made = True
     if _staged(dest):
         names = git(dest, "diff", "--cached", "--name-only", check=False).stdout or ""
         known = {row[0].split("/")[0] for row in rows}
@@ -625,11 +652,19 @@ def commit(dest: str, version: str, summary: str) -> bool:
             for line in names.splitlines()
             if "/" in line and line.split("/")[0] not in known
         })
+        loose = sorted({
+            line
+            for line in names.splitlines()
+            if "/" not in line and line not in known_files
+        })
         if missing:
             print("add a github folder line for: " + ", ".join(missing), file=sys.stderr)
+        if loose:
+            print("add a github file line for: " + ", ".join(loose), file=sys.stderr)
         git(dest, "commit", "-m", f"{version} {summary}", "-m", note)
         made = True
     if made:
+        git(dest, "commit", "--allow-empty", "-m", f"{version} {summary}", "-m", note)
         print(f"committed {version} in {dest}", file=sys.stderr)
     return made
 
@@ -658,16 +693,39 @@ def push(dest: str) -> str:
     return label
 
 
+def _archy_summary(version: str) -> str:
+    """The change for this version. The send step reads the ledger, not a missing JSON log."""
+    db = os.path.join(LIVE, "conf", "archy.db")
+    if not os.path.isfile(db):
+        return ""
+    try:
+        con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+        rows = con.execute(
+            "SELECT kind, to_ver, summary FROM archy_log ORDER BY id DESC LIMIT 40"
+        ).fetchall()
+        con.close()
+    except sqlite3.Error:
+        return ""
+    fallback = ""
+    for kind, to_ver, summary in rows:
+        if str(kind or "") == "github":
+            continue
+        text = str(summary or "").strip()
+        if not text:
+            continue
+        if not fallback:
+            fallback = text
+        if version and str(to_ver or "") == version:
+            return text
+    return fallback
+
+
 def latest_archy() -> tuple[str, str]:
     path = os.path.join(LIVE, "conf", "archy.json")
     with open(path, "r", encoding="utf-8") as fh:
         data = json.load(fh)
     version = str(data.get("version") or "")
-    log = data.get("log") or []
-    summary = ""
-    if log:
-        summary = str(log[0].get("summary") or "")
-    return version, summary
+    return version, _archy_summary(version)
 
 
 def _copy_stage(stage: str) -> None:
