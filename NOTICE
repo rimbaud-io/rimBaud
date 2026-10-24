@@ -19,3 +19,5 @@ Hummingbot is the trading engine the hunters run inside. It is not included
 here. Its own code stays under the Hummingbot Apache 2.0 notice.
 
 third_party/nlohmann/json.hpp is MIT, Copyright Niels Lohmann.
+
+See LICENSE for the Apache 2.0 terms.
