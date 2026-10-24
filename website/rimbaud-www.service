@@ -1,0 +1,17 @@
+[Unit]
+Description=rimBaud website
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/rimbaud-www
+Environment=HOST=127.0.0.1
+Environment=PORT=3010
+ExecStart=/usr/bin/node /opt/rimbaud-www/server.js
+Restart=on-failure
+RestartSec=2
+User=rimbaudwww
+Group=rimbaudwww
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
