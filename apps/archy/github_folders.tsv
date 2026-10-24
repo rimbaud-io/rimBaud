@@ -18,7 +18,6 @@ docs/print	Scripts that build the printable wire pages.	Local print helpers. The
 hunters	Hunter scripts that run inside Hummingbot. The engine is not in this repo.	One script for each hunter container. Shared pieces cover leverage, the risk skim, and the matrix store. Wallets and connector files are not here.
 install	Installer for a Linux machine. The risk notice is required before start.	Installs the desk, Spring, and the hunters. Hunters start only after the risk notice is accepted. The install password is not in the preseed.
 install/mint-image	Scripts for the Mint USB image. The install password is not here.	Builds and writes the rimBaud look onto an official Mint image. First boot asks for a new password.
-phone	Phone page for the matrix. It watches. It does not send an order.	A small page you can open on a phone. It reads the matrix. It does not place a trade.
 services	Side services that sit next to the five programs.	Condor gauge and the version page. Neither one is a hunter.
 services/condor	A small gauge beside Condor. Condor is Hummingbot's own screen.	rimBaud does not replace Condor. This folder is only the gauge that can sit next to it.
 services/version	The version page. It reads the Archy version.	Shows the published version. It does not deploy and it does not trade.
@@ -28,4 +27,3 @@ tools	Helpers: the publisher, the telegram sender, and the wallet creator.	Tools
 tools/telegram	Sends a short note to Telegram. The bot token is not in this folder.	One sender script. The token stays on the machine that runs it.
 tools/wallet-creator	Creates a Hyperliquid wallet on the user's own machine.	The new key stays where the user creates it. This folder does not contain a key.
 vpn	WireGuard enrollment between matrices. Live keys are not in this folder.	Sets up the link a remote matrix uses. Private keys are created on the machine, not stored here.
-website	Public pages for rimbaud.io. No wallets and no live balances.	Marketing and the product description. The trading desk is a different program.
