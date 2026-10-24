@@ -28,3 +28,5 @@ After any code edit in this repo, bump the grok suffix. Never LEVEL UP.
 
 Do not call `--operator-prepare-github` or `--operator-send-github`. The TO GITHUB button copies, audits, and sends. A bump does not push.
 
+`github_folders.tsv` is the GitHub folder column. Add a row for a new public folder. The publisher writes `ABOUT.md` and commits that folder with the row's line. The repository banner keeps the Archy version and the change. Do not put the bump sentence on every folder.
+
