@@ -44,6 +44,7 @@ SKIP_EXT = {
 }
 SKIP_NAMES = {
     "secrets.env", "hostname", "hosts", "chats.json", "wire_board.json",
+    ".session-secret", ".gate-hash", "forum_le",
 }
 HUNTERS = [
     "agenc_sol_trader.py", "bn_swing_trader.py", "bot_sl_override.py",
@@ -69,6 +70,8 @@ TREES = [
     ("version", "services/version"),
     ("HL_wallet_creator", "tools/wallet-creator"),
     ("docker-windows", "docker-windows"),
+    # rimbaud.io pages only. website/rimbaud_forum stays on this machine.
+    ("website/rimbaud-site", "website"),
 ]
 
 
@@ -123,11 +126,12 @@ def copy_tree(stage: str, src_rel: str, dst_rel: str) -> None:
             sp = os.path.join(dirpath, name)
             if os.path.islink(sp) or not os.path.isfile(sp) or os.path.getsize(sp) > 3_000_000:
                 continue
-            if is_binary(sp):
+            ext = os.path.splitext(name)[1].lower()
+            # Page pictures have null bytes. Other binaries stay out of the tree.
+            if is_binary(sp) and ext not in {".png", ".jpg", ".jpeg", ".webp", ".gif", ".ico"}:
                 continue
             rel = os.path.normpath(os.path.join(dst_rel, os.path.relpath(sp, src)))
             dp = os.path.join(out_dir, name)
-            ext = os.path.splitext(name)[1].lower()
             if ext in {".seed", ".json", ".py", ".sh", ".md", ".html", ".yml", ".yaml", ".txt", ".cpp", ".hpp", ".h", ".js", ".jsx", ".css", ".in"}:
                 with open(sp, "r", encoding="utf-8") as fh:
                     body = redact(rel, fh.read())
@@ -364,8 +368,10 @@ def audit_tree(stage: str) -> list[dict]:
                         continue
                     _add_hit(hits, "email", rel)
                     break
-                if token.search(blob) or telegram.search(blob):
+                if token.search(blob) or telegram.search(blob) or b"data-website-id=" in blob:
                     _add_hit(hits, "token", rel)
+                if re.search(br'PASS_HASH = Buffer\.from\("[0-9a-fA-F]{32,}"', blob):
+                    _add_hit(hits, "secret", rel)
                 if b"BEGIN PRIVATE" in blob or b"BEGIN OPENSSH PRIVATE" in blob or wg.search(blob):
                     _add_hit(hits, "private_key", rel)
                 if b"user-password-crypted password $6$" in blob or b"plaintext: rimbaud" in blob:
