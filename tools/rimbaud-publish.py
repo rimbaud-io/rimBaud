@@ -474,7 +474,79 @@ def build_stage(stage: str, version: str, summary: str) -> list[dict]:
     with open(os.path.join(stage, "VERSION"), "w", encoding="utf-8", newline="\n") as fh:
         fh.write(f"{version}\n{summary}\n")
     sanitize_stage(stage)
+    write_folder_pages(stage)
     return audit_tree(stage)
+
+
+def folder_catalog() -> list[tuple[str, str, str]]:
+    """Path, the GitHub column line, and the longer note. Archy owns the file."""
+    path = os.path.join(LIVE, "rimbaud-archy", "github_folders.tsv")
+    rows = []
+    with open(path, "r", encoding="utf-8") as fh:
+        for raw in fh:
+            line = raw.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split("\t")
+            if len(parts) != 3 or not parts[0] or not parts[1] or not parts[2]:
+                raise SystemExit("github folder line needs a path, a line, and a note")
+            rows.append((parts[0], parts[1], parts[2]))
+    return rows
+
+
+def about_page(rel: str, subject: str, detail: str, stamp: str = "") -> str:
+    """Folder note. The stamp is how a parent commit stays newer than a child commit."""
+    marker = f"<!-- archy-folder {stamp} -->\n" if stamp else "<!-- archy-folder -->\n"
+    name = rel.split("/")[-1]
+    return (
+        "<!--\n"
+        "Copyright 2026 Freiquell e.V., Fichtestraße 1-4, 08451 Crimmitschau, GERMANY www.rimbaud.io\n"
+        "\n"
+        "Licensed under the Apache License, Version 2.0 (the \"License\");\n"
+        "you may not use this file except in compliance with the License.\n"
+        "You may obtain a copy of the License at\n"
+        "\n"
+        "    http://www.apache.org/licenses/LICENSE-2.0\n"
+        "\n"
+        "Unless required by applicable law or agreed to in writing, software\n"
+        "distributed under the License is distributed on an \"AS IS\" BASIS,\n"
+        "WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n"
+        "See the License for the specific language governing permissions and\n"
+        "limitations under the License.\n"
+        "-->\n"
+        f"\n# {name}\n\n{subject}\n\n{detail}\n{marker}"
+    )
+
+
+def about_stamp(text: str) -> str:
+    match = re.search(r"<!-- archy-folder(?: ([^ >]+))? -->", text)
+    if not match:
+        return ""
+    return match.group(1) or ""
+
+
+def place_about(folder: str, rel: str, subject: str, detail: str, stamp: str | None = None) -> None:
+    dest = os.path.join(folder, "ABOUT.md")
+    current = ""
+    if os.path.isfile(dest):
+        with open(dest, "r", encoding="utf-8") as fh:
+            current = fh.read()
+    if stamp is None:
+        stamp = about_stamp(current)
+    text = about_page(rel, subject, detail, stamp)
+    if current != text:
+        with open(dest, "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(text)
+
+
+def write_folder_pages(stage: str) -> None:
+    """Put ABOUT.md in the staged tree so the audit sees the same note the commit writes."""
+    for rel, subject, detail in folder_catalog():
+        folder = os.path.join(stage, rel)
+        if not os.path.isdir(folder):
+            print(f"github folder missing from the tree: {rel}", file=sys.stderr)
+            continue
+        place_about(folder, rel, subject, detail, stamp="")
 
 
 def git(dest: str, *args: str, check: bool = True) -> subprocess.CompletedProcess:
@@ -490,17 +562,76 @@ def ensure_repo(dest: str) -> None:
         git(dest, "config", "user.email", "rimbaud@rimbaud.io")
 
 
+def _staged(dest: str, path: str = "") -> bool:
+    args = ["diff", "--cached", "--quiet"]
+    if path:
+        args.extend(["--", path])
+    return git(dest, *args, check=False).returncode != 0
+
+
 def commit(dest: str, version: str, summary: str) -> bool:
+    """One commit per listed folder, then the version banner for the files at the root.
+
+    GitHub shows the last commit subject beside each folder. The subject is the
+    folder line from rimbaud-archy/github_folders.tsv. The banner at the top of
+    the repository stays the Archy version and this change.
+    """
     ensure_repo(dest)
+    rows = sorted(folder_catalog(), key=lambda row: (-row[0].count("/"), row[0]))
+    by_path = {rel: (subject, detail) for rel, subject, detail in rows}
+    for rel, subject, detail in rows:
+        folder = os.path.join(dest, rel)
+        if os.path.isdir(folder):
+            place_about(folder, rel, subject, detail)
     git(dest, "add", "-A")
-    quiet = git(dest, "diff", "--cached", "--quiet", check=False)
-    if quiet.returncode == 0:
+    if not _staged(dest):
         print(f"github tree already at this content ({version})", file=sys.stderr)
         return False
-    msg = f"{version} {summary}\n\nArchy {version}\n"
-    git(dest, "commit", "-m", msg)
-    print(f"committed {version} in {dest}", file=sys.stderr)
-    return True
+    note = f"Archy {version}. {summary}".strip()
+    made = False
+    committed: list[str] = []
+    for rel, subject, detail in rows:
+        if not _staged(dest, rel):
+            continue
+        if not os.path.isdir(os.path.join(dest, rel)):
+            continue
+        git(dest, "commit", "-m", subject, "-m", detail + "\n\n" + note, "--", rel)
+        print(f"folder {rel}", file=sys.stderr)
+        committed.append(rel)
+        made = True
+    # A child commit is newer than its parent, so GitHub would show the child
+    # line on the parent. Stamp the parent and commit it again, after the child.
+    parents: list[str] = []
+    covered = set(committed)
+    for rel in committed:
+        parent = os.path.dirname(rel)
+        while parent:
+            if parent in by_path and parent not in covered:
+                parents.append(parent)
+                covered.add(parent)
+            parent = os.path.dirname(parent)
+    for rel in sorted(parents, key=lambda item: -item.count("/")):
+        subject, detail = by_path[rel]
+        place_about(os.path.join(dest, rel), rel, subject, detail, stamp=version)
+        git(dest, "add", "--", os.path.join(rel, "ABOUT.md"))
+        git(dest, "commit", "-m", subject, "-m", detail + "\n\n" + note, "--", rel)
+        print(f"folder {rel}", file=sys.stderr)
+        made = True
+    if _staged(dest):
+        names = git(dest, "diff", "--cached", "--name-only", check=False).stdout or ""
+        known = {row[0].split("/")[0] for row in rows}
+        missing = sorted({
+            line.split("/")[0]
+            for line in names.splitlines()
+            if "/" in line and line.split("/")[0] not in known
+        })
+        if missing:
+            print("add a github folder line for: " + ", ".join(missing), file=sys.stderr)
+        git(dest, "commit", "-m", f"{version} {summary}", "-m", note)
+        made = True
+    if made:
+        print(f"committed {version} in {dest}", file=sys.stderr)
+    return made
 
 
 def remote_label(dest: str) -> str:
@@ -542,7 +673,7 @@ def latest_archy() -> tuple[str, str]:
 def _copy_stage(stage: str) -> None:
     os.makedirs(DEST, exist_ok=True)
     subprocess.run(
-        ["rsync", "-a", "--delete", "--exclude", ".git", f"{stage}/", f"{DEST}/"],
+        ["rsync", "-a", "--delete", "--exclude", ".git", "--exclude", "ABOUT.md", f"{stage}/", f"{DEST}/"],
         check=True,
     )
     shutil.rmtree(stage, ignore_errors=True)
