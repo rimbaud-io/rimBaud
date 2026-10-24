@@ -37,7 +37,6 @@ install/         the machine installer and the Mint USB image. Hunters start onl
 vpn/             the WireGuard link between matrices.
 services/        condor (telegram gauge) and the version page.
 tools/           wallet creator and the telegram sender.
-docs/            the desk notes.
 third_party/     nlohmann JSON, MIT.
 ```
 
