@@ -67,8 +67,6 @@ TREES = [
     ("rimbaud_vpn", "vpn"),
     ("condor", "services/condor"),
     ("version", "services/version"),
-    ("docs/print", "docs/print"),
-    ("doku", "docs/desk"),
     ("HL_wallet_creator", "tools/wallet-creator"),
     ("docker-windows", "docker-windows"),
 ]
