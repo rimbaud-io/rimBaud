@@ -1,0 +1,10 @@
+# Archy owns this list. The publisher reads it when it copies the GitHub tree.
+# One root file per line, tab-separated: path, the line GitHub shows, the longer note.
+# The line stays when that file changes. The Archy version and the change go under it.
+# Add a row when a new file sits at the root of the public tree.
+
+.gitignore	Ignores secrets, wallets, logs, and build output.	The public tree leaves out connector files, databases, and a machine password.
+LICENSE	Apache License 2.0 for this source tree.	Copyright 2026 Freiquell e.V. Hummingbot is a separate project. nlohmann JSON stays MIT.
+NOTICE	What this tree includes, and what stays outside it.	Hummingbot is not in this repository. Third-party notices stay with their own files.
+README.md	rimBaud is the desk. Hummingbot is the engine underneath.	One wire for hunters, sides, and knobs. This folder is the source, not the running machine.
+VERSION	The Archy version of this tree.	The first line is the version. The second line is the change. The operator sends it from Archy.
