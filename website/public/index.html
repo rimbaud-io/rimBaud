@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>rimBaud // MATRIX</title>
+<meta name="description" content="rimBaud matrix. Standard DMan Maker on a test account, live BTC prints, funds and ROE. No orders.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23020804'/%3E%3Crect x='2' y='2' width='12' height='12' fill='none' stroke='%2300ff6a' stroke-width='1.5'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/app.css?v=desk4">
+</head>
+<body>
+<header>
+  <div class="brand">rimBaud <span>// MATRIX</span></div>
+  <div class="nav">
+    <span class="pill live" id="mode">test account</span>
+    <span class="pill" id="px">BTC …</span>
+    <span class="pill" id="feed">—</span>
+    <a class="home-link" href="/">Tools</a>
+    <button type="button" class="logout" id="out">Log out</button>
+  </div>
+  <button type="button" class="run" id="run">Run live</button>
+</header>
+
+<div class="desk">
+  <aside class="toolbox" id="toolbox">
+    <div class="tb-head">
+      <span class="tb-grip" aria-hidden="true">::::</span>
+      <h2>Toolbox</h2>
+    </div>
+    <input class="tb-search" id="tb-q" type="search" placeholder="search clips" autocomplete="off">
+    <p class="tb-hint">Drag a clip to move it. Right-click a clip or a wire. Drag from a port to connect. This test account does not compile to the desk.</p>
+    <div class="tb-tools" id="tb-tools"></div>
+  </aside>
+
+  <div class="board">
+    <div class="stage" id="stage">
+      <svg class="wires" id="wires" aria-hidden="true"></svg>
+
+      <article class="clip n-btc" id="n-btc">
+        <i class="port in"></i><i class="port out"></i>
+        <header>Coin</header>
+        <strong>BTC-USD</strong>
+        <p>Hyperliquid perpetual</p>
+        <p class="sub" id="btc-px">mark —</p>
+      </article>
+
+      <article class="clip n-bias" id="n-bias">
+        <i class="port in"></i><i class="port out"></i>
+        <header>DMan Maker BIAS</header>
+        <div class="bias" role="group" aria-label="BTC bias">
+          <button type="button" data-bias="LONG" class="on">LONG</button>
+          <button type="button" data-bias="SHORT">SHORT</button>
+          <button type="button" data-bias="FLAT">FLAT</button>
+        </div>
+        <p class="sub">FLAT stays idle. An open clip does not flip.</p>
+      </article>
+
+      <article class="clip n-ctrl" id="n-ctrl">
+        <i class="port in"></i><i class="port out"></i>
+        <header>Controller · DMan Maker</header>
+        <label>dontGoCrazy <button type="button" class="bool on" data-field="crazy">ON</button></label>
+        <label>afterLossNoRebuy <button type="button" class="bool on" data-field="rebuy">ON</button></label>
+        <label>Take profit % <input data-field="tp" type="number" min="0.1" max="50" step="0.1" value="2"></label>
+        <label>Trail arm % <input data-field="trailArm" type="number" min="0.1" max="20" step="0.1" value="1.5"></label>
+        <label>Trail delta % <input data-field="trailDelta" type="number" min="0.1" max="10" step="0.1" value="0.5"></label>
+        <label>Refresh sec <input data-field="refresh" type="number" min="10" max="600" step="1" value="30"></label>
+        <label>Stop loss ROE % <input data-field="sl" type="number" min="1" max="100" step="1" value="20"></label>
+        <label>Margin % leftover <input data-field="margin" type="number" min="1" max="100" step="1" value="100"></label>
+        <label>BTC leverage <input data-field="leverage" type="number" min="1" max="50" step="1" value="40"></label>
+        <p class="sub">DCA spreads 0.20 · 0.40 · 0.80 · 1.20%. Market-opens leftover margin.</p>
+      </article>
+
+      <article class="clip n-sl" id="n-sl">
+        <i class="port in"></i><i class="port out"></i>
+        <header>SL</header>
+        <strong id="sl-big">−20 ROE</strong>
+        <label>Stop <input data-field="sl" type="number" min="1" max="100" step="1" value="20"></label>
+      </article>
+
+      <article class="clip n-bot" id="n-bot">
+        <i class="port in"></i><i class="port out"></i>
+        <header>DMan Maker</header>
+        <p class="bot-side" id="bot-side">LONG armed</p>
+        <p class="roe" id="bot-roe">—</p>
+        <p class="sub" id="bot-roe-tag">ROE while the clip is open</p>
+        <dl>
+          <div><dt>Entry</dt><dd id="bot-entry">—</dd></div>
+          <div><dt>Mark</dt><dd id="bot-mark">—</dd></div>
+          <div><dt>Lev</dt><dd id="bot-lev">40x</dd></div>
+          <div><dt>Qty</dt><dd id="bot-qty">—</dd></div>
+        </dl>
+      </article>
+
+      <article class="clip n-acct" id="n-acct">
+        <header>Test account</header>
+        <p class="sub">paper · $1,000 start · no orders</p>
+        <dl class="acct">
+          <div><dt>Equity</dt><dd id="ac-eq">$1,000.00</dd></div>
+          <div><dt>Free</dt><dd id="ac-free">$1,000.00</dd></div>
+          <div><dt>Used margin</dt><dd id="ac-used">$0.00</dd></div>
+          <div><dt>Realized</dt><dd id="ac-real">$0.00</dd></div>
+          <div><dt>Open uPnL</dt><dd id="ac-upnl">$0.00</dd></div>
+        </dl>
+      </article>
+
+      <div class="chart-card" id="chart-card">
+        <header>BTC <span id="chart-tag">last hour, then the live print</span></header>
+        <svg id="chart" viewBox="0 0 360 120" preserveAspectRatio="none"></svg>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer class="kpis" aria-label="Test account">
+  <div class="kpi"><div class="lbl">Equity</div><div class="val" id="k-eq">$1,000.00</div></div>
+  <div class="kpi"><div class="lbl">Free</div><div class="val cyan" id="k-free">$1,000.00</div></div>
+  <div class="kpi"><div class="lbl">Used margin</div><div class="val" id="k-used">$0.00</div></div>
+  <div class="kpi"><div class="lbl">Realized</div><div class="val" id="k-real">$0.00</div></div>
+  <div class="kpi"><div class="lbl">Open uPnL</div><div class="val" id="k-upnl">$0.00</div></div>
+  <div class="kpi roe-kpi"><div class="lbl">ROE</div><div class="val" id="k-roe">—</div></div>
+  <div class="kpi"><div class="lbl">Bias</div><div class="val amber" id="k-bias">LONG</div></div>
+  <div class="kpi"><div class="lbl">TP / SL</div><div class="val gold" id="k-tpsl">+2% / −20</div></div>
+  <div class="kpi grow"><div class="lbl">Book</div><div class="val small" id="status">test account ready · LONG armed · press Run live</div></div>
+  <div class="spark" id="spark"></div>
+</footer>
+
+<script src="/dman.js?v=desk3"></script>
+<script src="/desk.js?v=desk3"></script>
+</body>
+</html>

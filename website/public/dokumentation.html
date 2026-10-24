@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dokumentation — rimBaud wire for Hummingbot</title>
+<meta name="description" content="How the rimBaud wire sequences Hummingbot hunters, coins, and wallets. This page sends no orders.">
+<meta name="robots" content="index,follow">
+<link rel="canonical" href="https://rimbaud.io/dokumentation">
+<link rel="stylesheet" href="/home.css?v=home59">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="/"><img class="mark" src="/logo.svg" alt="">rimBaud</a>
+  <button type="button" class="ham" id="ham" aria-expanded="false" aria-controls="ham-panel">
+    <span class="ham-bars" aria-hidden="true"></span>
+    Menu
+  </button>
+  <nav class="ham-panel" id="ham-panel" hidden>
+    <a href="/">rimBaud homepage</a>
+    <a href="https://forum.rimbaud.io">Forum</a>
+    <a href="/impressum">Impressum</a>
+  </nav>
+  <div class="signs">
+    <a class="sign" href="https://discord.gg/hRdJqJhCk">Discord</a>
+    <a class="sign" href="https://x.com/arthurimbaud_i" rel="me">X</a>
+    <a class="sign" href="https://github.com/rimbaud-io" rel="me">GitHub</a>
+  </div>
+</header>
+<main>
+  <section class="doc">
+    <div class="doc-inner">
+      <p class="kicker">Dokumentation</p>
+      <h1>How this site works</h1>
+      <p>rimBaud is the screen for a fleet of trading bots. One place shows what is running, which side each bot is on, and the knobs that tune it. The page you are reading describes the public site. It does not send orders.</p>
+
+      <h2>Open wire</h2>
+      <p>Under the headline is an easy DMan Maker chain. Drag a clip to move it. Drag from a right port onto a left port to wire it. The hour runs when the coin, the bias, the controller, the stop, and the hunter are wired in that order. The test account starts at $1,000 on the last public hour of BTC.</p>
+      <p>FLAT stays idle. An open clip stays on its side until you choose the other one. SHORT puts the win below the entry and the stop above. LONG puts the win and the trail arm above the entry and the stop below.</p>
+
+      <h2>Chart</h2>
+      <p>The candle chart uses the same orange as the wire. Price fits this hour. Levels fits every setting. Drag a line and the matching knob follows. Reset rebuy market-opens at the live public price with the knobs that are set. The result panel then follows that print. Equity, ROE, and the trade list update on the page. Nothing is sent to an exchange.</p>
+
+      <h2>Trades</h2>
+      <p>Under Where this wire ends, a scroll box lists every closed DMan Maker trade from this hour and from the live rebuy: time, side, entry, out, reason, PnL, and ROE. The list follows the newest close unless you scroll up.</p>
+
+      <h2>Desk</h2>
+      <p>Open the wire asks for the test login. That show is the draggable matrix. It does not change the live trading desk, and this documentation does not open it.</p>
+
+      <h2>License</h2>
+      <p>The software is open source under the <a href="https://www.apache.org/licenses/LICENSE-2.0">Apache License 2.0</a>. The oak leaf on the homepage opens <a href="https://github.com/rimbaud-io">github.com/rimbaud-io</a>.</p>
+    </div>
+  </section>
+</main>
+<footer class="foot tone t9">
+  <span>rimBaud</span>
+  <span>Open source under the Apache License 2.0.</span>
+  <a href="https://www.apache.org/licenses/LICENSE-2.0">License</a>
+  <a href="https://discord.gg/hRdJqJhCk">Discord</a>
+  <a href="https://x.com/arthurimbaud_i" rel="me">X</a>
+  <a href="https://github.com/rimbaud-io" rel="me">GitHub</a>
+  <a href="/impressum">Impressum</a>
+  <a href="/desk">Wire show</a>
+</footer>
+<script src="/nav.js?v=nav1"></script>
+</body>
+</html>

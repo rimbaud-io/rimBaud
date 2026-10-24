@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>rimBaud — Ableton-like wire for Hummingbot algo trading</title>
+<meta name="description" content="rimBaud wires Hummingbot hunters like a music sequencer. An Ableton-like desk for automated trading bots, coins, and wallets. Open source.">
+<meta name="keywords" content="automated trading bots, Hummingbot, hummingbots, algo trading, algorithmic trading, Ableton-like UI, wire, open source">
+<meta name="robots" content="index,follow">
+<link rel="canonical" href="https://rimbaud.io/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="rimBaud">
+<meta property="og:url" content="https://rimbaud.io/">
+<meta property="og:title" content="rimBaud — Ableton-like wire for Hummingbot algo trading">
+<meta property="og:description" content="rimBaud wires Hummingbot hunters like a music sequencer. An Ableton-like desk for automated trading bots, coins, and wallets. Open source.">
+<meta property="og:image" content="https://rimbaud.io/shots/matrix-desk.jpg">
+<meta property="og:image:alt" content="The rimBaud wire desk, with Hummingbot hunters, a chart, and the mothership">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="rimBaud — Ableton-like wire for Hummingbot algo trading">
+<meta name="twitter:description" content="rimBaud wires Hummingbot hunters like a music sequencer. An Ableton-like desk for automated trading bots, coins, and wallets. Open source.">
+<meta name="twitter:image" content="https://rimbaud.io/shots/matrix-desk.jpg">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"rimBaud","applicationCategory":"FinanceApplication","operatingSystem":"Linux, Windows","url":"https://rimbaud.io/","description":"rimBaud wires Hummingbot hunters like a music sequencer. An Ableton-like desk for automated trading bots, coins, and wallets. Open source.","license":"https://www.apache.org/licenses/LICENSE-2.0"}
+</script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23020804'/%3E%3Crect x='2' y='2' width='12' height='12' fill='none' stroke='%2300ff6a' stroke-width='1.5'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/home.css?v=home59">
+</head>
+<body>
+<header class="top has-leaf">
+  <a class="brand" href="/"><img class="mark" src="/logo.svg" alt=""><span class="brand-word">rimBaud</span></a>
+  <button type="button" class="ham" id="ham" aria-expanded="false" aria-controls="ham-panel">
+    <span class="ham-bars" aria-hidden="true"></span>
+    Menu
+  </button>
+  <nav class="ham-panel" id="ham-panel" hidden>
+    <a href="/" aria-current="page">rimBaud homepage</a>
+    <a href="https://forum.rimbaud.io">Forum</a>
+    <a href="/impressum">Impressum</a>
+  </nav>
+  <div class="signs">
+    <a class="sign" href="https://discord.gg/hRdJqJhCk">Discord</a>
+    <a class="sign" href="https://x.com/arthurimbaud_i" rel="me">X</a>
+    <a class="sign" href="https://github.com/rimbaud-io" rel="me">GitHub</a>
+  </div>
+</header>
+
+<main>
+  <section class="hero tone t1">
+    <img class="hero-mark" src="/logo.svg" alt="">
+    <a class="hero-hb" href="https://hummingbot.org" title="Hummingbot">
+      <img src="/hummingbot.svg?v=2" alt="Hummingbot">
+      <span>hummingbot</span>
+    </a>
+    <div class="hero-leaf">
+      <a href="https://github.com/rimbaud-io" rel="me" title="rimBaud on GitHub">
+        <img src="/oakleaf.svg" alt="">
+      </a>
+      <span class="leaf-hold" aria-hidden="true">OPEN SOURCE<br>JOIN OUR<br>FIGHT CLUB<br>BUILD BEST<br>W_I_R_E<br>FOR ALGO<br>TRADING</span>
+    </div>
+    <a class="leaf-cap leaf-diff" href="https://github.com/rimbaud-io" rel="me">OPEN SOURCE<br>JOIN OUR<br>FIGHT CLUB<br>BUILD BEST<br>W_I_R_E<br>FOR ALGO<br>TRADING</a>
+    <span class="leaf-cap leaf-mul" aria-hidden="true">OPEN SOURCE<br>JOIN OUR<br>FIGHT CLUB<br>BUILD BEST<br>W_I_R_E<br>FOR ALGO<br>TRADING</span>
+    <div class="hero-copy">
+      <div class="hero-face">
+        <p class="soft">rimBaud</p>
+        <h1>One wire<br>to sequence<br>them all</h1>
+      </div>
+      <div class="hero-face hero-diff" aria-hidden="true">
+        <p class="soft">rimBaud</p>
+        <h1>One wire<br>to sequence<br>them all</h1>
+      </div>
+      <div class="hero-face hero-mul" aria-hidden="true">
+        <p class="soft">rimBaud</p>
+        <h1>One wire<br>to sequence<br>them all</h1>
+      </div>
+    </div>
+  </section>
+
+  <section class="easy tone t2" id="setup">
+    <p class="kicker">Open wire</p>
+    <h2>Trading with automated hunter bots,<br>wire them like music sequencer.</h2>
+    <div class="easy-frame" id="easy-frame">
+    <div class="easy-desk">
+      <aside class="easy-tray" id="easy-tray">
+        <div id="easy-tools"></div>
+        <button type="button" class="easy-reset" id="easy-reset">Standard wire</button>
+      </aside>
+      <div class="easy-scroll" id="easy-scroll">
+        <div class="easy-stage" id="easy-stage">
+          <svg class="easy-wires" id="easy-wires" aria-hidden="true"></svg>
+          <article class="clip btc" id="e-btc" style="left:12px;top:156px">
+            <i class="port in" title="In"></i><i class="port out" title="Out. Drag onto an in port."></i>
+            <header>Coin</header>
+            <strong>BTC-USD</strong>
+            <p id="easy-px">Waiting for the print.</p>
+          </article>
+          <article class="clip bias" id="e-bias" style="left:196px;top:136px">
+            <i class="port in" title="In"></i><i class="port out" title="Out. Drag onto an in port."></i>
+            <header>DMan Maker BIAS</header>
+            <div class="bias-row" role="group" aria-label="Bias">
+              <button type="button" class="bias-btn on" data-bias="LONG">LONG</button>
+              <button type="button" class="bias-btn" data-bias="SHORT">SHORT</button>
+              <button type="button" class="bias-btn" data-bias="FLAT">FLAT</button>
+            </div>
+            <p>FLAT stays idle. Short puts the win below the entry and the stop above.</p>
+          </article>
+          <article class="clip ctrl" id="e-ctrl" style="left:412px;top:12px">
+            <i class="port in" title="In"></i>
+            <i class="port out" title="Out. Drag onto an in port."></i>
+            <header>Controller · DMan Maker</header>
+            <div class="ctrl-fields">
+              <label class="row">dontGoCrazy <button type="button" class="bool on" data-bool="crazy">on</button></label>
+              <label class="row">afterLossNoRebuy <button type="button" class="bool on" data-bool="rebuy">on</button></label>
+              <div class="knob-grid">
+                <label class="knob" aria-label="Take profit percent">
+                  <input id="easy-tp" type="number" min="0.1" max="50" step="0.1" value="2.0" tabindex="-1">
+                  <svg class="knob-svg" viewBox="0 0 44 44" aria-hidden="true"></svg>
+                  <span class="knob-name">Take profit %</span>
+                  <span class="knob-read">2.0</span>
+                </label>
+                <label class="knob" aria-label="Trail arm percent">
+                  <input id="easy-arm" type="number" min="0.1" max="20" step="0.1" value="1.5" tabindex="-1">
+                  <svg class="knob-svg" viewBox="0 0 44 44" aria-hidden="true"></svg>
+                  <span class="knob-name">Trail arm %</span>
+                  <span class="knob-read">1.5</span>
+                </label>
+                <label class="knob" aria-label="Trail delta percent">
+                  <input id="easy-delta" type="number" min="0.1" max="10" step="0.1" value="0.5" tabindex="-1">
+                  <svg class="knob-svg" viewBox="0 0 44 44" aria-hidden="true"></svg>
+                  <span class="knob-name">Trail delta %</span>
+                  <span class="knob-read">0.5</span>
+                </label>
+                <label class="knob" aria-label="Next in percent">
+                  <input id="easy-next" type="number" min="0.05" max="0.80" step="0.01" value="0.18" tabindex="-1">
+                  <svg class="knob-svg" viewBox="0 0 44 44" aria-hidden="true"></svg>
+                  <span class="knob-name">Next in %</span>
+                  <span class="knob-read">0.18</span>
+                </label>
+                <label class="knob" aria-label="Stop loss ROE percent">
+                  <input id="easy-sl" type="number" min="1" max="100" step="1" value="20" tabindex="-1">
+                  <svg class="knob-svg" viewBox="0 0 44 44" aria-hidden="true"></svg>
+                  <span class="knob-name">Stop loss %</span>
+                  <span class="knob-read">20</span>
+                </label>
+                <label class="knob" aria-label="Refresh seconds">
+                  <input id="easy-refresh" type="number" min="10" max="600" step="1" value="30" tabindex="-1">
+                  <svg class="knob-svg" viewBox="0 0 44 44" aria-hidden="true"></svg>
+                  <span class="knob-name">Refresh sec</span>
+                  <span class="knob-read">30</span>
+                </label>
+                <label class="knob" aria-label="Margin percent">
+                  <input id="easy-margin" type="number" min="1" max="100" step="1" value="100" tabindex="-1">
+                  <svg class="knob-svg" viewBox="0 0 44 44" aria-hidden="true"></svg>
+                  <span class="knob-name">Margin %</span>
+                  <span class="knob-read">100</span>
+                </label>
+                <label class="knob" aria-label="BTC leverage">
+                  <input id="easy-lev" type="number" min="1" max="50" step="1" value="40" tabindex="-1">
+                  <svg class="knob-svg" viewBox="0 0 44 44" aria-hidden="true"></svg>
+                  <span class="knob-name">BTC leverage</span>
+                  <span class="knob-read">40</span>
+                </label>
+              </div>
+            </div>
+            <p>Market-opens the leftover margin.</p>
+          </article>
+          <article class="clip sl" id="e-sl" style="left:680px;top:156px">
+            <i class="port in" title="In"></i><i class="port out" title="Out. Drag onto an in port."></i>
+            <header>SL</header>
+            <strong id="easy-sl-big">−20 ROE</strong>
+            <label class="row">Stop <input id="easy-sl2" type="number" min="1" max="100" step="1" value="20"></label>
+          </article>
+          <article class="clip bot" id="e-bot" style="left:868px;top:140px">
+            <i class="port in" title="In"></i><i class="port out" title="Out. Drag onto an in port."></i>
+            <header>DMan Maker</header>
+            <strong id="easy-side">LONG armed</strong>
+            <p id="easy-bot">The hunter on this chain.</p>
+          </article>
+        </div>
+      </div>
+    </div>
+    <div class="easy-chart" id="easy-chart">
+      <div class="easy-chart-bar">
+        <span>BTC</span>
+        <strong id="easy-chart-px">—</strong>
+        <span id="easy-chart-src">last public hour</span>
+        <span class="easy-chart-actions">
+          <button type="button" class="easy-reset" id="easy-reset-in" data-reset-in title="Reset the rebuy at the live price with the knobs now">Reset IN</button>
+          <span class="easy-scale" role="group" aria-label="Chart scale">
+            <button type="button" class="on" data-scale="price">Price</button>
+            <button type="button" data-scale="levels">Levels</button>
+          </span>
+        </span>
+      </div>
+      <svg id="easy-candles" viewBox="0 0 960 300" preserveAspectRatio="none" role="img" aria-label="BTC price with the open, the out, and the rebuy"></svg>
+      <p class="easy-chart-note" id="easy-chart-note">Price fits this hour. Drag a line, or a setting at the edge, and the knob follows.</p>
+    </div>
+    <div class="easy-end" aria-live="polite">
+      <div>
+        <div class="easy-end-head">
+          <p class="kicker">Where this wire ends</p>
+          <button type="button" class="easy-reset" id="easy-reset-rebuy" data-reset-in title="Clear a stop hold and rebuy at the live price with the knobs now">close position</button>
+        </div>
+        <p id="easy-status">The last public hour has not played yet.</p>
+        <p id="easy-sim">Reset rebuy market-opens at the live price with the knobs on the controller.</p>
+        <dl>
+          <div><dt>Equity</dt><dd id="easy-eq">$1,000.00</dd></div>
+          <div><dt>ROE</dt><dd id="easy-roe">—</dd></div>
+          <div><dt>Realized</dt><dd id="easy-real">$0.00</dd></div>
+        </dl>
+      </div>
+      <svg id="easy-spark" viewBox="0 0 320 72" preserveAspectRatio="none" aria-hidden="true"></svg>
+    </div>
+    <div class="easy-log" id="easy-log" aria-labelledby="easy-log-title">
+      <div class="easy-log-head">
+        <p class="kicker" id="easy-log-title">DMan Maker trades</p>
+        <p id="easy-log-count">No closed trade yet.</p>
+      </div>
+      <div class="easy-log-scroll" id="easy-log-scroll" tabindex="0">
+        <p class="easy-log-empty" id="easy-log-empty">No closed trade yet. Each close from this hour and the live rebuy is listed here.</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Side</th>
+              <th>Entry</th>
+              <th>Out</th>
+              <th>Why</th>
+              <th>PnL</th>
+              <th>ROE</th>
+            </tr>
+          </thead>
+          <tbody id="easy-log-body"></tbody>
+        </table>
+      </div>
+    </div>
+    </div>
+  </section>
+
+  <section class="intro tone t7">
+    <p class="lede">rimBaud is the screen for a fleet of trading bots. One place shows what is running, which side each bot is on, and the knobs that tune it. The bot engine underneath can change. The overview stays.</p>
+    <div class="shots">
+      <p class="kicker">Live C++ on Linux</p>
+      <figure>
+        <img src="/shots/matrix-desk.jpg?v=2" width="2000" height="993" alt="rimBaud on Linux: the matrix wire desk, an LTC chart, and the mothership window." loading="lazy">
+        <figcaption>The matrix, the chart, and the mothership.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section class="pillars" aria-label="How the overview works">
+    <article class="tone t5" id="see">
+      <h2>See</h2>
+      <p>Home lists every hunter, its side, and whether it is running. The chart draws the coin with the stop, the target, and the trail. Wire shows how a wallet, a coin, and a controller connect.</p>
+    </article>
+    <article class="tone t6" id="tune">
+      <h2>Tune</h2>
+      <p>BIAS is long, short, or flat. Flat stops the next entry and leaves an open clip in place. Knobs set the take-profit, the trail, and the stop. A saved preset belongs to one hunter.</p>
+    </article>
+    <article class="tone t4" id="apart">
+      <h2>Keep apart</h2>
+      <p>Each hunter has its own account. The overview does not invent a new order path. Close and a full leftover open are the only one-click size actions. A knob does not flatten a position.</p>
+    </article>
+    <article class="tone t9" id="engines">
+      <h2>Not one engine</h2>
+      <p>rimBaud is the overview, not the strategy engine. Hummingbot hunters are what this desk watches today. A second engine, such as Freqtrade, can run beside them and report into the same screen. The desk does not have to be that engine.</p>
+    </article>
+  </section>
+
+  <section class="tone t8" id="work">
+    <p class="kicker">On the desk</p>
+    <h2>What you work with</h2>
+    <ul class="work">
+      <li><strong>Spring</strong> The local brain that reads and writes hunter files.</li>
+      <li><strong>The native desk and this web desk</strong> On the same numbers.</li>
+      <li><strong>A chart per coin</strong> Tied to the hunter you pick.</li>
+      <li><strong>A wire canvas</strong> Wallet, coin, controller, and bias.</li>
+    </ul>
+  </section>
+
+  <section class="tone t3" id="hunters">
+    <p class="kicker">Hummingbots</p>
+    <h2>The hunters this desk watches today</h2>
+    <p class="section-lead">Eight Hummingbot hunters report into the overview. Where a hunter has a bias, LONG or SHORT can open a new clip and FLAT stays idle. An open clip does not flip. A second engine can sit beside them.</p>
+    <div class="grid">
+      <article class="card" style="--accent:#4f8cff">
+        <header><span class="mark">⚡</span><h3>HL Copy</h3></header>
+        <p class="meta">Copy · up to 3 wallets</p>
+        <p>Mirrors open perpetual positions from up to three Hyperliquid wallets. A new position opens the same side. A close on their book closes the mirror. Two leaders on the same coin: the first one wins. Copy shorts is a controller switch. HL Copy has no bias node.</p>
+      </article>
+      <article class="card" style="--accent:#f0b90b">
+        <header><span class="mark">▤</span><h3>PMM Simple</h3></header>
+        <p class="meta">BTC · ETH · LTC · TAO</p>
+        <p>LONG and flat rests one buy with the leftover margin. The clip then holds for the stop, the take-profit, or the trail. SHORT and flat stays idle until a full open. A full open follows the current bias. An open clip is never flattened by the other side.</p>
+      </article>
+      <article class="card" style="--accent:#7ecbff">
+        <header><span class="mark">∿</span><h3>Helliot</h3></header>
+        <p class="meta">BTC · ETH · LTC · TAO</p>
+        <p>Elliott structure on 15-minute swings. It looks for a 3-wave and enters in the fib retrace of the last impulse, long or short with the bias. The dashboard full-open buttons skip the wave wait. Exits are the ROE stop, the ROE target, and the structure target.</p>
+      </article>
+      <article class="card" style="--accent:#2ee6c7">
+        <header><span class="mark">≈</span><h3>SuperTrend</h3></header>
+        <p class="meta">BTC · ETH · LTC · TAO</p>
+        <p>SuperTrend signal, length and multiplier on the controller, with a distance gate so it does not chase. Bias still gates the entry. A SuperTrend reverse does not flip an open clip. Exit is the home stop, close, full open, or a scale-out.</p>
+      </article>
+      <article class="card" style="--accent:#ff5d73">
+        <header><span class="mark">▾</span><h3>Shorty</h3></header>
+        <p class="meta">BTC · ETH · LTC · TAO</p>
+        <p>Auto-entry stays short: 15-minute Bollinger high, and the 1-hour average is not up. A full open follows the current bias and does not flip an open clip. After a take-profit it waits for a bounce before it shorts again. The ROE stop covers the open clip.</p>
+      </article>
+      <article class="card" style="--accent:#c084fc">
+        <header><span class="mark">▦</span><h3>Dman</h3></header>
+        <p class="meta">BTC · ETH · LTC · TAO</p>
+        <p>Bollinger DMan. Long when price is through the lower band, short when it is through the upper band, in the bias direction. One clip of leftover margin. Trail plus the home ROE stop. No extra DCA clips on the open. Hold time is 12, 24, or 68 hours.</p>
+      </article>
+      <article class="card" style="--accent:#ffd166">
+        <header><span class="mark">▲</span><h3>Only Up</h3></header>
+        <p class="meta">BTC · LTC · TAO</p>
+        <p>Supertrend rider. Auto-entry stays long: 1-hour average up, 15-minute Supertrend long, and price not extended from the line. A full open follows the current bias and never flips an open clip. At the scale ROE it clips size and trails the runner.</p>
+      </article>
+      <article class="card" style="--accent:#a78bfa">
+        <header><span class="mark">⧉</span><h3>DMan Maker</h3></header>
+        <p class="meta">BTC · ETH · LTC · TAO · the paper show</p>
+        <p>Market-opens the leftover margin when bias is LONG or SHORT. It does not wait for a dip. The clip holds for take-profit, trail, or the ROE stop, then can re-enter on the same bias. dontGoCrazy and afterLossNoRebuy sit on this controller. The wire show runs this hunter.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="tone t10" id="coins">
+    <p class="kicker">Coins</p>
+    <h2>What you can wire</h2>
+    <p class="section-lead">A coin node is the market. Any coin Spring offers can be wired onto Hyperliquid. The line under the name is the margin that book allows.</p>
+    <div class="coin-fader" aria-hidden="true">
+      <div class="coin-track">
+        <span><b>BTC</b><small>40× · 2.5% margin · to $150M</small></span>
+        <span><b>ETH</b><small>25× · 4% margin · to $100M</small></span>
+        <span><b>LTC</b><small>10× · 10% margin · to $20M</small></span>
+        <span><b>TAO</b><small>5× · 20% margin</small></span>
+        <span><b>SOL</b><small>20× · 5% margin · to $70M</small></span>
+        <span><b>HYPE</b><small>10× · 10% margin · to $20M</small></span>
+        <span><b>DOGE</b><small>10× · 10% margin · to $20M</small></span>
+        <span><b>BTC</b><small>40× · 2.5% margin · to $150M</small></span>
+        <span><b>ETH</b><small>25× · 4% margin · to $100M</small></span>
+        <span><b>LTC</b><small>10× · 10% margin · to $20M</small></span>
+        <span><b>TAO</b><small>5× · 20% margin</small></span>
+        <span><b>SOL</b><small>20× · 5% margin · to $70M</small></span>
+        <span><b>HYPE</b><small>10× · 10% margin · to $20M</small></span>
+        <span><b>DOGE</b><small>10× · 10% margin · to $20M</small></span>
+      </div>
+    </div>
+    <p class="coin-fader-note">Hyperliquid perpetual only. Initial margin at that leverage, then the lower leverage after that size. The paper show still prices BTC and sends no order.</p>
+  </section>
+
+  <section class="tone t4" id="wallets">
+    <p class="kicker">Wallets</p>
+    <h2>One wallet per hunter</h2>
+    <p class="section-lead">A hunter does not trade until it has its own subaccount. The public show never opens those wallets. It uses a paper test account.</p>
+    <div class="grid">
+      <article class="card" style="--accent:#7ecbff">
+        <header><span class="mark">⬡</span><h3>Hunter wallets</h3></header>
+        <p>HL Copy, PMM Simple, Helliot, SuperTrend, Shorty, Dman, Only Up, and DMan Maker each have a wallet node. The address is configured on the desk, not on this page.</p>
+      </article>
+      <article class="card" style="--accent:#f0b90b">
+        <header><span class="mark">▣</span><h3>FUNDS bus</h3></header>
+        <p>One node for every Hyperliquid subaccount on the desk. Wire it when you want the book of balances in the graph.</p>
+      </article>
+      <article class="card" style="--accent:#ff4d6d">
+        <header><span class="mark">⛨</span><h3>RISK wallet</h3></header>
+        <p>A separate wallet. On the open wire, the controller’s extra out copies every second win here. The address stays on the desk. It sends no orders from this page.</p>
+      </article>
+      <article class="card" style="--accent:#7ecbff">
+        <header><span class="mark">◻</span><h3>Test account</h3></header>
+        <p>The wire show only. Paper book, $1,000 start. Equity, free margin, used margin, realized, and open uPnL. No live keys and no orders.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="tone t2" id="settings">
+    <p class="kicker">Settings</p>
+    <h2>Stops, moon, and controllers</h2>
+    <p class="section-lead">Wire a stop or a moon into a hunter. Each hunter also has its own controller for trail, rebuy, and clip size.</p>
+    <div class="grid">
+      <article class="card" style="--accent:#ff4d6d">
+        <header><span class="mark">▼</span><h3>Stop loss %</h3></header>
+        <p>ROE exit. Wire it into the hunter SL port. The home default on the desk is −20 ROE. At 40×, about half a percent of price is −20 ROE.</p>
+      </article>
+      <article class="card" style="--accent:#ffd24a">
+        <header><span class="mark">▲</span><h3>Moon %</h3></header>
+        <p>A price exit. Wire it into the hunter MOON port. On a long it sells when price is up that far. On a short it covers when price is down that far.</p>
+      </article>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <caption>Controller fields on each hunter</caption>
+        <thead>
+          <tr><th>Hunter</th><th>Knobs</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>HL Copy</td><td>Copy shorts, max leverage, positions per trader, max loss, min free, max books, poll seconds, max short ZEC.</td></tr>
+          <tr><td>PMM Simple</td><td>Take profit, trail arm, trail delta, refresh seconds, stop-loss ROE, margin % leftover.</td></tr>
+          <tr><td>Helliot</td><td>Take-profit ROE, stop-loss ROE, wave-2 min, wave-2 max, wave-3 extension, margin % leftover.</td></tr>
+          <tr><td>SuperTrend</td><td>Length, multiplier, distance, clip-at ROE, clip size, stop-loss ROE, margin % leftover.</td></tr>
+          <tr><td>Shorty</td><td>Take-profit ROE, stop-loss ROE, rebuy bounce, short Bollinger level, margin % leftover.</td></tr>
+          <tr><td>Dman</td><td>Trail arm, trail delta, rebuy Bollinger, short Bollinger, hold hours, stop-loss ROE.</td></tr>
+          <tr><td>Only Up</td><td>Close price, clip-at ROE, clip size, stop-loss ROE, Supertrend max distance, margin % leftover.</td></tr>
+          <tr><td>DMan Maker</td><td>dontGoCrazy, afterLossNoRebuy, take profit, trail arm, trail delta, refresh seconds, stop-loss ROE, margin % leftover.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="tone t5" id="bias">
+    <p class="kicker">BIAS</p>
+    <h2>LONG, SHORT, FLAT</h2>
+    <p class="section-lead">Bias is the permission to open. FLAT stays idle. Wiring a new bias does not flip a clip that is already open.</p>
+    <div class="grid">
+      <article class="card" style="--accent:#ffc857">
+        <header><span class="mark">⊕</span><h3>Manual BIAS</h3></header>
+        <p>LONG, SHORT, or FLAT for every coin. Wire the output into a hunter bias port.</p>
+      </article>
+      <article class="card" style="--accent:#f0b90b">
+        <header><span class="mark">⊕</span><h3>Desk BIAS</h3></header>
+        <p>One desk-wide LONG, FLAT, or SHORT. Telegram out goes to the desk. Setting it does not close an open clip.</p>
+      </article>
+      <article class="card" style="--accent:#a78bfa">
+        <header><span class="mark">◈</span><h3>Hunter BIAS</h3></header>
+        <p>PMM Simple, Helliot, SuperTrend, Shorty, Dman, Only Up, and DMan Maker each have a bias node for their own coins. HL Copy does not.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="tone t7" id="gauges">
+    <p class="kicker">Gauges</p>
+    <h2>Meters on the wire</h2>
+    <p class="section-lead">Gauges read the market. They do not place orders by themselves. Vol meter and BB width are on the toolbox for later.</p>
+    <div class="grid">
+      <article class="card" style="--accent:#c084fc"><header><span class="mark">◎</span><h3>Condor gauge</h3></header><p>Grok and heuristic bias meter. The reading can feed a hunter through the Condor tools.</p></article>
+      <article class="card" style="--accent:#c084fc"><header><span class="mark">◎</span><h3>HMM / vol</h3></header><p>Regime meter. Wire it when you want volatility state on the canvas.</p></article>
+      <article class="card" style="--accent:#a78bfa"><header><span class="mark">∿</span><h3>Vol meter</h3></header><p>Realized volatility. Marked later on the desk.</p></article>
+      <article class="card" style="--accent:#818cf8"><header><span class="mark">▭</span><h3>BB width</h3></header><p>Bollinger squeeze and expansion. Marked later on the desk.</p></article>
+      <article class="card" style="--accent:#f0b90b"><header><span class="mark">▲</span><h3>Post pump gauge</h3></header><p>Quiet, pump, or post. Recognition only. It sends no orders.</p></article>
+    </div>
+  </section>
+
+  <section class="tone t6" id="condor">
+    <p class="kicker">Condor</p>
+    <h2>Words in, bias out</h2>
+    <p class="section-lead">Condor is the side door. Telegram and Grok can set a hunter bias. Keys stay on the desk. This site does not ask for them.</p>
+    <div class="grid">
+      <article class="card" style="--accent:#34d399">
+        <header><span class="mark">⇄</span><h3>Translator</h3></header>
+        <p>Turns Telegram words into LONG, SHORT, FLAT, CLOSE, or OPEN 100% on a hunter bias. Coins on the node are BTC, ETH, and LTC.</p>
+      </article>
+      <article class="card" style="--accent:#ff4d6d">
+        <header><span class="mark">⏹</span><h3>Close translator</h3></header>
+        <p>CLOSE only. An extra Telegram line goes to the hunter emergency close. Idle does nothing.</p>
+      </article>
+      <article class="card" style="--accent:#34d399">
+        <header><span class="mark">✈</span><h3>Telegram bot</h3></header>
+        <p>Token and chat ids. Log into the bot posts open and close alerts. The bot into Condor carries commands.</p>
+      </article>
+      <article class="card" style="--accent:#2A9FD6">
+        <header><span class="mark">✦</span><h3>Grok bot</h3></header>
+        <p>Model and key, wired into Condor GROK. The key lives on the desk controller, not on this page.</p>
+      </article>
+      <article class="card" style="--accent:#ffc857">
+        <header><span class="mark">✉</span><h3>Email alerts</h3></header>
+        <p>Health alerts can land here. SMTP is marked later on the desk.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="tone t8" id="traders">
+    <p class="kicker">Traders</p>
+    <h2>Copy leaders</h2>
+    <div class="grid">
+      <article class="card" style="--accent:#7ecbff">
+        <header><span class="mark">◈</span><h3>Leaders</h3></header>
+        <p>A leader node wires into HL Copy slots T1, T2, and T3. The copy book follows that wallet. An alumni leader can stay on the canvas. Putting it back on the wire does not write it into the copy list again.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="tone t9" id="health">
+    <p class="kicker">System health</p>
+    <h2>The machine around the hunters</h2>
+    <div class="grid">
+      <article class="card" style="--accent:#9dffc0">
+        <header><span class="mark">▣</span><h3>Host CPU / RAM / disk</h3></header>
+        <p>Limits for CPU, memory, and disk. Live readings and alerts go into the stream.</p>
+      </article>
+      <article class="card" style="--accent:#7ecbff">
+        <header><span class="mark">⇄</span><h3>Internet</h3></header>
+        <p>A reachability probe. It does not spend Hyperliquid request weight. Live and alert go into the stream.</p>
+      </article>
+      <article class="card" style="--accent:#f0b90b">
+        <header><span class="mark">◈</span><h3>HL REST tokens</h3></header>
+        <p>Request weight used by this IP against the Hyperliquid REST budget. Live and alert go into the stream.</p>
+      </article>
+      <article class="card" style="--accent:#a78bfa">
+        <header><span class="mark">⧉</span><h3>1:1 backup twin</h3></header>
+        <p>A second machine for the same desk. Marked later on the toolbox.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="tone t1" id="output">
+    <p class="kicker">Output</p>
+    <h2>What the desk shows you</h2>
+    <div class="grid">
+      <article class="card" style="--accent:#7ecbff"><header><span class="mark">≡</span><h3>LOGS bus</h3></header><p>Live tail of the desk logs. One bus for the graph.</p></article>
+      <article class="card" style="--accent:#86efac"><header><span class="mark">▤</span><h3>XML file</h3></header><p>Download or save the wire as conf/wire_graph.xml.</p></article>
+      <article class="card" style="--accent:#7ecbff"><header><span class="mark">▶</span><h3>Live stream</h3></header><p>Open positions and logs, together.</p></article>
+      <article class="card" style="--accent:#34d399"><header><span class="mark">☰</span><h3>Stream</h3></header><p>Telegram, Grok, and the log feed on one node.</p></article>
+      <article class="card" style="--accent:#9dffc0"><header><span class="mark">≡</span><h3>Book</h3></header><p>Funds and ROE. On the wire show this is the paper equity strip: equity, free, used, realized, open uPnL, and ROE.</p></article>
+    </div>
+  </section>
+</main>
+
+<footer class="foot tone t9">
+  <span>rimBaud</span>
+  <span>Open source under the Apache License 2.0.</span>
+  <a href="https://www.apache.org/licenses/LICENSE-2.0">License</a>
+  <a href="https://discord.gg/hRdJqJhCk">Discord</a>
+  <a href="https://x.com/arthurimbaud_i" rel="me">X</a>
+  <a href="https://github.com/rimbaud-io" rel="me">GitHub</a>
+  <a href="/impressum">Impressum</a>
+  <a href="/desk">Wire show</a>
+</footer>
+<script src="/nav.js?v=nav1"></script>
+<script src="/dman.js?v=easy2"></script>
+<script src="/easy.js?v=easy15"></script>
+</body>
+</html>
