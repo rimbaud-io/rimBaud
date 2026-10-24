@@ -26,3 +26,5 @@ After any code edit in this repo, bump the grok suffix. Never LEVEL UP.
 
 `0.1` → `0.1g1` → `0.1g2`. Operator raises `0.1` → `0.2` only in the Archy window (two-click LEVEL UP).
 
+Do not call `--operator-prepare-github` or `--operator-send-github`. The TO GITHUB button copies, audits, and sends. A bump does not push.
+

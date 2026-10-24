@@ -24,6 +24,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <fcntl.h>
 #include <fstream>
 #include <signal.h>
 #include <sstream>
@@ -98,9 +99,61 @@ static json load_status() {
 }
 
 struct Hit {
-    enum Kind { Idle, Close, LevelUp, Refresh } kind = Idle;
+    enum Kind { Idle, Close, LevelUp, Refresh, Github } kind = Idle;
     Rect r{};
 };
+
+struct GhJob {
+    pid_t pid = 0;
+    int kind = 0;
+};
+
+static const char* GH_FILE = "/tmp/rimbaud-archy-github.json";
+
+static bool spawn_github(GhJob& job, int kind, const std::string& script) {
+    if (job.pid > 0) return false;
+    unlink(GH_FILE);
+    pid_t pid = fork();
+    if (pid < 0) return false;
+    if (pid == 0) {
+        int fd = open(GH_FILE, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+        if (fd >= 0) {
+            dup2(fd, STDOUT_FILENO);
+            close(fd);
+        }
+        int err = open("/dev/null", O_WRONLY);
+        if (err >= 0) {
+            dup2(err, STDERR_FILENO);
+            if (err != STDERR_FILENO) close(err);
+        }
+        setenv("ARCHY_OPERATOR", "1", 1);
+        const char* flag = kind == 2 ? "--operator-send-github" : "--operator-prepare-github";
+        execlp("python3", "python3", script.c_str(), flag, (char*)nullptr);
+        _exit(127);
+    }
+    job.pid = pid;
+    job.kind = kind;
+    return true;
+}
+
+static int poll_github(GhJob& job, json& out) {
+    if (job.pid <= 0) return 0;
+    int status = 0;
+    pid_t got = waitpid(job.pid, &status, WNOHANG);
+    if (got == 0) return 0;
+    int kind = job.kind;
+    job.pid = 0;
+    job.kind = 0;
+    std::ifstream in(GH_FILE);
+    std::stringstream ss;
+    ss << in.rdbuf();
+    std::string raw = ss.str();
+    auto cut = raw.find_last_of('\n');
+    if (cut != std::string::npos && cut + 1 < raw.size()) raw = raw.substr(cut + 1);
+    try { out = json::parse(raw.empty() ? "{}" : raw); }
+    catch (...) { out = json::object(); }
+    return kind;
+}
 
 int archy_desk_main() {
     signal(SIGINT, on_int);
@@ -123,7 +176,7 @@ int archy_desk_main() {
     unsigned long rose = rgb(dpy, cm, 255, 77, 109);
     unsigned long clip = rgb(dpy, cm, 44, 44, 44);
 
-    int W = 860, H = 620;
+    int W = 920, H = 760;
     XSetWindowAttributes wa{};
     wa.background_pixel = bg;
     wa.event_mask = ExposureMask | StructureNotifyMask | ButtonPressMask | KeyPressMask | PointerMotionMask;
@@ -160,6 +213,10 @@ int archy_desk_main() {
     json st = load_status();
     std::string toast;
     double toast_until = 0, arm_until = 0;
+    GhJob gh;
+    bool gh_armed = false;
+    double send_until = 0;
+    std::vector<std::string> gh_lines;
     auto now = []() {
         timespec ts{};
         clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -211,9 +268,37 @@ int archy_desk_main() {
         txt(armed ? orange : muted, lup.x + 14, lup.y + 38, std::string(ver) + "  ->  " + next);
         hits.push_back({Hit::LevelUp, lup});
 
-        txt(gold, 18, 196, "DEPLOYED MATRICES");
+        Rect gpan{18, 184, W - 36, 112};
+        bool sending = gh_armed && now() < send_until;
+        fill(panel, gpan);
+        stroke(sending ? orange : border, gpan);
+        txt(gold, gpan.x + 12, gpan.y + 20, "GITHUB");
+        txt(muted, gpan.x + 84, gpan.y + 20, "1 copy and audit    2 click again to send");
+        bool busy = gh.pid > 0;
+        const char* lab = "TO GITHUB";
+        if (busy && gh.kind == 2) lab = "SENDING";
+        else if (busy) lab = "COPYING";
+        else if (sending) lab = "CLICK AGAIN TO SEND";
+        Rect gb{gpan.x + gpan.w - 236, gpan.y + 8, 220, 28};
+        fill(sending ? rgb(dpy, cm, 50, 22, 8) : clip, gb);
+        stroke(sending ? orange : gold, gb);
+        txt(sending ? orange : gold, gb.x + 14, gb.y + 18, lab);
+        if (!busy) hits.push_back({Hit::Github, gb});
+        int gly = gpan.y + 48;
+        if (gh_lines.empty()) {
+            txt(muted, gpan.x + 12, gly, "a personal detail blocks the send");
+        } else {
+            unsigned long col = sending ? green : (gh.pid > 0 ? cyan : rose);
+            for (auto& line : gh_lines) {
+                if (gly > gpan.y + gpan.h - 10) break;
+                txt(col, gpan.x + 12, gly, ascii(line, 96));
+                gly += 16;
+            }
+        }
+
+        txt(gold, 18, 312, "DEPLOYED MATRICES");
         json deps = st.contains("deploys") ? st["deploys"] : json::array();
-        int y = 212;
+        int y = 328;
         if (!deps.is_array() || deps.empty()) {
             txt(muted, 24, y + 8, "none yet  ·  Meta PUSH latest records the version on that box");
             y += 28;
@@ -268,8 +353,65 @@ int archy_desk_main() {
         XFlush(dpy);
     };
 
+    auto apply_github = [&](const json& rep, int kind) {
+        gh_lines.clear();
+        bool clean = false;
+        bool pushed = false;
+        try { if (rep.contains("clean") && rep["clean"].is_boolean()) clean = rep["clean"].get<bool>(); } catch (...) {}
+        try { if (rep.contains("pushed") && rep["pushed"].is_boolean()) pushed = rep["pushed"].get<bool>(); } catch (...) {}
+        std::string msg = ascii(jstr(rep, "message", jstr(rep, "error", "github copy failed")), 96);
+        if (pushed && rep.contains("version")) {
+            st = rep;
+            gh_armed = false;
+            send_until = 0;
+            gh_lines.push_back(msg.empty() ? "sent to github" : msg);
+            say(gh_lines.back());
+            return;
+        }
+        if (kind == 1 && clean) {
+            gh_armed = true;
+            send_until = now() + 15;
+            gh_lines.push_back("audit clean - no personal information");
+            gh_lines.push_back(msg.empty() ? "click again to send" : msg);
+            say("audit clean - click again to send");
+            return;
+        }
+        gh_armed = false;
+        send_until = 0;
+        if (rep.contains("findings") && rep["findings"].is_array() && !rep["findings"].empty()) {
+            int extra = (int)rep["findings"].size();
+            for (auto& f : rep["findings"]) {
+                if (!f.is_object() || (int)gh_lines.size() >= 3) break;
+                int n = 1;
+                try { if (f.contains("n") && f["n"].is_number()) n = f["n"].get<int>(); } catch (...) {}
+                char line[180];
+                snprintf(line, sizeof(line), "%s  %s  x%d",
+                         ascii(jstr(f, "kind"), 16).c_str(),
+                         ascii(jstr(f, "file"), 62).c_str(),
+                         n);
+                gh_lines.push_back(line);
+                extra--;
+            }
+            if (extra > 0 && !gh_lines.empty()) gh_lines.back() += "  +";
+            say("audit blocked the send");
+            return;
+        }
+        gh_lines.push_back(msg.empty() ? "github copy failed" : msg);
+        say(gh_lines.back());
+    };
+
     redraw();
     while (g_run) {
+        json gh_done;
+        int gh_kind = poll_github(gh, gh_done);
+        if (gh_kind) {
+            apply_github(gh_done, gh_kind);
+            redraw();
+        } else if (gh_armed && gh.pid <= 0 && now() >= send_until) {
+            gh_armed = false;
+            say("send cancelled");
+            redraw();
+        }
         while (XPending(dpy)) {
             XEvent e;
             XNextEvent(dpy, &e);
@@ -300,7 +442,27 @@ int archy_desk_main() {
                             arm_until = 0;
                             setenv("ARCHY_OPERATOR", "1", 1);
                             st = slurp_cmd("ARCHY_OPERATOR=1 python3 \"" + db_py() + "\" --operator-level-up 2>/dev/null");
-                            say("LEVEL UP  →  " + jstr(st, "version", "?") + "   grok suffix reset");
+                            say("LEVEL UP  ->  " + jstr(st, "version", "?") + "   grok suffix reset");
+                        }
+                    } else if (h.kind == Hit::Github) {
+                        if (gh.pid > 0) {
+                            say("github copy still running");
+                        } else if (gh_armed && now() < send_until) {
+                            if (!spawn_github(gh, 2, db_py())) say("could not start the send");
+                            else {
+                                gh_armed = false;
+                                send_until = 0;
+                                gh_lines = {"sending to github"};
+                                say("sending to github");
+                            }
+                        } else {
+                            gh_armed = false;
+                            send_until = 0;
+                            if (!spawn_github(gh, 1, db_py())) say("could not start the copy");
+                            else {
+                                gh_lines = {"copying the github folder and running the audit"};
+                                say("copying and auditing");
+                            }
                         }
                     }
                     redraw();

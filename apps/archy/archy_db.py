@@ -176,6 +176,70 @@ def publish_github(version: str, summary: str) -> None:
     )
 
 
+def _publish_script() -> str:
+    return os.path.join(ROOT, "scripts", "rimbaud_publish.py")
+
+
+def _operator_github(flag: str) -> dict:
+    """Copy or send. The Archy window sets ARCHY_OPERATOR. A bump never reaches this."""
+    if os.environ.get("ARCHY_OPERATOR") != "1":
+        return {
+            "ok": False,
+            "clean": False,
+            "pushed": False,
+            "error": "github send is the Archy window only",
+        }
+    script = _publish_script()
+    if not os.path.isfile(script):
+        return {"ok": False, "clean": False, "pushed": False, "error": "publish script missing"}
+    ran = subprocess.run(
+        [sys.executable, script, flag],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    raw = (ran.stdout or "").strip()
+    data = None
+    if raw:
+        try:
+            data = json.loads(raw.splitlines()[-1])
+        except json.JSONDecodeError:
+            data = None
+    if not isinstance(data, dict):
+        return {"ok": False, "clean": False, "pushed": False, "error": "github copy failed"}
+    return data
+
+
+def prepare_github() -> dict:
+    """Copy into the GitHub folder and audit. Does not push."""
+    return _operator_github("--prepare-json")
+
+
+def send_github() -> dict:
+    """Second click. Re-audits the GitHub folder, then pushes."""
+    data = _operator_github("--send-json")
+    if data.get("ok") and data.get("pushed"):
+        c = _con()
+        st = state_dict(c)
+        ver = str(data.get("version") or st["display"])
+        c.execute(
+            "INSERT INTO archy_log (ts, kind, who, from_ver, to_ver, summary, files) VALUES (?,?,?,?,?,?,?)",
+            (_utc(), "github", "operator", st["display"], ver, "sent " + ver + " to github", ""),
+        )
+        c.commit()
+        c.close()
+        fresh = dump_status()
+        fresh["ok"] = True
+        fresh["clean"] = True
+        fresh["pushed"] = True
+        fresh["message"] = data.get("message") or ("sent " + ver + " to github")
+        fresh["findings"] = []
+        if data.get("remote"):
+            fresh["remote"] = data.get("remote")
+        return fresh
+    return data
+
+
 def bump_g(summary: str, files: str = "", who: str = "grok"):
     """Grok-only: 0.1 → 0.1g1 → 0.1g2. Never raises 0.1 to 0.2."""
     c = _con()
@@ -291,6 +355,12 @@ def main(argv):
             print("LEVEL UP is operator-only in the rimbaud-archy desk.", file=sys.stderr)
             return 3
         print(json.dumps(level_up(), indent=2))
+        return 0
+    if cmd == "--operator-prepare-github":
+        print(json.dumps(prepare_github()))
+        return 0
+    if cmd == "--operator-send-github":
+        print(json.dumps(send_github()))
         return 0
     print("rimbaud-archy db: --status | --bump-g SUMMARY [files] | --record-deploy SITE", file=sys.stderr)
     return 2

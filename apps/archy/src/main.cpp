@@ -61,7 +61,8 @@ int main(int argc, char** argv) {
                 "  --status               print current version JSON\n"
                 "  --bump-g MSG [files]   Grok edit: 0.1 → 0.1g1 → 0.1g2\n"
                 "  --record-deploy SITE   after live-push to a matrix\n"
-                "Never CLOSE/OPEN. Never 0.1→0.2 from Grok.\n");
+                "  TO GITHUB              desk only: copy, audit, second click sends\n"
+                "Never CLOSE/OPEN. Never 0.1→0.2 from Grok. A bump does not push.\n");
         return 0;
     }
     return archy_desk_main();

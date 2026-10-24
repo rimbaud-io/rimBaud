@@ -15,7 +15,8 @@
 
 """Refresh the GitHub tree from the live rimBaud source and commit that version.
 
-Archy --bump-g calls this. It does not push unless --push is passed.
+Archy --bump-g calls this and commits locally. It does not push.
+The Archy window copies, audits, then asks for a second click before a push.
 It refuses a remote that points at hummingbot/hummingbot.
 """
 from __future__ import annotations
@@ -275,13 +276,62 @@ def sanitize_stage(stage: str) -> None:
                 os.rename(src, dst)
 
 
-def assert_public(stage: str) -> None:
+_EMAIL_OK = (
+    b"rimbaud.io", b"example.com", b"example.org", b"apache.org",
+    b"github.com", b"hummingbot.io",
+)
+_PUBLISH_SRC = {"rimbaud_publish.py", "rimbaud-publish.py"}
+
+
+def _safe_rel(stage: str, path: str) -> str:
+    rel = os.path.relpath(path, stage).replace("\\", "/")
     user = os.environ.get("USER") or os.environ.get("LOGNAME") or ""
-    name_b = user.encode() if user and user.lower() not in _SKIP_NAMES else b""
+    if user and user.lower() not in _SKIP_NAMES and len(user) >= 3:
+        rel = re.sub(re.escape(user), "operator", rel, flags=re.IGNORECASE)
+    if len(rel) > 90:
+        rel = rel[:87] + "..."
+    return rel
+
+
+def _add_hit(hits: dict, kind: str, rel: str) -> None:
+    key = (kind, rel)
+    row = hits.get(key)
+    if row is None:
+        hits[key] = {"kind": kind, "file": rel, "n": 1}
+    else:
+        row["n"] += 1
+
+
+def _public_ip(addr: bytes) -> bool:
+    try:
+        nums = [int(part) for part in addr.split(b".")]
+    except ValueError:
+        return False
+    if len(nums) != 4 or any(n > 255 for n in nums):
+        return False
+    a, b = nums[0], nums[1]
+    if a in (0, 127) or addr in _RESOLVERS or addr == b"255.255.255.255":
+        return False
+    if a == 10 or (a == 192 and b == 168) or (a == 172 and 16 <= b <= 31):
+        return False
+    if a == 169 and b == 254:
+        return False
+    return True
+
+
+def audit_tree(stage: str) -> list[dict]:
+    """Personal information in a publish tree. The report has kind, file, and count only."""
+    user = os.environ.get("USER") or os.environ.get("LOGNAME") or ""
+    name_b = user.encode() if user and user.lower() not in _SKIP_NAMES and len(user) >= 3 else b""
     eth = re.compile(br"(?<![0-9a-fA-F])0x(?!0{40}(?![0-9a-fA-F]))[0-9a-fA-F]{40}(?![0-9a-fA-F])")
     home = re.compile(br"(?<![A-Za-z0-9._-])/home/(?!hummingbot\b)[A-Za-z0-9._-]")
     media = re.compile(br"/media/(?!usb(?![A-Za-z0-9._-]))(?!cdrom(?![A-Za-z0-9._-]))[A-Za-z0-9._-]+")
     ip = re.compile(br"\b(?:\d{1,3}\.){3}\d{1,3}\b")
+    email = re.compile(br"[A-Za-z0-9._%+-]+@([A-Za-z0-9.-]+\.[A-Za-z]{2,})")
+    token = re.compile(br"(?:gho_|ghp_|github_pat_)[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9]{20,}")
+    telegram = re.compile(br"(?<![A-Za-z0-9])\d{8,10}:[A-Za-z0-9_-]{35,}")
+    wg = re.compile(br"PrivateKey\s*=\s*[A-Za-z0-9+/]{40,}")
+    hits: dict = {}
     for dirpath, dirnames, filenames in os.walk(stage):
         dirnames[:] = [d for d in dirnames if d != "third_party" and d != ".git"]
         for name in filenames:
@@ -292,34 +342,50 @@ def assert_public(stage: str) -> None:
                 continue
             if b"\0" in blob or len(blob) > 5_000_000:
                 continue
-            rel = os.path.relpath(path, stage)
+            rel = _safe_rel(stage, path)
+            src = name in _PUBLISH_SRC
             if home.search(blob):
-                raise SystemExit(f"publish refused, home path in {rel}")
+                _add_hit(hits, "home", rel)
             if name_b and re.search(rb"(?i)\b" + re.escape(name_b) + rb"\b", blob):
-                raise SystemExit(f"publish refused, operator name in {rel}")
+                _add_hit(hits, "name", rel)
             if eth.search(blob):
-                raise SystemExit(f"publish refused, wallet in {rel}")
+                _add_hit(hits, "wallet", rel)
             if media.search(blob):
-                raise SystemExit(f"publish refused, media user in {rel}")
+                _add_hit(hits, "media", rel)
             for match in ip.finditer(blob):
-                addr = match.group(0)
-                try:
-                    nums = [int(part) for part in addr.split(b".")]
-                except ValueError:
-                    continue
-                if len(nums) != 4 or any(n > 255 for n in nums):
-                    continue
-                a, b = nums[0], nums[1]
-                if a in (0, 127) or addr in _RESOLVERS or addr == b"255.255.255.255":
-                    continue
-                if a == 10 or (a == 192 and b == 168) or (a == 172 and 16 <= b <= 31):
-                    continue
-                if a == 169 and b == 254:
-                    continue
-                raise SystemExit(f"publish refused, public address in {rel}")
+                if _public_ip(match.group(0)):
+                    _add_hit(hits, "public_ip", rel)
+                    break
+            if not src:
+                for match in email.finditer(blob):
+                    domain = match.group(1).lower()
+                    if domain.endswith((b".service", b".socket", b".target", b".timer", b".mount", b".device", b".path", b".slice", b".scope")):
+                        continue
+                    if match.start() > 0 and blob[match.start() - 1:match.start()] == b"/":
+                        continue
+                    if any(domain == ok or domain.endswith(b"." + ok) for ok in _EMAIL_OK):
+                        continue
+                    _add_hit(hits, "email", rel)
+                    break
+                if token.search(blob) or telegram.search(blob):
+                    _add_hit(hits, "token", rel)
+                if b"BEGIN PRIVATE" in blob or b"BEGIN OPENSSH PRIVATE" in blob or wg.search(blob):
+                    _add_hit(hits, "private_key", rel)
+                if b"user-password-crypted password $6$" in blob or b"plaintext: rimbaud" in blob:
+                    _add_hit(hits, "secret", rel)
+    rows = list(hits.values())
+    rows.sort(key=lambda row: (row["kind"], row["file"]))
+    return rows[:40]
 
 
-def build_stage(stage: str, version: str, summary: str) -> None:
+def assert_public(stage: str) -> None:
+    findings = audit_tree(stage)
+    if findings:
+        row = findings[0]
+        raise SystemExit(f"publish refused, {row['kind']} in {row['file']}")
+
+
+def build_stage(stage: str, version: str, summary: str) -> list[dict]:
     if os.path.isdir(stage):
         shutil.rmtree(stage)
     os.makedirs(stage)
@@ -408,22 +474,7 @@ def build_stage(stage: str, version: str, summary: str) -> None:
     with open(os.path.join(stage, "VERSION"), "w", encoding="utf-8", newline="\n") as fh:
         fh.write(f"{version}\n{summary}\n")
     sanitize_stage(stage)
-    assert_public(stage)
-    forbidden = ("BEGIN PRIVATE", "user-password-crypted password $6$", "plaintext: rimbaud")
-    for dirpath, _, filenames in os.walk(stage):
-        for name in filenames:
-            path = os.path.join(dirpath, name)
-            if os.path.getsize(path) > 5_000_000:
-                continue
-            try:
-                blob = open(path, "rb").read()
-            except OSError:
-                continue
-            if name in {"rimbaud-publish.py", "rimbaud_publish.py"}:
-                continue
-            for needle in forbidden:
-                if needle.encode() in blob:
-                    raise SystemExit(f"publish refused, secret-shaped text in {path}")
+    return audit_tree(stage)
 
 
 def git(dest: str, *args: str, check: bool = True) -> subprocess.CompletedProcess:
@@ -452,16 +503,28 @@ def commit(dest: str, version: str, summary: str) -> bool:
     return True
 
 
-def push(dest: str) -> None:
+def remote_label(dest: str) -> str:
     url = git(dest, "remote", "get-url", "origin", check=False)
     if url.returncode != 0:
-        print("no github remote yet. commit is local only.", file=sys.stderr)
-        return
+        return ""
     remote = (url.stdout or "").strip()
     if "hummingbot/hummingbot" in remote:
         raise SystemExit("refusing to push: origin is the Hummingbot repository")
+    shown = re.sub(r"^[A-Za-z0-9+.-]+://", "", remote)
+    shown = re.sub(r"^[^@/]+@", "", shown)
+    if shown.endswith(".git"):
+        shown = shown[:-4]
+    return shown[:80]
+
+
+def push(dest: str) -> str:
+    label = remote_label(dest)
+    if not label:
+        print("no github remote yet. commit is local only.", file=sys.stderr)
+        return ""
     subprocess.run(["git", "push", "-u", "origin", "HEAD"], cwd=dest, check=True)
-    print(f"pushed to {remote}", file=sys.stderr)
+    print(f"pushed to {label}", file=sys.stderr)
+    return label
 
 
 def latest_archy() -> tuple[str, str]:
@@ -476,13 +539,117 @@ def latest_archy() -> tuple[str, str]:
     return version, summary
 
 
+def _copy_stage(stage: str) -> None:
+    os.makedirs(DEST, exist_ok=True)
+    subprocess.run(
+        ["rsync", "-a", "--delete", "--exclude", ".git", f"{stage}/", f"{DEST}/"],
+        check=True,
+    )
+    shutil.rmtree(stage, ignore_errors=True)
+
+
+def _emit(payload: dict) -> None:
+    print(json.dumps(payload), flush=True)
+
+
+def prepare_json() -> int:
+    """Copy the live tree into the GitHub folder and audit it. Does not push."""
+    version, summary = latest_archy()
+    summary = summary or "source update"
+    if not version:
+        _emit({"ok": False, "clean": False, "pushed": False, "error": "no archy version"})
+        return 1
+    stage = "/tmp/rimbaud-github-stage"
+    try:
+        findings = build_stage(stage, version, summary)
+    except SystemExit:
+        shutil.rmtree(stage, ignore_errors=True)
+        _emit({"ok": False, "clean": False, "pushed": False, "error": "github copy failed"})
+        return 1
+    if findings:
+        shutil.rmtree(stage, ignore_errors=True)
+        _emit({
+            "ok": False,
+            "clean": False,
+            "pushed": False,
+            "committed": False,
+            "version": version,
+            "findings": findings,
+            "message": "audit blocked the send",
+        })
+        return 2
+    _copy_stage(stage)
+    committed = commit(DEST, version, summary)
+    _emit({
+        "ok": True,
+        "clean": True,
+        "pushed": False,
+        "committed": committed,
+        "version": version,
+        "findings": [],
+        "message": "audit clean - click again to send",
+    })
+    return 0
+
+
+def send_json() -> int:
+    """Push the GitHub folder after a fresh audit. The second Archy click."""
+    if not os.path.isdir(os.path.join(DEST, ".git")):
+        _emit({"ok": False, "clean": False, "pushed": False, "error": "github folder is not ready"})
+        return 1
+    findings = audit_tree(DEST)
+    if findings:
+        _emit({
+            "ok": False,
+            "clean": False,
+            "pushed": False,
+            "findings": findings,
+            "message": "audit blocked the send",
+        })
+        return 2
+    try:
+        label = remote_label(DEST)
+    except SystemExit:
+        _emit({"ok": False, "clean": True, "pushed": False, "error": "refusing the Hummingbot repository"})
+        return 1
+    if not label:
+        _emit({"ok": False, "clean": True, "pushed": False, "error": "no github remote"})
+        return 1
+    ran = subprocess.run(
+        ["git", "push", "-u", "origin", "HEAD"],
+        cwd=DEST,
+        capture_output=True,
+        text=True,
+    )
+    if ran.returncode != 0:
+        _emit({"ok": False, "clean": True, "pushed": False, "error": "github push failed"})
+        return 1
+    version, _summary = latest_archy()
+    _emit({
+        "ok": True,
+        "clean": True,
+        "pushed": True,
+        "version": version,
+        "remote": label,
+        "findings": [],
+        "message": "sent " + version + " to github",
+    })
+    return 0
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description="Commit the rimBaud GitHub tree at the Archy version")
     parser.add_argument("--version", default="")
     parser.add_argument("--summary", default="")
     parser.add_argument("--no-commit", action="store_true")
     parser.add_argument("--push", action="store_true")
+    parser.add_argument("--prepare-json", action="store_true")
+    parser.add_argument("--send-json", action="store_true")
     args = parser.parse_args(argv)
+    if args.prepare_json:
+        return prepare_json()
+    if args.send_json:
+        return send_json()
     version, summary = args.version, args.summary
     if not version or not summary:
         got_v, got_s = latest_archy()
@@ -492,13 +659,13 @@ def main(argv: list[str]) -> int:
         print("no archy version", file=sys.stderr)
         return 1
     stage = "/tmp/rimbaud-github-stage"
-    build_stage(stage, version, summary)
-    os.makedirs(DEST, exist_ok=True)
-    subprocess.run(
-        ["rsync", "-a", "--delete", "--exclude", ".git", f"{stage}/", f"{DEST}/"],
-        check=True,
-    )
-    shutil.rmtree(stage, ignore_errors=True)
+    findings = build_stage(stage, version, summary)
+    if findings:
+        shutil.rmtree(stage, ignore_errors=True)
+        for row in findings[:12]:
+            print(f"publish refused, {row['kind']} in {row['file']}", file=sys.stderr)
+        return 1
+    _copy_stage(stage)
     if args.no_commit:
         print(f"refreshed {DEST} at {version}", file=sys.stderr)
         return 0
