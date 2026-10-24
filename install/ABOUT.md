@@ -19,4 +19,4 @@ limitations under the License.
 Installer for a Linux machine. The risk notice is required before start.
 
 Installs the desk, Spring, and the hunters. Hunters start only after the risk notice is accepted. The install password is not in the preseed.
-<!-- archy-folder -->
+<!-- archy-folder 0.2g5 -->
