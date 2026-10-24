@@ -19,4 +19,4 @@ limitations under the License.
 Windows bundle. Docker runs Hummingbot, the hunters, and Spring.
 
 Start with up.bat or up.sh. That asks for the risk notice first. Wallets and the install password are not in this folder.
-<!-- archy-folder -->
+<!-- archy-folder 0.2g5 -->
