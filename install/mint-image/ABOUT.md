@@ -19,4 +19,4 @@ limitations under the License.
 Scripts for the Mint USB image. The install password is not here.
 
 Builds and writes the rimBaud look onto an official Mint image. First boot asks for a new password.
-<!-- archy-folder -->
+<!-- archy-folder 0.2g5 -->
