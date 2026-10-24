@@ -19,4 +19,4 @@ limitations under the License.
 Web wire and the Flask pages. Keys stay on the machine.
 
 The browser wire and the hunter pages. A wallet on the wire is a subaccount name. The key paste stays on the local Confiig page.
-<!-- archy-folder -->
+<!-- archy-folder 0.2g5 -->
