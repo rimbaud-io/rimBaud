@@ -76,6 +76,9 @@ export default function ContextMenu({
             <button type="button" className="ctx-item" onClick={() => onConfigureWallet(menu.node)}>
               Configure wallet
             </button>
+            <button type="button" className="ctx-item" onClick={() => onRemove(menu.node.id)}>
+              Remove from canvas
+            </button>
             <button type="button" className="ctx-item danger" onClick={() => onDeleteWallet(menu.node)}>
               Delete wallet
             </button>

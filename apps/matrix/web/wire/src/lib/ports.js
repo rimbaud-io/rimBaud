@@ -13,7 +13,7 @@
 // limitations under the License.
 
 export const PORT_TIP = {
-  botWallet: "Input: Hyperliquid subaccount this hunter trades with.",
+  botWallet: "Input: Hyperliquid subaccount this controller signs with. Any registered subaccount.",
   botRisk: "Output (right): realized-win skim — wire into a RISK wallet left. Mapped on compile; no auto HL send.",
   botCoin: "Input: which coin this hunter trades.",
   botIncome: "Output: map positive income to a wallet (no auto HL send yet).",

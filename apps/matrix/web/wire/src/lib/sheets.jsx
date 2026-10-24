@@ -115,8 +115,8 @@ function copyFor(tool) {
     const body = bodyFor(hid);
     return "Wire ctrl into the hunter. Knobs are read each tick. They do not send orders by themselves. " + (body || tool.hint || "");
   }
-  if (tool.type === "wallet" && hid) {
-    return "Wallet node. Output is this hunter's subaccount. Wire it into the hunter wallet input. This node does not move funds.";
+  if (tool.type === "wallet") {
+    return "Hyperliquid subaccount. Wire it into any controller wallet input. One subaccount, one controller. This node does not move funds.";
   }
   if (tool.type === "bias" && hid) {
     return "BIAS node. LONG, SHORT, or FLAT per coin. The hunter treats it as a gate. FLAT stops new entries and leaves an open clip in place.";

@@ -3317,19 +3317,24 @@ def _write_json_file(path, data):
     os.replace(tmp, path)
 
 
-def _load_extra_wallets():
+def _load_pool_wallets():
+    """Registered Hyperliquid subaccounts. A row is not owned by one controller."""
     data = _read_json_file(WIRE_WALLETS_FILE) or {}
     rows = data.get("wallets") if isinstance(data.get("wallets"), list) else []
     out = []
+    seen = set()
     for row in rows:
         if not isinstance(row, dict):
             continue
         wid = str(row.get("id") or "").strip()
-        if not wid.startswith("wallet-extra-"):
+        if not wid.startswith("wallet-") or len(wid) > 80:
             continue
+        if wid in seen:
+            continue
+        seen.add(wid)
         addr = str(row.get("address") or "").strip()
         out.append({
-            "id": wid[:80],
+            "id": wid,
             "name": str(row.get("name") or "Wallet")[:40],
             "address": addr,
             "use_vault": bool(row.get("use_vault", True)),
@@ -3339,9 +3344,32 @@ def _load_extra_wallets():
     return out
 
 
+def _load_extra_wallets():
+    return _load_pool_wallets()
+
+
+def _pool_is_managed():
+    """True once this matrix owns the pool. An empty managed pool stays empty."""
+    data = _read_json_file(WIRE_WALLETS_FILE) or {}
+    return bool(data.get("managed"))
+
+
+def _pool_address_taken(addr, exclude_id=None):
+    want = str(addr or "").strip().lower()
+    if not want:
+        return None
+    for w in _load_pool_wallets():
+        if exclude_id and w.get("id") == exclude_id:
+            continue
+        if str(w.get("address") or "").strip().lower() == want:
+            return w.get("name") or w.get("id")
+    return None
+
+
 def _save_extra_wallets(rows):
     payload = {
         "updated": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC"),
+        "managed": True,
         "wallets": rows,
     }
     _write_json_file(WIRE_WALLETS_FILE, payload)
@@ -3604,7 +3632,7 @@ def _canvas_bot_ids(nodes):
         bid = ""
         if ntype == "bot":
             bid = str(n.get("id") or data.get("botId") or "")
-        elif ntype in ("ctrl", "wallet", "bias") and data.get("botId"):
+        elif ntype in ("ctrl", "bias") and data.get("botId"):
             bid = str(data.get("botId") or "")
         if not bid or bid in seen:
             continue
@@ -3790,6 +3818,32 @@ WIRE_COIN_COLOR = {
 }
 
 
+def _copy_saved_wallet_edges(nodes, edges):
+    """Keep the operator's wallet and income wires. Do not snap a subaccount back to one hunter."""
+    saved = _read_json_file(WIRE_GRAPH_FILE) or {}
+    ids = {n.get("id") for n in nodes if isinstance(n, dict)}
+    types = {n.get("id"): n.get("type") for n in nodes if isinstance(n, dict)}
+    have = {_edge_key(e) for e in edges if isinstance(e, dict)}
+    for e in saved.get("edges") or []:
+        if not isinstance(e, dict):
+            continue
+        src = str(e.get("source") or "")
+        tgt = str(e.get("target") or "")
+        sh = str(e.get("sourceHandle") or "")
+        th = str(e.get("targetHandle") or "")
+        if src not in ids or tgt not in ids:
+            continue
+        k = _edge_key(e)
+        if k in have:
+            continue
+        wallet_link = sh == "wallet" and th == "wallet"
+        income_link = sh in ("income", "funds") and th in ("income", "in") and types.get(tgt) == "wallet"
+        if not wallet_link and not income_link:
+            continue
+        edges.append(_wire_edge(str(e.get("id") or ("e-" + src + "-" + tgt)), src, sh, tgt, th))
+        have.add(k)
+
+
 def _wire_edge(eid, source, sh, target, th):
     return {
         "id": eid,
@@ -3802,11 +3856,6 @@ def _wire_edge(eid, source, sh, target, th):
 
 def build_live_wire_graph():
     """Rebuild the canvas from live wallets, positions, SL, bias, moon, DMan tune."""
-    accounts = {}
-    stored = load_bot_accounts()
-    for b in stored.get("bots") or []:
-        if isinstance(b, dict) and b.get("id"):
-            accounts[b["id"]] = b.get("address")
     sl_file = _read_json_file(BOT_SL_FILE) or {}
     tune = _dman_tune_map()
     bias_map = {}
@@ -3880,18 +3929,6 @@ def build_live_wire_graph():
                 "id": bid,
             },
         })
-        addr = accounts.get(bid)
-        nodes.append({
-            "id": "wallet-" + bid,
-            "type": "wallet",
-            "position": {"x": 260, "y": y},
-            "data": {
-                "botId": bid, "name": name, "icon": icon, "color": color,
-                "address": addr, "toolId": "wallet-" + bid,
-            },
-        })
-        edges.append(_wire_edge("e-wallet-" + bid, "wallet-" + bid, "wallet", bid, "wallet"))
-        edges.append(_wire_edge("e-income-" + bid, bid, "income", "wallet-" + bid, "income"))
         edges.append(_wire_edge("e-logs-" + bid, bid, "logs", "logs", "in"))
 
         if has_bias:
@@ -4013,14 +4050,17 @@ def build_live_wire_graph():
         "position": {"x": 1180, "y": 360},
         "data": {"toolId": "funds"},
     })
-    for i, w in enumerate(_load_extra_wallets()):
+    for i, w in enumerate(_load_pool_wallets()):
         wid = str(w.get("id") or "")
         if not wid or any(n.get("id") == wid for n in nodes):
             continue
+        bid = wid[7:] if wid.startswith("wallet-") else ""
+        y = hunter_y.get(bid, 560 + i * 190)
+        x = 260 if bid in hunter_y else 1180
         nodes.append({
             "id": wid,
             "type": "wallet",
-            "position": {"x": 1180, "y": 560 + i * 190},
+            "position": {"x": x, "y": y},
             "data": {
                 "name": w.get("name") or "Wallet",
                 "icon": "⬡",
@@ -4031,6 +4071,7 @@ def build_live_wire_graph():
                 "toolId": wid,
             },
         })
+    _copy_saved_wallet_edges(nodes, edges)
 
     return {
         "v": 5,
@@ -4719,10 +4760,14 @@ def _apply_wire_graph(nodes, edges):
                 moon = None
         win = None
         if wallet_n:
-            win = (wallet_n.get("data") or {}).get("address") or (wallet_n.get("data") or {}).get("name")
+            wd = wallet_n.get("data") if isinstance(wallet_n.get("data"), dict) else {}
+            win = str(wd.get("name") or "subaccount")
+            bname = str((n.get("data") or {}).get("name") or bid)
+            applied.append(bname + " uses " + win)
         wout = None
         if income_n:
-            wout = (income_n.get("data") or {}).get("address") or (income_n.get("data") or {}).get("name") or income_n.get("id")
+            idata = income_n.get("data") if isinstance(income_n.get("data"), dict) else {}
+            wout = str(idata.get("name") or "subaccount")
         runtime["bots"][bid] = {
             "coin": coin,
             "coins": coins_wired,
@@ -4846,55 +4891,46 @@ def _apply_copy_trader_wires(nodes, edges):
 
 @app.route("/api/wire/wallets", methods=["GET", "POST", "DELETE"])
 def api_wire_wallets():
-    """Canvas wallets + register unique Hyperliquid subaccounts (paste 0x from HL)."""
+    """Register or remove a Hyperliquid subaccount. Does not bind it to a hunter, write a connector, or restart."""
     if request.method == "GET":
-        slots = _hunter_wallet_slots()
+        pool = _load_pool_wallets()
         occupied = [
-            {"address": a, "name": n}
-            for a, n in _occupied_hl_addresses().items()
+            {"id": w.get("id") or "", "address": w.get("address") or "", "name": w.get("name") or w.get("id")}
+            for w in pool if w.get("address")
         ]
         return jsonify({
             "ok": True,
-            "wallets": _load_extra_wallets(),
-            "hunters": slots,
-            "empty_slots": [s for s in slots if s.get("empty")],
+            "wallets": pool,
+            "pool_managed": _pool_is_managed(),
+            "hunters": [],
+            "empty_slots": [],
             "occupied": occupied,
         })
     if request.method == "DELETE":
         body = request.get_json(silent=True) or {}
         wid = str(body.get("id") or request.args.get("id") or "").strip()
-        if not wid.startswith("wallet-extra-"):
-            return jsonify({"ok": False, "error": "not an extra wallet"}), 400
-        rows = [w for w in _load_extra_wallets() if w.get("id") != wid]
+        rows = _load_pool_wallets()
+        if not any(w.get("id") == wid for w in rows):
+            return jsonify({"ok": False, "error": "wallet is not in the pool"}), 400
+        rows = [w for w in rows if w.get("id") != wid]
         _save_extra_wallets(rows)
-        return jsonify({"ok": True, "wallets": rows, "message": "wallet deleted"})
+        return jsonify({"ok": True, "wallets": rows, "message": "wallet removed from the wire"})
     body = request.get_json(silent=True) or {}
     name = str(body.get("name") or "Wallet").strip()[:40] or "Wallet"
     addr = str(body.get("address") or "").strip()
-    if addr and not _valid_hl_address(addr):
+    if not _valid_hl_address(addr):
         return jsonify({"ok": False, "error": "address must be 0x + 40 hex chars"}), 400
     use_vault = bool(body.get("use_vault", True))
-    bind_id = str(body.get("bind_id") or "").strip()
-    restart = bool(body.get("restart"))
-    exclude = bind_id or str(body.get("id") or "").strip() or None
-    if addr:
-        taken = _occupied_hl_addresses(exclude_id=exclude).get(addr.lower())
-        if taken:
-            return jsonify({"ok": False, "error": f"address already used by {taken}"}), 400
-    if bind_id:
-        if not addr:
-            return jsonify({"ok": False, "error": "subaccount address required"}), 400
-        out = _confiig_set_address(bind_id, addr, use_vault=use_vault, restart=restart)
-        if not out.get("ok"):
-            return jsonify(out), 400
-        return jsonify(out)
     color = str(body.get("color") or "#f0b90b")[:20]
     wid = str(body.get("id") or "").strip()
-    rows = _load_extra_wallets()
-    if wid and not wid.startswith("wallet-extra-"):
-        return jsonify({"ok": False, "error": "not an extra wallet"}), 400
+    rows = _load_pool_wallets()
+    if wid and not wid.startswith("wallet-"):
+        return jsonify({"ok": False, "error": "not a wire wallet"}), 400
     if not wid:
         wid = "wallet-extra-" + secrets.token_hex(4)
+    taken = _pool_address_taken(addr, exclude_id=wid)
+    if taken:
+        return jsonify({"ok": False, "error": "address already used by " + str(taken)}), 400
     found = False
     for row in rows:
         if row.get("id") == wid:
@@ -4902,6 +4938,7 @@ def api_wire_wallets():
             row["address"] = addr
             row["use_vault"] = use_vault
             row["color"] = color
+            row["custom"] = True
             found = True
             break
     if not found:
@@ -4920,6 +4957,7 @@ def api_wire_wallets():
         "wallet": row,
         "wallets": rows,
         "bound": False,
+        "restarted": False,
         "message": ("updated " if found else "added ") + name,
     })
 
@@ -5021,6 +5059,7 @@ def api_wire_catalog():
         "hunters": hunters,
         "v2_sleepers": v2_rows,
         "wallets": _load_extra_wallets(),
+        "pool_managed": _pool_is_managed(),
         "traders": _copy_leader_cards(),
         "fields": {h["id"]: h.get("controller_fields") or [] for h in hunters},
     })
@@ -5247,6 +5286,9 @@ def _slim_wire_canvas(nodes_in, edges_in):
             x, y = 0.0, 0.0
         raw = n.get("data") if isinstance(n.get("data"), dict) else {}
         data = {k: raw[k] for k in _WIRE_KEEP if k in raw}
+        if ntype == "wallet":
+            data.pop("botId", None)
+            data["custom"] = True
         slim_nodes.append({"id": nid, "type": ntype, "position": {"x": x, "y": y}, "data": data})
     slim_edges = []
     for e in (edges_in or [])[:200]:
@@ -5287,7 +5329,16 @@ def _overlay_node_keep(n):
         return True
     if ntype in ("risk_wallet", "desk_bias"):
         return True
-    if ntype == "wallet" and data.get("custom"):
+    if ntype == "wallet":
+        addr = str(data.get("address") or "").strip()
+        if data.get("custom") or (addr.startswith("0x") and len(addr) == 42):
+            return True
+    nid = str(n.get("id") or "")
+    if ntype == "bot" and nid.startswith("hummingbot-v2-"):
+        return True
+    if ntype == "ctrl" and nid.startswith("ctrl-hummingbot-v2-"):
+        return True
+    if ntype == "bias" and nid.startswith("bias-hummingbot-v2-"):
         return True
     return False
 
@@ -5319,7 +5370,7 @@ def _overlay_saved_canvas(live):
         tgt = str(e.get("target") or "")
         sh = str(e.get("sourceHandle") or "")
         th = str(e.get("targetHandle") or "")
-        if src in extra_ids or tgt in extra_ids or sh in ("tg", "grok", "out", "moon", "trader", "eclose", "live", "alert", "risk") or th in ("tg", "grok", "moon", "trader", "eclose", "live", "alert", "risk") or str(sh).startswith("trader") or str(th).startswith("trader"):
+        if src in extra_ids or tgt in extra_ids or sh in ("tg", "grok", "out", "moon", "trader", "eclose", "live", "alert", "risk", "wallet", "income", "funds") or th in ("tg", "grok", "moon", "trader", "eclose", "live", "alert", "risk", "wallet", "income") or str(sh).startswith("trader") or str(th).startswith("trader"):
             extra_edges.append(e)
             live_ek.add(k)
     out = dict(live)

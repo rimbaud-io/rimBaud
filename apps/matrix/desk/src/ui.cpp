@@ -171,7 +171,7 @@ enum Page { PgHome, PgWire, PgCondor, PgHunters, PgFunds, PgStrategy, PgSystem, 
 const char* PAGE_NAME[] = {"HOME", "WIRE", "CONDOR", "HUNTERS", "FUNDS", "STRATEGY", "SYSTEM"};
 
 struct Hit {
-    enum Kind { Idle, Nav, Hunter, NotWired, WireNode, WireEdge, WirePort, ToolCat, ToolItem, WireBoard, WireAct, Ctx, Backend, Chart, Sl, Lev, Restart, HunterGate, DeskBias, CoinBias, CoinClose, CoinOpen100, CtrlBool, CtrlKnob, CtrlSel, CtrlStd, CopyMute, CopySlots, CopyAudit, AuditClose, AuditRun, Quit, PackSave, PackRestore, WireSnap, AnnotColor, AnnotSize, InspectBack, CompileClose, CompileWork, CompileGo, PresetDrop, PresetPick, PresetSave, ApiKey, ReplYes, ReplNo } kind = Idle;
+    enum Kind { Idle, Nav, Hunter, NotWired, WireNode, WireEdge, WirePort, ToolCat, ToolItem, WireBoard, WireAct, Ctx, Backend, Chart, Sl, Lev, Restart, HunterGate, DeskBias, CoinBias, CoinClose, CoinOpen100, CtrlBool, CtrlKnob, CtrlSel, CtrlStd, CopyMute, CopySlots, CopyAudit, AuditClose, AuditRun, Quit, PackSave, PackRestore, WireSnap, AnnotColor, AnnotSize, InspectBack, CompileClose, CompileWork, CompileGo, PresetDrop, PresetPick, PresetSave, ApiKey, ReplYes, ReplNo, FundsDel, FundsAdd, FundsField } kind = Idle;
     int i = -1;
     Rect r{};
     std::string key;
@@ -800,6 +800,9 @@ struct DeskUi {
     bool api_edit = false;
     bool api_busy = false;
     std::string api_buf;
+    int funds_edit = 0;
+    std::string funds_name;
+    std::string funds_addr;
     std::string api_addr;
     std::string api_exch;
     std::string api_note;
@@ -880,7 +883,6 @@ struct DeskUi {
         if (n.type == "bot") {
             std::string bid = n.id;
             if (has("bias-" + bid)) push_e("e-bias-" + bid, "bias-" + bid, "bias", bid, "bias");
-            if (has("wallet-" + bid)) push_e("e-wallet-" + bid, "wallet-" + bid, "wallet", bid, "wallet");
             if (has("ctrl-" + bid)) push_e("e-ctrl-" + bid, "ctrl-" + bid, "ctrl", bid, "ctrl");
             if (has("logs")) push_e("e-logs-" + bid, bid, "logs", "logs", "in");
         }
@@ -888,8 +890,6 @@ struct DeskUi {
             push_e("e-bias-" + n.bot_id, n.id, "bias", n.bot_id, "bias");
         if (n.type == "ctrl" && !n.bot_id.empty() && has(n.bot_id))
             push_e("e-ctrl-" + n.bot_id, n.id, "ctrl", n.bot_id, "ctrl");
-        if (n.type == "wallet" && !n.bot_id.empty() && has(n.bot_id))
-            push_e("e-wallet-" + n.bot_id, n.id, "wallet", n.bot_id, "wallet");
         if (n.type == "logs") {
             for (auto& o : snap.wire_nodes)
                 if (o.type == "bot") push_e("e-logs-" + o.id, o.id, "logs", n.id, "in");
@@ -917,17 +917,16 @@ struct DeskUi {
         bool has_bias = false;
         for (auto& t : snap.tools)
             if (t.id == "bias-" + bot.id) { has_bias = true; break; }
-        spawn("wallet-" + bot.id, "wallet", bot.label + " wallet", -170, 0);
-        spawn("ctrl-" + bot.id, "ctrl", bot.label + " controller", -170, 90);
+        spawn("ctrl-" + bot.id, "ctrl", bot.label + " controller", -170, 0);
         if (has_bias)
-            spawn("bias-" + bot.id, "bias", bot.label + " BIAS", -170, 180);
+            spawn("bias-" + bot.id, "bias", bot.label + " BIAS", -170, 90);
         add_auto_edges(bot);
     }
 
     void strip_v2_io(const std::string& bot_id) {
-        std::set<std::string> drop{
-            "wallet-" + bot_id, "ctrl-" + bot_id, "bias-" + bot_id
-        };
+        std::set<std::string> drop{"ctrl-" + bot_id, "bias-" + bot_id};
+        int wi = find_node(snap, "wallet-" + bot_id);
+        if (wi >= 0 && snap.wire_nodes[wi].address.empty()) drop.insert("wallet-" + bot_id);
         snap.wire_nodes.erase(std::remove_if(snap.wire_nodes.begin(), snap.wire_nodes.end(),
             [&](const WireNode& wn) { return drop.count(wn.id); }), snap.wire_nodes.end());
         snap.wire_edges.erase(std::remove_if(snap.wire_edges.begin(), snap.wire_edges.end(),
@@ -959,8 +958,10 @@ struct DeskUi {
             n.extra = "192x192";
             if (n.label.empty() || n.label == t.label) n.label = "NOTE";
         }
-        if (n.id.rfind("ctrl-", 0) == 0) n.bot_id = n.id.substr(5);
-        else if (n.id.rfind("wallet-", 0) == 0) n.bot_id = n.id.substr(7);
+        if (n.type == "wallet") {
+            n.bot_id.clear();
+            n.address = t.address;
+        } else if (n.id.rfind("ctrl-", 0) == 0) n.bot_id = n.id.substr(5);
         else if (n.id.rfind("bias-", 0) == 0) n.bot_id = n.id.substr(5);
         else if (n.type == "bot") n.bot_id = n.id;
         snap.wire_nodes.push_back(n);
@@ -1288,9 +1289,11 @@ struct DeskUi {
         for (auto& wn : snap.wire_nodes) {
             if (keep.count(wn.id) && wn.type == "bot" && is_v2_sleeper_id(wn.id)) {
                 stop_ids.push_back(wn.id);
-                keep.insert("wallet-" + wn.id);
                 keep.insert("ctrl-" + wn.id);
                 keep.insert("bias-" + wn.id);
+                std::string wid = "wallet-" + wn.id;
+                for (auto& o : snap.wire_nodes)
+                    if (o.id == wid && o.address.empty()) keep.insert(wid);
             }
         }
         if (api) {
@@ -1315,6 +1318,45 @@ struct DeskUi {
         snap.wire_edges.erase(snap.wire_edges.begin() + i);
         edge_sel = -1;
         say("wire deleted");
+    }
+
+    // One subaccount per controller, and one controller per subaccount. Income follows the move.
+    void claim_wallet(const std::string& wallet_id, const std::string& bot_id) {
+        std::vector<WireEdge> kept;
+        kept.reserve(snap.wire_edges.size() + 1);
+        for (auto& e : snap.wire_edges) {
+            bool drop = false;
+            if (e.target == bot_id && e.target_handle == "wallet" && e.source != wallet_id) drop = true;
+            if (e.source == wallet_id && e.source_handle == "wallet" && e.target != bot_id) drop = true;
+            if ((e.source_handle == "income" || e.source_handle == "funds") && e.target == wallet_id && e.source != bot_id)
+                drop = true;
+            if (e.source == bot_id && (e.source_handle == "income" || e.source_handle == "funds")
+                && e.target_handle == "income" && e.target != wallet_id)
+                drop = true;
+            if (!drop) kept.push_back(e);
+        }
+        bool has_inc = false;
+        for (auto& e : kept)
+            if (e.source == bot_id && e.source_handle == "income" && e.target == wallet_id) has_inc = true;
+        if (!has_inc) {
+            WireEdge e;
+            e.id = "e-" + bot_id + "-income-" + wallet_id;
+            e.source = bot_id;
+            e.target = wallet_id;
+            e.source_handle = "income";
+            e.target_handle = "income";
+            kept.push_back(e);
+        }
+        snap.wire_edges.swap(kept);
+    }
+
+    void claim_if_wallet(const WireNode& src, const WireNode& tgt, const std::string& sh, const std::string& th) {
+        if (sh != "wallet" || th != "wallet") return;
+        const WireNode* wn = nullptr;
+        const WireNode* bn = nullptr;
+        if (src.type == "wallet" && (tgt.type == "bot" || tgt.type == "homebot")) { wn = &src; bn = &tgt; }
+        else if (tgt.type == "wallet" && (src.type == "bot" || src.type == "homebot")) { wn = &tgt; bn = &src; }
+        if (wn && bn) claim_wallet(wn->id, bn->id);
     }
 
     bool connect_nodes(int ia, int ib) {
@@ -1345,6 +1387,7 @@ struct DeskUi {
         e.source_handle = sh;
         e.target_handle = th;
         snap.wire_edges.push_back(e);
+        claim_if_wallet(src, tgt, sh, th);
         say("wired " + src.label + " " + sh + " -> " + tgt.label + " " + th);
         return true;
     }
@@ -1383,6 +1426,7 @@ struct DeskUi {
         e.source_handle = sh;
         e.target_handle = th;
         snap.wire_edges.push_back(e);
+        claim_if_wallet(src, tgt, sh, th);
         say("wired " + src.label + "." + sh + " -> " + tgt.label + "." + th);
         return true;
     }
@@ -2394,7 +2438,7 @@ WireNode tool_wire_node(const ToolItem& t) {
     n.color = t.color;
     n.kind = t.kind;
     if (n.id.rfind("ctrl-", 0) == 0) n.bot_id = n.id.substr(5);
-    else if (n.id.rfind("wallet-", 0) == 0) n.bot_id = n.id.substr(7);
+    else if (n.type == "wallet") n.bot_id.clear();
     else if (n.id.rfind("bias-", 0) == 0 && n.id != "bias-manual") n.bot_id = n.id.substr(5);
     else if (n.type == "bot" || n.type == "homebot") n.bot_id = n.id;
     if (n.id == "hummingbot-hl" && n.kind.empty()) n.kind = "copy";
@@ -2590,8 +2634,8 @@ ToolCopy tool_copy(const DeskSnap& s, const ToolItem& t) {
         if (c.body.empty() && !t.hint.empty()) c.body = t.hint;
         return c;
     }
-    if (t.type == "wallet" && !hid.empty()) {
-        c.body = "Wallet node. Output is this hunter's subaccount. Wire it into the hunter wallet input. This node does not move funds.";
+    if (t.type == "wallet") {
+        c.body = "Hyperliquid subaccount. Wire it into any controller wallet input. One subaccount, one controller. This node does not move funds.";
         return c;
     }
     if (t.type == "bias" && !hid.empty()) {
@@ -2611,7 +2655,7 @@ ToolCopy tool_copy(const DeskSnap& s, const ToolItem& t) {
     else if (t.id == "risk-wallet")
         c.body = "RISK wallet. A hunter parks the second win here when that skim is on. Wire risk from the hunter into this inlet.";
     else if (t.id == "funds")
-        c.body = "FUNDS bus. Balances from the Hyperliquid subaccounts. This node does not move funds.";
+        c.body = "FUNDS bus. Registered Hyperliquid subaccounts. Add or delete them on the FUNDS page. This node does not move funds.";
     else if (t.type == "trader")
         c.body = "Leader wallet. Wire trader into Copy trader-1, trader-2, or trader-3. The copy hunter mirrors this address.";
     else if (t.id == "logs")
@@ -2801,6 +2845,7 @@ int run_desk(FlaskApi& api) {
     int api_fd = -1;
     std::string api_out;
     bool api_paste_wait = false;
+    bool funds_paste_wait = false;
     double api_blink = 0;
     XMapWindow(dpy, win);
     Cursor cur_arrow = XCreateFontCursor(dpy, XC_left_ptr);
@@ -2832,6 +2877,13 @@ int run_desk(FlaskApi& api) {
             if (ui.snap.tools.empty()) ui.api->load_fields(ui.snap);
             ui.wire_fitted = false;
             ui.last_wire = ui.now();
+        }
+        if (p != PgFunds) ui.funds_edit = 0;
+        if (p == PgFunds) {
+            if (ui.snap.wire_nodes.empty()) ui.api->load_wire(ui.snap, "desk");
+            bool any = false;
+            for (auto& t : ui.snap.tools) if (t.type == "wallet") any = true;
+            if (!any) ui.api->load_fields(ui.snap);
         }
         if (p == PgStrategy && !ui.qa_ok) {
             ui.api->load_qa(ui.snap);
@@ -4938,29 +4990,93 @@ int run_desk(FlaskApi& api) {
         auto draw_funds = [&]() {
             int y = body.y + 16 - ui.scroll;
             int x = 18;
+            auto lower = [](std::string s) {
+                for (char& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+                return s;
+            };
             text(dpy, buf, gc, C.gold, x, y, "HYPERLIQUID WALLETS");
-            text(dpy, buf, gc, C.muted, x + 220, y, "from /api/home  ·  address edit / restart not wired");
+            text(dpy, buf, gc, C.muted, x + 220, y, "subaccounts on this matrix  ·  any controller  ·  keys stay on /confiig");
             y += 24;
-            text(dpy, buf, gc, C.muted, x, y, "hunter");
+            text(dpy, buf, gc, C.muted, x, y, "name");
             text(dpy, buf, gc, C.muted, x + 160, y, "address");
-            text(dpy, buf, gc, C.muted, x + 520, y, "equity");
-            text(dpy, buf, gc, C.muted, x + 640, y, "free");
-            text(dpy, buf, gc, C.muted, x + 760, y, "pos");
-            text(dpy, buf, gc, C.muted, x + 820, y, "run");
+            text(dpy, buf, gc, C.muted, x + 560, y, "equity");
+            text(dpy, buf, gc, C.muted, x + 660, y, "free");
+            text(dpy, buf, gc, C.muted, x + 760, y, "wired");
             y += 18;
-            for (auto& w : ui.snap.wallets) {
-                text(dpy, buf, gc, C.text, x, y, ascii(w.name, 16));
-                text(dpy, buf, gc, C.cyan, x + 160, y, w.address.empty() ? "-" : w.address);
-                text(dpy, buf, gc, C.gold, x + 520, y, money(w.equity));
-                text(dpy, buf, gc, C.green, x + 640, y, money(w.free_usd));
-                char n[8];
-                snprintf(n, sizeof(n), "%d", w.n_pos);
-                text(dpy, buf, gc, C.text, x + 760, y, n);
-                text(dpy, buf, gc, w.running ? C.green : C.rose, x + 820, y, w.running ? "RUN" : "OFF");
+            struct Row { std::string id, name, address, wired; double eq = 0, free = 0; bool have = false; };
+            std::vector<Row> rows;
+            for (auto& t : ui.snap.tools) {
+                if (t.type != "wallet" || t.address.size() < 42) continue;
+                Row r;
+                r.id = t.id;
+                r.name = t.label;
+                r.address = t.address;
+                rows.push_back(r);
+            }
+            if (rows.empty()) {
+                for (auto& w : ui.snap.wallets) {
+                    if (w.address.size() < 42) continue;
+                    Row r;
+                    r.id = "wallet-" + w.id;
+                    r.name = w.name;
+                    r.address = w.address;
+                    rows.push_back(r);
+                }
+            }
+            for (auto& r : rows) {
+                std::string want = lower(r.address);
+                for (auto& w : ui.snap.wallets) {
+                    if (w.address.size() < 42 || lower(w.address) != want) continue;
+                    r.eq = w.equity;
+                    r.free = w.free_usd;
+                    r.have = true;
+                    break;
+                }
+                for (auto& e : ui.snap.wire_edges) {
+                    if (e.source != r.id || e.source_handle != "wallet") continue;
+                    int ni = find_node(ui.snap, e.target);
+                    if (ni >= 0) r.wired = ui.snap.wire_nodes[ni].label;
+                }
+                text(dpy, buf, gc, C.text, x, y, ascii(r.name, 16));
+                text(dpy, buf, gc, C.cyan, x + 160, y, r.address);
+                text(dpy, buf, gc, C.gold, x + 560, y, r.have ? money(r.eq) : "-");
+                text(dpy, buf, gc, C.green, x + 660, y, r.have ? money(r.free) : "-");
+                text(dpy, buf, gc, r.wired.empty() ? C.muted : C.gold, x + 760, y, ascii(r.wired.empty() ? "-" : r.wired, 16));
+                Rect del{x + 940, y - 12, 46, 16};
+                stroke(dpy, buf, gc, C.rose, del);
+                text(dpy, buf, gc, C.rose, del.x + 8, del.y + 12, "DEL");
+                ui.hits.push_back({Hit::FundsDel, -1, del, r.id});
                 y += 18;
             }
+            if (rows.empty()) {
+                text(dpy, buf, gc, C.muted, x, y, "no subaccounts yet");
+                y += 18;
+            }
+            y += 14;
+            text(dpy, buf, gc, C.gold, x, y, "ADD");
+            y += 8;
+            auto field = [&](int fx, int fw, int which, const std::string& val, const char* placeholder) {
+                Rect box{fx, y, fw, 22};
+                bool on = ui.funds_edit == which;
+                fill(dpy, buf, gc, C.panel, box);
+                stroke(dpy, buf, gc, on ? C.gold : C.border, box);
+                std::string show = val.empty() ? placeholder : val;
+                if (on && val.empty()) show = std::string(placeholder) + " _";
+                else if (on) show += "_";
+                text(dpy, buf, gc, val.empty() && !on ? C.muted : C.text, box.x + 6, box.y + 15, ascii(show, fw / 8));
+                ui.hits.push_back({Hit::FundsField, which, box});
+            };
+            field(x, 180, 1, ui.funds_name, "name");
+            field(x + 190, 420, 2, ui.funds_addr, "0x subaccount");
+            Rect add{x + 620, y, 64, 22};
+            fill(dpy, buf, gc, rgb(dpy, cm, 20, 50, 24), add);
+            stroke(dpy, buf, gc, C.green, add);
+            text(dpy, buf, gc, C.green, add.x + 16, add.y + 15, "ADD");
+            ui.hits.push_back({Hit::FundsAdd, 0, add});
+            y += 36;
+            text(dpy, buf, gc, C.muted, x, y, "Click a field, type or Ctrl+V, Enter adds. DEL removes it from the wire.");
             y += 16;
-            text(dpy, buf, gc, C.muted, x, y, "Paste / save wallet keys stays on Flask /confiig until this page is wired.");
+            text(dpy, buf, gc, C.muted, x, y, "A listed subaccount can wire to any controller. No key paste here. No restart. No fund move.");
             ui.content_h = y + ui.scroll - body.y + 40;
         };
 
@@ -5684,6 +5800,39 @@ int run_desk(FlaskApi& api) {
                 ui.api_buf.push_back(static_cast<char>(c));
         }
     };
+    auto accept_funds_chars = [&](const std::string& chunk) {
+        if (!ui.funds_edit) return;
+        std::string& buf = ui.funds_edit == 1 ? ui.funds_name : ui.funds_addr;
+        int cap = ui.funds_edit == 1 ? 24 : 42;
+        for (unsigned char c : chunk) {
+            if ((int)buf.size() >= cap) break;
+            if (ui.funds_edit == 1) {
+                bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                    || (c >= '0' && c <= '9') || c == ' ' || c == '-' || c == '_';
+                if (ok) buf.push_back(static_cast<char>(c));
+            } else if ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F') || c == 'x' || c == 'X') {
+                buf.push_back(static_cast<char>(c));
+            }
+        }
+    };
+    auto submit_funds = [&]() {
+        std::string name = ui.funds_name;
+        std::string addr = ui.funds_addr;
+        while (!name.empty() && name.back() == ' ') name.pop_back();
+        if (name.empty()) { ui.say("name the subaccount"); return; }
+        if (addr.size() != 42 || addr.rfind("0x", 0) != 0) {
+            ui.say("address must be 0x and 40 hex characters");
+            return;
+        }
+        std::string msg = ui.api->wallet_add(name, addr);
+        ui.say(msg);
+        if (msg.find("added") != std::string::npos || msg.find("updated") != std::string::npos) {
+            ui.funds_name.clear();
+            ui.funds_addr.clear();
+            ui.funds_edit = 0;
+            ui.api->load_fields(ui.snap);
+        }
+    };
     show_pub();
 
     bool run = true;
@@ -5698,7 +5847,9 @@ int run_desk(FlaskApi& api) {
             } else if (e.type == SelectionNotify) {
                 api_paste_wait = false;
                 if (e.xselection.property == None) {
-                    if (ui.api_edit) ui.say("clipboard empty — copy the API key, then Ctrl+V");
+                    if (ui.funds_edit) ui.say("clipboard empty");
+                    else if (ui.api_edit) ui.say("clipboard empty — copy the API key, then Ctrl+V");
+                    funds_paste_wait = false;
                 } else {
                     Atom type = None;
                     int fmt = 0;
@@ -5708,9 +5859,12 @@ int run_desk(FlaskApi& api) {
                                            AnyPropertyType, &type, &fmt, &n, &rem, &data) == Success && data) {
                         std::string chunk(reinterpret_cast<char*>(data), static_cast<size_t>(n));
                         XFree(data);
-                        accept_api_chars(chunk);
+                        if (funds_paste_wait) accept_funds_chars(chunk);
+                        else accept_api_chars(chunk);
+                        funds_paste_wait = false;
                         wipe_secret(chunk);
                     }
+                    funds_paste_wait = false;
                 }
                 redraw();
             } else if (e.type == Expose) redraw();
@@ -5777,6 +5931,34 @@ int run_desk(FlaskApi& api) {
                     }
                 }
                 if (annot_keys) { /* caption edit owns keys */ }
+                else if (ui.funds_edit && ui.page == PgFunds) {
+                    char chs[8]{};
+                    int nch = XLookupString(&e.xkey, chs, 7, &ks, nullptr);
+                    bool ctrl = (e.xkey.state & ControlMask) != 0;
+                    bool shift = (e.xkey.state & ShiftMask) != 0;
+                    std::string& buf = ui.funds_edit == 1 ? ui.funds_name : ui.funds_addr;
+                    int cap = ui.funds_edit == 1 ? 24 : 42;
+                    if (ks == XK_Escape) {
+                        ui.funds_edit = 0;
+                    } else if (ks == XK_Return || ks == XK_KP_Enter) {
+                        if (ui.funds_edit == 1) ui.funds_edit = 2;
+                        else submit_funds();
+                    } else if (ks == XK_Tab) {
+                        ui.funds_edit = ui.funds_edit == 1 ? 2 : 1;
+                    } else if (ks == XK_BackSpace || ks == XK_Delete) {
+                        if (!buf.empty()) buf.pop_back();
+                    } else if ((ctrl && (ks == XK_v || ks == XK_V)) || (nch == 1 && chs[0] == 22)) {
+                        funds_paste_wait = true;
+                        XConvertSelection(dpy, atom_clip, atom_utf8, atom_paste, win, CurrentTime);
+                    } else if (shift && ks == XK_Insert) {
+                        funds_paste_wait = true;
+                        XConvertSelection(dpy, XA_PRIMARY, atom_utf8, atom_paste, win, CurrentTime);
+                    } else if (!ctrl && nch == 1) {
+                        accept_funds_chars(std::string(1, chs[0]));
+                        if ((int)buf.size() > cap) buf.resize(static_cast<size_t>(cap));
+                    }
+                    redraw();
+                }
                 else if (ui.preset_edit) {
                     char chs[8]{};
                     int nch = XLookupString(&e.xkey, chs, 7, &ks, nullptr);
@@ -6277,6 +6459,21 @@ int run_desk(FlaskApi& api) {
                             ui.wire_inspect = -1;
                             ui.inspect_scroll = 0;
                             redraw();
+                        } else if (h.kind == Hit::FundsDel) {
+                            if (!h.key.empty()) {
+                                ui.say(ui.api->wallet_delete(h.key));
+                                ui.api->load_fields(ui.snap);
+                            }
+                            redraw();
+                            break;
+                        } else if (h.kind == Hit::FundsAdd) {
+                            submit_funds();
+                            redraw();
+                            break;
+                        } else if (h.kind == Hit::FundsField) {
+                            ui.funds_edit = h.i == 2 ? 2 : 1;
+                            redraw();
+                            break;
                         } else if (h.kind == Hit::ApiKey) {
                             api_click = true;
                             if (h.i == 3) {

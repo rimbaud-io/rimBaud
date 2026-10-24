@@ -253,6 +253,7 @@ struct ToolItem {
     std::string hint;
     std::string color;
     std::string kind;
+    std::string address;
     bool unique = true;
 };
 
@@ -450,6 +451,9 @@ public:
     std::string save_layout(const DeskSnap& snap);
     std::string sleeper_start(const std::string& id);
     std::string sleeper_stop(const std::string& id);
+    // Register or remove a subaccount in the wire pool. Does not write a connector or restart a hunter.
+    std::string wallet_add(const std::string& name, const std::string& address);
+    std::string wallet_delete(const std::string& id);
 };
 
 double display_value(const CtrlField& f, const nlohmann::json& stored);

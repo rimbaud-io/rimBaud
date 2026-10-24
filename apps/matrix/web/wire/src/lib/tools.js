@@ -92,17 +92,6 @@ function v2Tools(rows) {
       color,
       data: { botId: id, name, color, icon: "⚙", v2: true, values: {}, fields: [] },
     });
-    out.push({
-      toolId: "wallet-" + id,
-      category: "wallets",
-      unique: true,
-      type: "wallet",
-      label: name + " wallet",
-      hint: "wire before it can trade",
-      icon: "▣",
-      color,
-      data: { botId: id, name: name + " wallet", color, v2: true },
-    });
     if (hasBias) {
       out.push({
         toolId: biasId(id),
@@ -345,22 +334,11 @@ export function catalogTools({ hunters, extraWallets = [], extraHunters = [], ex
     unique: true,
     type: "funds",
     label: "FUNDS bus",
-    hint: "all HL subs",
+    hint: "registered HL subs",
     icon: "▣",
     color: "#f0b90b",
     data: { wallets: [] },
   },
-  ...outHunters.map((h) => ({
-    toolId: "wallet-" + h.id,
-    category: "wallets",
-    unique: true,
-    type: "wallet",
-    label: h.name + " wallet",
-    hint: "subaccount · Confiig",
-    icon: "⬡",
-    color: h.color,
-    data: { botId: h.id, name: h.name, color: h.color, icon: h.icon },
-  })),
   {
     toolId: "risk-wallet",
     category: "wallets",
@@ -378,7 +356,7 @@ export function catalogTools({ hunters, extraWallets = [], extraHunters = [], ex
     unique: true,
     type: "wallet",
     label: w.name || "Wallet",
-    hint: w.address ? String(w.address).slice(0, 10) + "…" : "extra subaccount",
+    hint: "subaccount",
     icon: "⬡",
     color: w.color || "#f0b90b",
     data: {
@@ -541,6 +519,55 @@ export function toolById(id) {
 
 export function uid(prefix) {
   return prefix + "-" + Math.random().toString(36).slice(2, 8);
+}
+
+export function mergePoolWallets(catalogWallets, homeBots) {
+  const out = [];
+  const seenId = new Set();
+  const seenAddr = new Set();
+  const add = (row) => {
+    if (!row) return;
+    const id = String(row.id || "").trim();
+    if (!id.startsWith("wallet-")) return;
+    const addr = String(row.address || "").trim();
+    const key = addr.toLowerCase();
+    if (!/^0x[a-f0-9]{40}$/.test(key)) return;
+    if (seenId.has(id) || seenAddr.has(key)) return;
+    seenId.add(id);
+    seenAddr.add(key);
+    out.push({
+      id,
+      name: row.name || "Wallet",
+      address: addr,
+      color: row.color || "#f0b90b",
+      use_vault: row.use_vault !== false,
+      custom: true,
+    });
+  };
+  for (const w of catalogWallets || []) add(w);
+  for (const b of homeBots || []) {
+    add({
+      id: "wallet-" + b.id,
+      name: b.name || b.id,
+      address: b.address,
+      color: b.color || "#f0b90b",
+      use_vault: b.id !== "hummingbot-hl",
+    });
+  }
+  return out;
+}
+
+export function claimWalletEdges(edges, walletId, botId) {
+  const kept = (edges || []).filter((x) => {
+    if (x.target === botId && x.targetHandle === "wallet" && x.source !== walletId) return false;
+    if (x.source === walletId && x.sourceHandle === "wallet" && x.target !== botId) return false;
+    if ((x.sourceHandle === "income" || x.sourceHandle === "funds") && x.target === walletId && x.source !== botId) return false;
+    if (x.source === botId && (x.sourceHandle === "income" || x.sourceHandle === "funds") && x.targetHandle === "income" && x.target !== walletId) return false;
+    return true;
+  });
+  const has = kept.some((x) => x.source === botId && x.sourceHandle === "income" && x.target === walletId);
+  if (!has) kept.push(makeEdge("e-" + botId + "-income-" + walletId, botId, "income", walletId, "income"));
+  return kept;
 }
 
 export function makeNode(tool, position) {
@@ -745,8 +772,6 @@ export function autoEdgesFor(node, existing) {
       if (node.data.hasBias && has(bid)) {
         out.push(makeEdge("e-bias-" + node.id, bid, "bias", node.id, "bias"));
       }
-      const wid = "wallet-" + node.id;
-      if (has(wid)) out.push(makeEdge("e-wallet-" + node.id, wid, "wallet", node.id, "wallet"));
       const cid = "ctrl-" + node.id;
       if (has(cid)) out.push(makeEdge("e-ctrl-" + node.id, cid, "ctrl", node.id, "ctrl"));
     }
@@ -764,9 +789,6 @@ export function autoEdgesFor(node, existing) {
   }
   if (node.type === "ctrl" && node.data.botId && has(node.data.botId)) {
     out.push(makeEdge("e-ctrl-" + node.data.botId, node.id, "ctrl", node.data.botId, "ctrl"));
-  }
-  if (node.type === "wallet" && node.data.botId && has(node.data.botId)) {
-    out.push(makeEdge("e-wallet-" + node.data.botId, node.id, "wallet", node.data.botId, "wallet"));
   }
 
   if (node.type === "xlate") {

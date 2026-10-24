@@ -37,7 +37,7 @@ export default function FundsNode({ data, selected }) {
       >
         HL wallets
       </div>
-      <p className="wn-note">Rewire through Confiig — not raw 0x drag.</p>
+      <p className="wn-note">Registered subaccounts. Add or delete them in the Funds menu. Any of them can wire to a controller.</p>
       <div className="fund-list">
         {wallets.length === 0 && <div className="empty">waiting for /api/home…</div>}
         {wallets.map((w) => (

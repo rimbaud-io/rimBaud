@@ -18,9 +18,6 @@ export default function WalletModal({ form, busy, error, onClose, onSave }) {
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
   const [useVault, setUseVault] = useState(true);
-  const [restart, setRestart] = useState(false);
-  const [bindId, setBindId] = useState("");
-  const [slots, setSlots] = useState([]);
   const [occupied, setOccupied] = useState([]);
 
   useEffect(() => {
@@ -28,31 +25,23 @@ export default function WalletModal({ form, busy, error, onClose, onSave }) {
     setName(form.name || (form.mode === "add" ? "Subaccount" : ""));
     setAddress(form.address || "");
     setUseVault(form.use_vault !== false);
-    setRestart(false);
-    setBindId(form.bind_id || form.botId || "");
-    if (form.mode === "add" || form.custom) {
-      fetch("/api/wire/wallets")
-        .then((r) => r.json())
-        .then((d) => {
-          setSlots(d.hunters || []);
-          setOccupied(d.occupied || []);
-        })
-        .catch(() => {});
-    }
+    fetch("/api/wire/wallets")
+      .then((r) => r.json())
+      .then((d) => setOccupied(d.occupied || []))
+      .catch(() => {});
   }, [form]);
 
   if (!form) return null;
-  const hunter = !!(form.botId && !form.custom);
   const adding = form.mode === "add";
   const title = adding ? "Add subaccount" : "Configure wallet";
+  const self = String((form.node && form.node.id) || "");
   const taken = occupied.find(
     (o) =>
       o.address &&
       address &&
       o.address.toLowerCase() === address.toLowerCase() &&
-      o.name !== name
+      o.id !== self
   );
-  const emptySlots = slots.filter((s) => s.empty);
 
   return (
     <>
@@ -60,12 +49,12 @@ export default function WalletModal({ form, busy, error, onClose, onSave }) {
       <div className="wallet-modal" role="dialog" aria-label={title}>
         <div className="compile-head">
           <strong>{title}</strong>
-          <span>{hunter ? form.botId : adding ? "new Hyperliquid sub" : "extra canvas wallet"}</span>
+          <span>{adding ? "new Hyperliquid sub" : "wire subaccount"}</span>
           <button type="button" onClick={onClose}>close</button>
         </div>
         <label>
           Name
-          <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="DMan Maker sub" />
+          <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Subaccount" />
         </label>
         <label>
           Subaccount address
@@ -73,45 +62,19 @@ export default function WalletModal({ form, busy, error, onClose, onSave }) {
             type="text"
             value={address}
             onChange={(e) => setAddress(e.target.value.trim())}
-            placeholder="0x… from Hyperliquid"
+            placeholder="0x from Hyperliquid"
             spellCheck={false}
           />
         </label>
         {taken ? <p className="wallet-err">Already used by {taken.name}</p> : null}
-        {(adding || hunter) && (
-          <label className="chk">
-            <input type="checkbox" checked={useVault} onChange={(e) => setUseVault(e.target.checked)} />
-            Use as Hyperliquid subaccount (vault)
-          </label>
-        )}
-        {adding && (
-          <label>
-            Attach to hunter
-            <select value={bindId} onChange={(e) => setBindId(e.target.value)}>
-              <option value="">Canvas only (income map)</option>
-              {emptySlots.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name} — needs unique sub
-                </option>
-              ))}
-              {slots.filter((s) => !s.empty).map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name} — replace current
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-        {(hunter || bindId) && (
-          <label className="chk">
-            <input type="checkbox" checked={restart} onChange={(e) => setRestart(e.target.checked)} />
-            Restart container after save
-          </label>
-        )}
+        <label className="chk">
+          <input type="checkbox" checked={useVault} onChange={(e) => setUseVault(e.target.checked)} />
+          Hyperliquid vault subaccount
+        </label>
         <p className="health">
-          Create the subaccount in Hyperliquid first, then paste the 0x here.
-          It must be unique (not Copy / Swing / Helliot / Surfn / Shorty / Dman / Only Up).
-          Does not close positions. Restart only if you tick it.
+          Create the subaccount in Hyperliquid first, then paste the address here.
+          Once it is in the list it can wire to any controller. This does not move funds and does not restart a hunter.
+          Connector keys stay on Confiig.
         </p>
         {error ? <p className="wallet-err">{error}</p> : null}
         <div className="wallet-actions">
@@ -119,14 +82,14 @@ export default function WalletModal({ form, busy, error, onClose, onSave }) {
           <button
             type="button"
             className="go"
-            disabled={busy || !name.trim() || ((adding || hunter) && !address)}
+            disabled={busy || !name.trim() || !address || !!taken}
             onClick={() => onSave({
               ...form,
+              id: self || undefined,
               name: name.trim(),
               address: address.trim(),
               use_vault: useVault,
-              restart,
-              bind_id: adding ? bindId : (form.botId || ""),
+              custom: true,
             })}
           >
             {busy ? "Saving…" : "Save"}

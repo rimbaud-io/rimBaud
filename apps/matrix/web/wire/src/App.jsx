@@ -54,7 +54,7 @@ import { buildGraph, clearPos, CONTROLLER_FIELDS, HUNTERS, LAYOUT } from "./lib/
 import { captureBaseline, fmtDiff, listChanges, stampDiffs } from "./lib/diff.js";
 import { closeHits, liveKeySet, markEdges } from "./lib/impact.js";
 import { HISTORY_KEEP, packStep, persistHistory, replayConfig } from "./lib/history.js";
-import { clsPnl, fmtSecs, money } from "./lib/format.js";
+import { clsPnl, fmtSecs, money, shortAddr } from "./lib/format.js";
 import {
   activeV2Controller,
   applyControllerSwap,
@@ -66,8 +66,10 @@ import {
   isV2SleeperId,
   loadSavedGraph,
   isControllerTool,
+  claimWalletEdges,
   makeEdge,
   makeNode,
+  mergePoolWallets,
   refreshTools,
   replaceDropTarget,
   restoreSaved,
@@ -180,7 +182,7 @@ function mergeHome(nodes, edges, home, hunters = HUNTERS) {
   const byId = Object.fromEntries(bots.map((b) => [b.id, b]));
   const canvasById = Object.fromEntries((nodes || []).map((n) => [n.id, n]));
   const positions = home.positions || [];
-  const wallets = bots.map((b) => ({
+  const wallets = bots.filter((b) => /^0x[a-fA-F0-9]{40}$/.test(String(b.address || ""))).map((b) => ({
     id: b.id,
     name: b.name,
     address: b.address,
@@ -561,6 +563,7 @@ function Board() {
   const [botsOpen, setBotsOpen] = useState(false);
   const [sysOpen, setSysOpen] = useState(false);
   const [fundsOpen, setFundsOpen] = useState(false);
+  const [poolList, setPoolList] = useState([]);
   const [stratOpen, setStratOpen] = useState(false);
   const catalogRef = useRef({ hunters: HUNTERS, wallets: [], traders: [] });
   const boardRef = useRef("desk");
@@ -599,15 +602,20 @@ function Board() {
       .then((r) => r.json())
       .then((d) => {
         if (!d || d.ok === false || !Array.isArray(d.hunters)) return;
+        const listed = mergePoolWallets(d.wallets || [], []);
+        const managed = !!d.pool_managed || listed.length > 0;
+        const pool = managed ? listed : mergePoolWallets([], (homeRef.current && homeRef.current.bots) || []);
         catalogRef.current = {
           hunters: d.hunters,
-          wallets: d.wallets || [],
+          wallets: pool,
+          poolReady: managed,
           traders: d.traders || [],
           v2Sleepers: d.v2_sleepers || [],
         };
+        setPoolList(pool);
         refreshTools({
           hunters: d.hunters,
-          extraWallets: d.wallets || [],
+          extraWallets: pool,
           extraLeaders: d.traders || [],
           v2Sleepers: d.v2_sleepers || [],
         });
@@ -615,6 +623,25 @@ function Board() {
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!fundsOpen) return undefined;
+    let alive = true;
+    fetch("/api/wire/wallets")
+      .then((r) => r.json())
+      .then((d) => {
+        if (!alive || !d || d.ok === false) return;
+        const rows = mergePoolWallets(d.wallets || [], []);
+        if (!d.pool_managed && !rows.length) return;
+        const cat = catalogRef.current || {};
+        catalogRef.current = { ...cat, wallets: rows, poolReady: true };
+        setPoolList(rows);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [fundsOpen]);
 
   useEffect(() => {
     if (!boardOpen) return;
@@ -935,6 +962,21 @@ function Board() {
         const d = await r.json();
         if (!alive) return;
         setHome(d);
+        const cat = catalogRef.current || {};
+        if (!cat.poolReady) {
+          const pool = mergePoolWallets([], d.bots || []);
+          if (pool.length) {
+            catalogRef.current = { ...cat, wallets: pool };
+            setPoolList(pool);
+            refreshTools({
+              hunters: cat.hunters || HUNTERS,
+              extraWallets: pool,
+              extraLeaders: cat.traders || [],
+              v2Sleepers: cat.v2Sleepers || [],
+              board: boardRef.current,
+            });
+          }
+        }
         setErr("");
         setNodes((cur) => {
           try {
@@ -1123,8 +1165,8 @@ function Board() {
       const v2bot = tool.type === "bot" && String(tool.toolId || "").startsWith("hummingbot-v2-");
       const spawned = [];
       if (v2bot) {
-        const slots = [["wallet-", 0], ["ctrl-", 90]];
-        if (!tool.data || tool.data.hasBias !== false) slots.push(["bias-", 180]);
+        const slots = [["ctrl-", 0]];
+        if (!tool.data || tool.data.hasBias !== false) slots.push(["bias-", 90]);
         slots.forEach(([pre, dy]) => {
           const sid = pre + tool.toolId;
           if (existingIds.has(sid)) return;
@@ -1252,15 +1294,18 @@ function Board() {
   }, [performReplace, replaceAsk]);
 
   const removeNode = useCallback(
-    (id) => {
+    (id, opts) => {
       setMenu(null);
       remember("remove");
       const v2 = String(id || "").startsWith("hummingbot-v2-");
       const drop = new Set([id]);
       if (v2) {
-        drop.add("wallet-" + id);
         drop.add("ctrl-" + id);
         drop.add("bias-" + id);
+        const wid = "wallet-" + id;
+        const wn = (nodesRef.current || []).find((n) => n.id === wid);
+        const addr = wn && wn.data && wn.data.address;
+        if (wn && !addr) drop.add(wid);
         postSleeper(id, "stop");
       }
       setNodes((ns) => {
@@ -1274,7 +1319,7 @@ function Board() {
       });
       setSelected((s) => (s && drop.has(s.id) ? null : s));
       setToolPick((t) => (t && drop.has(t.toolId) ? null : t));
-      if (!v2) ping("removed from canvas");
+      if (!v2 && !(opts && opts.quiet)) ping("removed from canvas");
     },
     [persistGraph, postSleeper, remember, setEdges, setNodes]
   );
@@ -1309,6 +1354,15 @@ function Board() {
         let base = es;
         if (c.targetHandle === "coin") {
           base = base.filter((x) => !(x.target === c.target && x.targetHandle === "coin"));
+        }
+        if (c.sourceHandle === "wallet" && c.targetHandle === "wallet") {
+          const ns = nodesRef.current || [];
+          const srcN = ns.find((n) => n.id === c.source);
+          const tgtN = ns.find((n) => n.id === c.target);
+          const walletId = srcN && srcN.type === "wallet" ? c.source : (tgtN && tgtN.type === "wallet" ? c.target : null);
+          const botId = srcN && (srcN.type === "bot" || srcN.type === "homebot") ? c.source
+            : (tgtN && (tgtN.type === "bot" || tgtN.type === "homebot") ? c.target : null);
+          if (walletId && botId) base = claimWalletEdges(base, walletId, botId);
         }
         const next = addEdge(e, base);
         setNodes((ns) => {
@@ -1407,97 +1461,31 @@ function Board() {
 
   const deleteWallet = async (node) => {
     setMenu(null);
-    const custom = !!(node.data.custom || String(node.id || "").startsWith("wallet-extra-") || !node.data.botId);
-    if (custom) {
-      try {
-        const r = await fetch("/api/wire/wallets", {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: node.id }),
-        });
-        const d = await r.json().catch(() => ({}));
-        if (!r.ok || d.ok === false) throw new Error(d.error || "delete failed");
-      } catch (e) {
-        ping("Delete failed: " + e.message);
-        return;
-      }
+    try {
+      const r = await fetch("/api/wire/wallets", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: node.id }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || d.ok === false) throw new Error(d.error || "delete failed");
+      const rows = Array.isArray(d.wallets) ? d.wallets : [];
+      const cat = catalogRef.current || {};
+      catalogRef.current = { ...cat, wallets: rows, poolReady: true };
+      setPoolList(rows);
+    } catch (e) {
+      ping("Delete failed: " + e.message);
+      return;
     }
-    removeNode(node.id);
-    ping(custom ? "wallet deleted" : "wallet removed from canvas");
+    removeNode(node.id, { quiet: true });
+    window.dispatchEvent(new Event("wire-catalog"));
+    ping("wallet removed from the wire");
   };
 
   const saveWallet = async (form) => {
     setWalletBusy(true);
     setWalletErr("");
     try {
-      if ((form.botId && !form.custom) || form.bind_id) {
-        if (!/^0x[a-fA-F0-9]{40}$/.test(form.address || "")) {
-          throw new Error("address must be 0x + 40 hex chars");
-        }
-        const bind = form.bind_id || form.botId;
-        const r = await fetch("/api/wire/wallets", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: form.name,
-            address: form.address,
-            use_vault: form.use_vault !== false,
-            restart: !!form.restart,
-            bind_id: bind,
-          }),
-        });
-        const d = await r.json().catch(() => ({}));
-        if (!r.ok || d.ok === false) throw new Error(d.error || "subaccount save failed");
-        const w = d.wallet || {
-          id: "wallet-" + bind,
-          botId: bind,
-          name: form.name,
-          address: form.address,
-        };
-        setNodes((ns) => {
-          const nid = (form.node && form.node.id) || w.id;
-          const has = ns.some((n) => n.id === nid || n.id === w.id);
-          let next;
-          if (has) {
-            next = ns.map((n) =>
-              n.id === nid || n.id === w.id
-                ? {
-                    ...n,
-                    data: {
-                      ...n.data,
-                      ...w,
-                      address: form.address,
-                      use_vault: form.use_vault !== false,
-                      botId: bind,
-                      custom: false,
-                    },
-                  }
-                : n
-            );
-          } else {
-            remember("add wallet");
-            const pos = form.flow || { x: 260, y: 200 };
-            next = [
-              ...ns,
-              {
-                id: w.id,
-                type: "wallet",
-                position: pos,
-                data: {
-                  ...w,
-                  icon: "⬡",
-                  toolId: w.id,
-                  custom: false,
-                },
-              },
-            ];
-          }
-          persistGraph(next, edgesRef.current);
-          return next;
-        });
-        ping(d.message || "subaccount saved");
-        window.dispatchEvent(new Event("wire-catalog"));
-      } else {
         const r = await fetch("/api/wire/wallets", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1510,6 +1498,11 @@ function Board() {
         });
         const d = await r.json().catch(() => ({}));
         if (!r.ok || d.ok === false) throw new Error(d.error || "wallet save failed");
+        if (Array.isArray(d.wallets)) {
+          const cat = catalogRef.current || {};
+          catalogRef.current = { ...cat, wallets: d.wallets, poolReady: true };
+          setPoolList(d.wallets);
+        }
         const w = d.wallet || {};
         if (form.mode === "add") {
           remember("add wallet");
@@ -1548,7 +1541,6 @@ function Board() {
           ping(d.message || "wallet saved");
           window.dispatchEvent(new Event("wire-catalog"));
         }
-      }
       setWalletForm(null);
     } catch (e) {
       setWalletErr(e.message || String(e));
@@ -2589,8 +2581,26 @@ function Board() {
               Funds ▾
             </button>
             {fundsOpen ? (
-              <div className="board-dd-menu">
-                <a href="/confiig">Hyperliquid Wallets</a>
+              <div className="board-dd-menu funds-menu">
+                <div className="dd-hint">Registered subaccounts. Any of them can wire to a controller.</div>
+                {poolList.map((w) => (
+                  <div key={w.id} className="fund-nav">
+                    <span className="dd-lab">{w.name || "Wallet"}</span>
+                    <span className="dd-hint">{shortAddr(w.address)}</span>
+                    <button type="button" className="fund-del" onClick={() => deleteWallet({ id: w.id })}>
+                      Delete
+                    </button>
+                  </div>
+                ))}
+                {!poolList.length ? <span className="dd-hint">none registered</span> : null}
+                <button
+                  type="button"
+                  className="fund-add"
+                  onClick={() => { setFundsOpen(false); openAddWallet(); }}
+                >
+                  Add subaccount
+                </button>
+                <a href="/confiig">Connector keys stay on Confiig</a>
               </div>
             ) : null}
           </div>

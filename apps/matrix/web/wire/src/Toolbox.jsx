@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { boardCategories, TOOLS, refreshTools } from "./lib/tools.js";
+import { boardCategories, mergePoolWallets, TOOLS, refreshTools } from "./lib/tools.js";
 
 const LS = "matrix-wire-toolbox-v1";
 
@@ -67,19 +67,22 @@ export default function Toolbox({
   const box = useRef(null);
 
   const loadCatalog = useCallback(() => {
-    fetch("/api/wire/catalog")
-      .then((r) => r.json())
-      .then((d) => {
-        if (!d || d.ok === false) return;
-        setTools(refreshTools({
-          hunters: d.hunters || [],
-          extraWallets: d.wallets || [],
-          extraLeaders: d.traders || [],
-          v2Sleepers: d.v2_sleepers || [],
-          board,
-        }));
-      })
-      .catch(() => {});
+    Promise.all([
+      fetch("/api/wire/catalog").then((r) => r.json()).catch(() => null),
+      fetch("/api/home").then((r) => r.json()).catch(() => null),
+    ]).then(([d, home]) => {
+      if (!d || d.ok === false) return;
+      const listed = mergePoolWallets(d.wallets || [], []);
+      const managed = !!d.pool_managed || listed.length > 0;
+      const pool = managed ? listed : mergePoolWallets([], (home && home.bots) || []);
+      setTools(refreshTools({
+        hunters: d.hunters || [],
+        extraWallets: pool,
+        extraLeaders: d.traders || [],
+        v2Sleepers: d.v2_sleepers || [],
+        board,
+      }));
+    }).catch(() => {});
   }, [board]);
 
   useEffect(() => {

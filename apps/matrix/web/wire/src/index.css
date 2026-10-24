@@ -202,6 +202,47 @@ header {
   text-transform: none;
   color: var(--muted);
 }
+.board-dd-menu.funds-menu {
+  min-width: 320px;
+  max-height: 70vh;
+  overflow: auto;
+}
+.board-dd-menu.funds-menu > .dd-hint {
+  padding: 6px 10px 2px;
+}
+.fund-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+}
+.fund-nav .dd-lab {
+  flex: 1;
+  min-width: 0;
+}
+.fund-nav .dd-hint {
+  flex: 0 0 auto;
+}
+.board-dd-menu.funds-menu .fund-del,
+.board-dd-menu.funds-menu .fund-add {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  width: auto;
+  padding: 3px 8px;
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.board-dd-menu.funds-menu .fund-del {
+  color: var(--rose);
+  border-color: #5a2030;
+}
+.board-dd-menu.funds-menu .fund-add {
+  width: 100%;
+  justify-content: flex-start;
+  color: var(--gold);
+}
 .pill.preview { color: var(--amber); border-color: #5a4818; }
 .pill.dirty {
   color: var(--gold);

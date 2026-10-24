@@ -521,7 +521,6 @@ void FlaskApi::load_fields(DeskSnap& snap) {
         bool has_bias = flag(h, "hasBias", true);
         snap.tools.push_back(tool(id, "hummingbots", "bot", name, has_bias ? "BIAS hunter" : "multi · no BIAS", col));
         snap.tools.push_back(tool("ctrl-" + id, "settings", "ctrl", name + " controller", "trail / rebuy / clip", col));
-        snap.tools.push_back(tool("wallet-" + id, "wallets", "wallet", name + " wallet", "subaccount", col));
         if (has_bias)
             snap.tools.push_back(tool("bias-" + id, "bias", "bias", name + " BIAS", "LONG / SHORT / FLAT", col));
     }
@@ -536,7 +535,6 @@ void FlaskApi::load_fields(DeskSnap& snap) {
             bool has_bias = flag(h, "hasBias", true);
             snap.tools.push_back(tool(id, "hummingbots_v2", "bot", name, desc, col));
             snap.tools.push_back(tool("ctrl-" + id, "settings", "ctrl", name + " controller", "V2 std knobs", col));
-            snap.tools.push_back(tool("wallet-" + id, "wallets", "wallet", name + " wallet", "wire before it can trade", col));
             if (has_bias)
                 snap.tools.push_back(tool("bias-" + id, "bias", "bias", name + " BIAS", "LONG / SHORT / FLAT", col));
         }
@@ -549,11 +547,41 @@ void FlaskApi::load_fields(DeskSnap& snap) {
             snap.tools.push_back(tool(id, "traders", "trader", str(t, "title", "Leader"), "wire into Copy T1/T2/T3", str(t, "color", "#7ecbff")));
         }
     }
+    auto push_wallet = [&](const json& w) {
+        if (!w.is_object()) return;
+        std::string wid = str(w, "id");
+        std::string addr = str(w, "address");
+        if (wid.empty() || addr.size() < 42) return;
+        for (auto& t : snap.tools) if (t.id == wid) return;
+        ToolItem tw = tool(wid, "wallets", "wallet", str(w, "name", "Wallet"),
+                           "subaccount", str(w, "color", "#f0b90b"));
+        tw.address = addr;
+        snap.tools.push_back(tw);
+    };
     if (j.contains("wallets") && j["wallets"].is_array()) {
-        for (auto& w : j["wallets"]) {
-            if (!w.is_object()) continue;
-            snap.tools.push_back(tool(str(w, "id"), "wallets", "wallet", str(w, "name", "Wallet"),
-                                     str(w, "address"), str(w, "color", "#f0b90b")));
+        for (auto& w : j["wallets"]) push_wallet(w);
+    }
+    bool any_wallet = false;
+    for (auto& t : snap.tools) if (t.type == "wallet") any_wallet = true;
+    bool pool_managed = flag(j, "pool_managed", false);
+    if (!any_wallet) {
+        auto fr = http_request(flask_host, flask_port, "GET", "/api/wire/wallets");
+        if (fr.error.empty() && fr.status == 200) {
+            json wj = parse_or(fr.body);
+            if (flag(wj, "pool_managed", false)) pool_managed = true;
+            if (wj.contains("wallets") && wj["wallets"].is_array()) {
+                for (auto& w : wj["wallets"]) push_wallet(w);
+            }
+        }
+        any_wallet = false;
+        for (auto& t : snap.tools) if (t.type == "wallet") any_wallet = true;
+    }
+    if (!any_wallet && !pool_managed) {
+        for (auto& w : snap.wallets) {
+            if (w.address.size() < 42) continue;
+            ToolItem tw = tool("wallet-" + w.id, "wallets", "wallet", w.name, "subaccount", "#f0b90b");
+            tw.address = w.address;
+            snap.tools.push_back(tw);
         }
     }
     const char* coins[][2] = {{"BTC","#f0b90b"},{"ETH","#7ecbff"},{"LTC","#9dffc0"},{"TAO","#24c3cf"},{"HBAR","#34d399"},{"POL","#c084fc"}};
@@ -617,6 +645,7 @@ static void parse_wire_graph(DeskSnap& snap, const json& root) {
             w.armed = flag(d, "armed");
             w.bot_id = str(d, "id");
             if (w.bot_id.empty()) w.bot_id = str(d, "botId");
+            if (w.type == "wallet") w.bot_id.clear();
             if (d.contains("bias") && d["bias"].is_object()) {
                 for (auto it = d["bias"].begin(); it != d["bias"].end(); ++it)
                     if (it.value().is_string()) w.bias[it.key()] = it.value().get<std::string>();
@@ -741,10 +770,11 @@ json FlaskApi::graph_json(const DeskSnap& snap) {
             {"toolId", n.id},
         };
         if (!n.kind.empty()) data["kind"] = n.kind;
-        if (!n.bot_id.empty()) {
+        if (!n.bot_id.empty() && n.type != "wallet") {
             data["botId"] = n.bot_id;
             data["id"] = n.bot_id;
         }
+        if (n.type == "wallet") data["custom"] = true;
         if (!n.address.empty()) data["address"] = n.address;
         if (!n.skim_mode.empty()) data["skim_mode"] = n.skim_mode;
         if (n.type == "risk_wallet") data["armed"] = n.armed;
@@ -1362,6 +1392,34 @@ std::string FlaskApi::save_layout(const DeskSnap& snap) {
         if (r.status != 200 || flag(j, "ok") == false)
             return str(j, "error", "layout save failed");
         return str(j, "message", "layout saved");
+    } catch (const std::exception& e) {
+        return e.what();
+    }
+}
+
+std::string FlaskApi::wallet_add(const std::string& name, const std::string& address) {
+    try {
+        json body = {{"name", name}, {"address", address}, {"use_vault", true}};
+        auto r = http_request(flask_host, flask_port, "POST", "/api/wire/wallets", body.dump());
+        if (!r.error.empty()) return r.error;
+        json j = parse_or(r.body);
+        if (r.status != 200 || flag(j, "ok") == false)
+            return str(j, "error", "wallet was not added");
+        return str(j, "message", "wallet added");
+    } catch (const std::exception& e) {
+        return e.what();
+    }
+}
+
+std::string FlaskApi::wallet_delete(const std::string& id) {
+    try {
+        json body = {{"id", id}};
+        auto r = http_request(flask_host, flask_port, "DELETE", "/api/wire/wallets", body.dump());
+        if (!r.error.empty()) return r.error;
+        json j = parse_or(r.body);
+        if (r.status != 200 || flag(j, "ok") == false)
+            return str(j, "error", "wallet was not removed");
+        return str(j, "message", "wallet removed from the wire");
     } catch (const std::exception& e) {
         return e.what();
     }
