@@ -24,3 +24,6 @@ secrets.env
 *.db
 *.sqlite
 docker-windows/.env
+website/.session-secret
+website/.gate-hash
+forum_le
