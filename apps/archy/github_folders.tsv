@@ -74,3 +74,6 @@ install/mint-image/overlay/usr/share/themes/rimBaud/cinnamon	Cinnamon colors for
 install/mint-image/overlay/usr/share/themes/rimBaud/gtk-3.0	GTK colors for the rimBaud theme.	One stylesheet.
 install/mint-image/preseed	Installer answers for the Mint image.	The password line is a placeholder. First boot asks for a new password.
 install/templates	Connector example for a new install.	A blank Hyperliquid connector file. No key and no wallet.
+website	Public pages for rimbaud.io. The forum is not in this folder.	Homepage, documentation, links, and the legal notice. The desk login hash is not here.
+website/public	Pages and pictures for rimbaud.io.	The homepage, the documentation, the links, and the imprint.
+website/public/shots	Desk picture on the rimbaud.io homepage.	One photograph of the matrix, the chart, and the mothership.
