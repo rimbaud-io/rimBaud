@@ -21,7 +21,7 @@ rimBaud is the desk for automatic trading. Hummingbot is the engine underneath. 
 Five applications:
 
 ```
-apps/matrix/     the screen. Native desk, chart, and the website.
+apps/matrix/     the screen. Native desk, chart, and the web wire.
 apps/spring/     the brain on port 5004. Reads and writes the hunter files.
 apps/meta/       the mothership. Lists the matrices. Does not close a clip.
 apps/pettibon/   the saved trade book for one hunter.
@@ -34,8 +34,6 @@ Around them:
 hunters/         the trader scripts that run inside Hummingbot.
 docker-windows/  Windows download. Docker Desktop runs Hummingbot, the hunters, and Spring. Start with up.bat or up.sh. That asks for the risk notice first.
 install/         the machine installer and the Mint USB image. Hunters start only after the risk notice is accepted.
-website/         the public pages.
-phone/           the phone page.
 vpn/             the WireGuard link between matrices.
 services/        condor (telegram gauge) and the version page.
 tools/           wallet creator and the telegram sender.
