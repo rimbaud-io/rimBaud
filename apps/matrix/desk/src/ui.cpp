@@ -1015,19 +1015,33 @@ struct DeskUi {
         return "";
     }
 
-    // Bot or ctrl under the cursor. A v2 bot dropped on its ctrl card targets that bot.
+    // The bot a canvas card stands for. A ctrl card stands for its parent bot.
+    int controller_bot_index(int hit) const {
+        if (hit < 0 || hit >= static_cast<int>(snap.wire_nodes.size())) return -1;
+        const auto& n = snap.wire_nodes[hit];
+        if (n.type == "bot") return hit;
+        if (n.type != "ctrl") return -1;
+        auto bot_of = [&](const std::string& id) {
+            if (id.empty()) return -1;
+            int bi = find_node(snap, id);
+            if (bi < 0 || snap.wire_nodes[bi].type != "bot") return -1;
+            return bi;
+        };
+        int bi = bot_of(ctrl_parent_id(n));
+        if (bi < 0 && n.id.rfind("ctrl-", 0) == 0) bi = bot_of(n.id.substr(5));
+        return bi;
+    }
+
+    // A controller tool dropped on a bot or on that bot's controller card.
     int drop_replace_target(const ToolItem& t, int hit) const {
         if (hit < 0 || hit >= static_cast<int>(snap.wire_nodes.size())) return -1;
         if (t.type != "bot" && t.type != "ctrl") return -1;
         const auto& n = snap.wire_nodes[hit];
         if (n.type != "bot" && n.type != "ctrl") return -1;
-        if (t.type == "bot" && is_v2_sleeper_id(t.id) && n.type == "ctrl") {
-            std::string parent = ctrl_parent_id(n);
-            if (!is_v2_sleeper_id(parent)) return -1;
-            int bi = find_node(snap, parent);
-            if (bi < 0 || snap.wire_nodes[bi].type != "bot") return -1;
-            if (snap.wire_nodes[bi].id == t.id) return -1;
-            return bi;
+        if (t.type == "bot") {
+            int bot = controller_bot_index(hit);
+            if (bot < 0 || snap.wire_nodes[bot].id == t.id) return -1;
+            return bot;
         }
         if (n.type != t.type || n.id == t.id) return -1;
         return hit;
@@ -1047,7 +1061,7 @@ struct DeskUi {
         ctx_on = false;
     }
 
-    // Right-click. A standard hummingbots_v2 row uses the v2 controller, not a live hunter.
+    // Right-click. A selected bot, or the bot behind a selected controller card, is the target.
     void ask_replace(const ToolItem& t) {
         if (t.type != "bot" && t.type != "ctrl") {
             say("right-click replaces a controller");
@@ -1061,17 +1075,8 @@ struct DeskUi {
         }
         int target = -1;
         if (t.type == "bot" && is_v2_sleeper_id(t.id)) {
-            if (wire_sel >= 0 && wire_sel < static_cast<int>(snap.wire_nodes.size())) {
-                auto& sel = snap.wire_nodes[wire_sel];
-                if (sel.type == "bot" && is_v2_sleeper_id(sel.id)) target = wire_sel;
-                else if (sel.type == "ctrl") {
-                    std::string parent = ctrl_parent_id(sel);
-                    if (is_v2_sleeper_id(parent)) {
-                        int bi = find_node(snap, parent);
-                        if (bi >= 0 && snap.wire_nodes[bi].type == "bot") target = bi;
-                    }
-                }
-            }
+            if (wire_sel >= 0 && wire_sel < static_cast<int>(snap.wire_nodes.size()))
+                target = controller_bot_index(wire_sel);
             if (target < 0) {
                 int nmatch = 0, only = -1;
                 for (int i = 0; i < static_cast<int>(snap.wire_nodes.size()); ++i) {
@@ -1082,7 +1087,7 @@ struct DeskUi {
                 }
                 if (nmatch == 1) target = only;
                 else if (nmatch == 0) {
-                    say("no controller on the canvas — drag one on first");
+                    say("drop it on the controller to replace");
                     return;
                 } else {
                     say("drop it on the controller to replace");
@@ -1130,12 +1135,13 @@ struct DeskUi {
             return;
         }
         ToolItem t = *tp;
-        if (t.type == "bot" && is_v2_sleeper_id(t.id) && snap.wire_nodes[target].type == "ctrl") {
-            std::string parent = ctrl_parent_id(snap.wire_nodes[target]);
-            if (is_v2_sleeper_id(parent)) {
-                int bi = find_node(snap, parent);
-                if (bi >= 0 && snap.wire_nodes[bi].type == "bot") target = bi;
+        if (t.type == "bot" && snap.wire_nodes[target].type == "ctrl") {
+            int bi = controller_bot_index(target);
+            if (bi < 0) {
+                say("drop it on the controller to replace");
+                return;
             }
+            target = bi;
         }
         int here = find_node(snap, t.id);
         if (t.unique && here >= 0) {
