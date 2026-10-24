@@ -3595,10 +3595,100 @@ def get_wire_hunter_rows():
     return rows
 
 
+def _desk_canvas_bot_ids(nodes=None):
+    """Bot nodes on a desk canvas. A wallet, bias, or ctrl card is not a hunter.
+    None reads the saved wire. An empty list means that canvas has no bot nodes.
+    """
+    if nodes is None:
+        graph = _read_json_file(WIRE_GRAPH_FILE) or {}
+        nodes = graph.get("nodes") if isinstance(graph, dict) else []
+    ids = []
+    seen = set()
+    for n in nodes or []:
+        if not isinstance(n, dict) or str(n.get("type") or "") != "bot":
+            continue
+        bid = str(n.get("id") or "")
+        if not bid or bid in seen or bid.startswith("wallet-"):
+            continue
+        seen.add(bid)
+        ids.append(bid)
+    return ids
+
+
+def _retired_home_node(node, retired):
+    if not isinstance(node, dict):
+        return False
+    nid = str(node.get("id") or "")
+    data = node.get("data") if isinstance(node.get("data"), dict) else {}
+    bot = str(data.get("botId") or "")
+    tool = str(data.get("toolId") or "")
+    if nid in retired or bot in retired or tool in retired:
+        return True
+    for bid in retired:
+        companions = ("bias-" + bid, "ctrl-" + bid, "wallet-" + bid)
+        if nid in companions or tool in companions:
+            return True
+    return False
+
+
+def _strip_retired_home_boards(retired):
+    """Drop a removed controller from the Home canvas and its draft.
+    The desk wire and the wallet pool stay. Does not close a clip.
+    """
+    retired = {str(x) for x in (retired or []) if x}
+    if not retired:
+        return 0
+    dropped = 0
+    for path in (
+        WIRE_BOARD_FILES.get("home"),
+        WIRE_BOARD_DRAFT.get("home"),
+    ):
+        if not path:
+            continue
+        data = _read_json_file(path)
+        if not isinstance(data, dict):
+            continue
+        nodes_in = [n for n in (data.get("nodes") or []) if isinstance(n, dict)]
+        drop_ids = set(retired)
+        keep_nodes = []
+        for n in nodes_in:
+            if _retired_home_node(n, retired):
+                nid = str(n.get("id") or "")
+                if nid:
+                    drop_ids.add(nid)
+                continue
+            keep_nodes.append(n)
+        edges_in = [e for e in (data.get("edges") or []) if isinstance(e, dict)]
+        keep_edges = []
+        for e in edges_in:
+            src = str(e.get("source") or "")
+            tgt = str(e.get("target") or "")
+            if src in drop_ids or tgt in drop_ids:
+                continue
+            keep_edges.append(e)
+        if len(keep_nodes) == len(nodes_in) and len(keep_edges) == len(edges_in):
+            continue
+        out = dict(data)
+        out["nodes"] = keep_nodes
+        out["edges"] = keep_edges
+        try:
+            _write_json_file(path, out)
+        except OSError:
+            continue
+        dropped += (len(nodes_in) - len(keep_nodes))
+    return dropped
+
+
 def get_home_brief_specs():
+    """Home cards. A saved wire with bot nodes wins. on_home false also hides.
+    An empty or missing wire does not blank Home.
+    """
+    on_wire = set(_desk_canvas_bot_ids())
     out = []
     for h in _load_registry():
         if h.get("on_home") is False:
+            continue
+        if on_wire and h.get("id") not in on_wire:
             continue
         kind = h.get("kind") or "coins"
         status = h.get("status_file") or ""
@@ -3621,33 +3711,14 @@ def get_home_restart_ids():
     )
 
 
-def _canvas_bot_ids(nodes):
-    ids = []
-    seen = set()
-    for n in nodes or []:
-        if not isinstance(n, dict):
-            continue
-        ntype = str(n.get("type") or "")
-        data = n.get("data") if isinstance(n.get("data"), dict) else {}
-        bid = ""
-        if ntype == "bot":
-            bid = str(n.get("id") or data.get("botId") or "")
-        elif ntype in ("ctrl", "bias") and data.get("botId"):
-            bid = str(data.get("botId") or "")
-        if not bid or bid in seen:
-            continue
-        if bid.startswith("wallet-extra-"):
-            continue
-        seen.add(bid)
-        ids.append(bid)
-    return ids
-
-
 def _promote_canvas_to_home(nodes):
-    """Register hummingbots on this canvas as Home cards. Does not start or close anything."""
-    ids = _canvas_bot_ids(nodes)
+    """Home follows the desk bot nodes. Hunters left off the canvas leave Home.
+    An empty canvas does not clear Home. Does not start, stop, or close anything,
+    and does not remove a pool wallet from the desk wire.
+    """
+    ids = _desk_canvas_bot_ids(nodes)
     if not ids:
-        return []
+        return {"shown": [], "hidden": []}
     hunters = _load_registry()
     by_id = {h["id"]: h for h in hunters}
     names = []
@@ -3688,13 +3759,26 @@ def _promote_canvas_to_home(nodes):
             hunters.append(row)
             by_id[bid] = row
             dirty = True
-        if row.get("on_home") is False:
+        if row.get("on_home") is not True:
             row["on_home"] = True
             dirty = True
         names.append(row.get("name") or bid)
+    want = set(ids)
+    hidden = []
+    retired = set()
+    for row in hunters:
+        bid = str(row.get("id") or "")
+        if not bid or bid in want:
+            continue
+        retired.add(bid)
+        if row.get("on_home") is not False:
+            row["on_home"] = False
+            dirty = True
+            hidden.append(row.get("name") or bid)
     if dirty:
         _save_registry(hunters)
-    return names
+    _strip_retired_home_boards(retired)
+    return {"shown": names, "hidden": hidden}
 
 
 def _occupied_hl_addresses(exclude_id=None):
@@ -5431,7 +5515,15 @@ def api_wire_graph():
         except Exception:
             pass
     applied = _apply_wire_graph(slim_nodes, slim_edges)
-    return jsonify({"ok": True, "n": len(slim_nodes), "e": len(slim_edges), "applied": applied})
+    home_sync = _promote_canvas_to_home(slim_nodes)
+    return jsonify({
+        "ok": True,
+        "n": len(slim_nodes),
+        "e": len(slim_edges),
+        "applied": applied,
+        "home": home_sync.get("shown") or [],
+        "home_off": home_sync.get("hidden") or [],
+    })
 
 
 WIRE_BOARD_FILES = {
@@ -6363,7 +6455,11 @@ def _compile_report(nodes, edges, controllers, positions, workaround=False):
 
 @app.route("/api/wire/compile", methods=["POST"])
 def api_wire_compile():
-    """Offline check of the canvas vs live production. Does not write hunters."""
+    """Offline check of the canvas vs live production.
+    A desk compile also records which bot nodes stay on Home.
+    It does not write the desk graph, stop a container, close a clip, or move a wallet.
+    A Home-board compile does not change which hunters are on Home.
+    """
     body = request.get_json(silent=True) or {}
     nodes = body.get("nodes") if isinstance(body.get("nodes"), list) else []
     edges = body.get("edges") if isinstance(body.get("edges"), list) else []
@@ -6384,6 +6480,16 @@ def api_wire_compile():
         except Exception:
             sid = None
     report["compile_id"] = sid
+    try:
+        home_sync = _promote_canvas_to_home(nodes)
+    except Exception:
+        home_sync = {}
+    shown = home_sync.get("shown") or []
+    hidden = home_sync.get("hidden") or []
+    report["home"] = shown
+    report["home_off"] = hidden
+    if hidden:
+        report["message"] = (report.get("message") or "Compile OK") + " · off Home: " + ", ".join(hidden)
     return jsonify(report)
 
 
@@ -6469,9 +6575,13 @@ def api_wire_integrate():
             applied.append(out.get("message") or bid)
     graph_applied = _apply_wire_graph(nodes, edges)
     applied.extend(graph_applied or [])
-    home_added = _promote_canvas_to_home(nodes)
+    home_sync = _promote_canvas_to_home(nodes)
+    home_added = home_sync.get("shown") or []
+    home_off = home_sync.get("hidden") or []
     if home_added:
         applied.append("Home cards: " + ", ".join(home_added))
+    if home_off:
+        applied.append("Home off the wire: " + ", ".join(home_off))
     if _MATRIX_OK:
         try:
             matrix_store.upsert_layout(nodes)
@@ -6483,6 +6593,7 @@ def api_wire_integrate():
         "applied": applied,
         "parked": report.get("parked") or [],
         "home": home_added,
+        "home_off": home_off,
         "message": "Integrated to production · " + (", ".join(applied) if applied else "wiring/income map only"),
         "income_transfer": False,
         "positions_untouched": True,
