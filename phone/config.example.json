@@ -1,6 +1,0 @@
-{
-  "apiBase": "https://YOUR.STATIC.IP",
-  "token": "change-me-long-random-token",
-  "pollMs": 4000,
-  "note": "Copy to config.json on the phone gateway. PWA talks only to apiBase. Never put HL keys here."
-}
