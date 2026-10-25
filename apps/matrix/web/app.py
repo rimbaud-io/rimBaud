@@ -4973,9 +4973,116 @@ def _apply_copy_trader_wires(nodes, edges):
     return [f"copy follow {label}"]
 
 
+_WALLET_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 _-]{0,39}$")
+
+
+def _clean_wallet_name(raw):
+    name = " ".join(str(raw or "").split())
+    if not _WALLET_NAME.match(name):
+        return ""
+    return name[:40]
+
+
+def _stamp_wallet_name(path, wid, name):
+    """Set the canvas label for this pool id. The address and the edges stay."""
+    if not path:
+        return []
+    data = _read_json_file(path)
+    if not isinstance(data, dict):
+        return []
+    nodes = data.get("nodes")
+    if not isinstance(nodes, list):
+        return []
+    hit = False
+    for node in nodes:
+        if not isinstance(node, dict) or str(node.get("id") or "") != wid:
+            continue
+        payload = node.get("data") if isinstance(node.get("data"), dict) else {}
+        payload["name"] = name
+        node["data"] = payload
+        hit = True
+    if not hit:
+        return []
+    _write_json_file(path, data)
+    bots = []
+    for edge in data.get("edges") or []:
+        if not isinstance(edge, dict):
+            continue
+        if str(edge.get("source") or "") != wid:
+            continue
+        if str(edge.get("targetHandle") or "") != "wallet":
+            continue
+        target = str(edge.get("target") or "")
+        if target:
+            bots.append(target)
+    return bots
+
+
+def _rename_wallet_labels(wid, name):
+    boards = [WIRE_GRAPH_FILE]
+    boards.extend(WIRE_BOARD_FILES.values())
+    boards.extend(WIRE_BOARD_DRAFT.values())
+    wired = []
+    for path in boards:
+        bots = _stamp_wallet_name(path, wid, name)
+        if path == WIRE_GRAPH_FILE:
+            wired = bots
+    runtime = _read_json_file(WIRE_RUNTIME_FILE)
+    bots = runtime.get("bots") if isinstance(runtime, dict) else None
+    if not isinstance(bots, dict):
+        return
+    changed = False
+    for bot_id in wired:
+        row = bots.get(bot_id)
+        if isinstance(row, dict) and "wallet_in" in row:
+            row["wallet_in"] = name
+            changed = True
+    if changed:
+        _write_json_file(WIRE_RUNTIME_FILE, runtime)
+
+
+def _rename_pool_wallet(wid, name):
+    """Change the pool label only. Same id, same address, same wire."""
+    wid = str(wid or "").strip()
+    name = _clean_wallet_name(name)
+    if not wid.startswith("wallet-"):
+        return {"ok": False, "error": "not a wire wallet"}, 400
+    if not name:
+        return {"ok": False, "error": "name the subaccount"}, 400
+    rows = _load_pool_wallets()
+    row = next((w for w in rows if w.get("id") == wid), None)
+    if not row:
+        return {"ok": False, "error": "wallet is not in the pool"}, 400
+    folded = name.casefold()
+    for other in rows:
+        if other.get("id") == wid:
+            continue
+        if str(other.get("name") or "").casefold() == folded:
+            return {"ok": False, "error": "that name is already a subaccount"}, 400
+    if str(row.get("name") or "") == name:
+        return {
+            "ok": True,
+            "wallet": row,
+            "wallets": rows,
+            "renamed": False,
+            "message": "name unchanged",
+        }, 200
+    row["name"] = name
+    _save_extra_wallets(rows)
+    _rename_wallet_labels(wid, name)
+    return {
+        "ok": True,
+        "wallet": row,
+        "wallets": rows,
+        "renamed": True,
+        "restarted": False,
+        "message": "renamed to " + name,
+    }, 200
+
+
 @app.route("/api/wire/wallets", methods=["GET", "POST", "DELETE"])
 def api_wire_wallets():
-    """Register or remove a Hyperliquid subaccount. Does not bind it to a hunter, write a connector, or restart."""
+    """Register, rename, or remove a Hyperliquid subaccount. Does not bind it to a hunter, write a connector, or restart."""
     if request.method == "GET":
         pool = _load_pool_wallets()
         occupied = [
@@ -5000,6 +5107,9 @@ def api_wire_wallets():
         _save_extra_wallets(rows)
         return jsonify({"ok": True, "wallets": rows, "message": "wallet removed from the wire"})
     body = request.get_json(silent=True) or {}
+    if str(body.get("op") or "") == "rename":
+        payload, code = _rename_pool_wallet(body.get("id"), body.get("name"))
+        return jsonify(payload), code
     name = str(body.get("name") or "Wallet").strip()[:40] or "Wallet"
     addr = str(body.get("address") or "").strip()
     if not _valid_hl_address(addr):
