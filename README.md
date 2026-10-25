@@ -20,6 +20,8 @@ rimBaud is the desk for automatic trading. Hummingbot is the engine underneath. 
 
 Five applications:
 
+![The rimBaud desk, with the matrix, the chart, and meta open](docs/five-applications.jpg)
+
 ```
 apps/matrix/     the screen. Native desk, chart, and the web wire.
 apps/spring/     the brain on port 5004. Reads and writes the hunter files.
