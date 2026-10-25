@@ -1829,6 +1829,8 @@ std::string action_tip(const DeskUi& ui, const Hit& h) {
         }
         case Hit::Restart: {
             std::string n = (h.i >= 0 && h.i < (int)ui.snap.bots.size()) ? ui.snap.bots[h.i].name : "hunter";
+            if (h.key == "start")
+                return "start " + n + ". Positions stay. Does not move funds.";
             return "restart " + n + " — positions stay on Hyperliquid";
         }
         case Hit::HunterGate: {
@@ -3215,9 +3217,11 @@ int run_desk(FlaskApi& api) {
                 stroke(dpy, buf, gc, C.gold, hch);
                 text(dpy, buf, gc, C.gold, hch.x + 8, hch.y + 12, "Chart");
                 ui.hits.push_back({Hit::Chart, i, hch, follow_coin(b, ui.snap)});
-                stroke(dpy, buf, gc, C.amber, rst);
-                text(dpy, buf, gc, C.amber, rst.x + 4, rst.y + 12, "Restart");
-                ui.hits.push_back({Hit::Restart, i, rst});
+                bool down = !b.running && !b.deactivated;
+                stroke(dpy, buf, gc, down ? C.gold : C.amber, rst);
+                text(dpy, buf, gc, down ? C.gold : C.amber, rst.x + (down ? 8 : 4), rst.y + 12,
+                     down ? "START" : "Restart");
+                ui.hits.push_back({Hit::Restart, i, rst, down ? "start" : ""});
             }
             int rows = (static_cast<int>(ui.snap.bots.size()) + cols - 1) / std::max(1, cols);
             y += rows * (ch + 10) + 8;
@@ -4332,16 +4336,35 @@ int run_desk(FlaskApi& api) {
             }
             {
                 bool de = b->deactivated;
+                bool down = !de && !b->running;
                 Rect gate{x, yy, 132, 22};
                 draw_ip_btn(dpy, buf, gc, C, gate, de, b->running, ui.hits, ui.sel);
+                int note_x = gate.x + gate.w + 10;
                 const char* note = de
                     ? "red - 0 HL IP. Spring does not touch positions."
                     : (b->running
                         ? "green - active. Spring does not touch positions."
-                        : "off - container is down. Spring does not touch positions.");
+                        : "container is down. START loads it. Positions stay.");
+                if (down) {
+                    Rect st{gate.x + gate.w + 8, yy, 64, 22};
+                    if (st.x + st.w < right - 8) {
+                        stroke(dpy, buf, gc, C.gold, st);
+                        text(dpy, buf, gc, C.gold, st.x + 8, st.y + 16, "START");
+                        ui.hits.push_back({Hit::Restart, ui.sel, st, "start"});
+                        note_x = st.x + st.w + 8;
+                    }
+                } else if (!de && b->running) {
+                    Rect st{gate.x + gate.w + 8, yy, 84, 22};
+                    if (st.x + st.w < right - 8) {
+                        stroke(dpy, buf, gc, C.amber, st);
+                        text(dpy, buf, gc, C.amber, st.x + 10, st.y + 16, "Restart");
+                        ui.hits.push_back({Hit::Restart, ui.sel, st, ""});
+                        note_x = st.x + st.w + 8;
+                    }
+                }
                 text(dpy, buf, gc, de ? C.rose : (b->running ? C.green : C.muted),
-                     gate.x + gate.w + 10, gate.y + 15,
-                     fit_px(note, inner - gate.w - 12));
+                     note_x, gate.y + 15,
+                     fit_px(note, std::max(1, right - note_x)));
                 yy += 30;
             }
 
@@ -6671,7 +6694,21 @@ int run_desk(FlaskApi& api) {
                             redraw();
                         } else if (h.kind == Hit::Restart) {
                             if (h.i >= 0 && h.i < (int)ui.snap.bots.size()) {
-                                ui.say(ui.api->post_restart(ui.snap.bots[h.i].id));
+                                auto& b = ui.snap.bots[h.i];
+                                bool v2 = b.id.rfind("hummingbot-v2-", 0) == 0;
+                                bool start = h.key == "start" || (v2 && !b.running && !b.deactivated);
+                                if (start && v2) {
+                                    std::string msg = ui.api->sleeper_start(b.id);
+                                    if (msg.find("started") != std::string::npos)
+                                        msg = b.name + " started. Positions stay.";
+                                    else if (msg.find("cap") != std::string::npos)
+                                        msg = "V2 cap is full. Stop one controller first. Positions stay.";
+                                    else if (msg.find("failed") != std::string::npos)
+                                        msg = "could not start " + b.name + ". Positions stay.";
+                                    ui.say(msg);
+                                } else {
+                                    ui.say(ui.api->post_restart(b.id));
+                                }
                                 ui.refresh(false);
                             }
                             redraw();
