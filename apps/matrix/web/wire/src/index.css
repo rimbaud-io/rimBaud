@@ -224,6 +224,7 @@ header {
   flex: 0 0 auto;
 }
 .board-dd-menu.funds-menu .fund-del,
+.board-dd-menu.funds-menu .fund-ren,
 .board-dd-menu.funds-menu .fund-add {
   display: inline-flex;
   flex-direction: row;
@@ -237,6 +238,10 @@ header {
 .board-dd-menu.funds-menu .fund-del {
   color: var(--rose);
   border-color: #5a2030;
+}
+.board-dd-menu.funds-menu .fund-ren {
+  color: var(--gold);
+  border-color: #8a6a12;
 }
 .board-dd-menu.funds-menu .fund-add {
   width: 100%;

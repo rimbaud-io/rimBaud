@@ -1459,6 +1459,37 @@ function Board() {
     });
   };
 
+  const renameWallet = async (row) => {
+    const next = window.prompt("New name for this subaccount", row.name || "");
+    if (next == null) return;
+    const name = next.trim();
+    if (!name) {
+      ping("name the subaccount");
+      return;
+    }
+    try {
+      const r = await fetch("/api/wire/wallets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ op: "rename", id: row.id, name }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || d.ok === false) throw new Error(d.error || "rename failed");
+      const rows = Array.isArray(d.wallets) ? d.wallets : [];
+      const cat = catalogRef.current || {};
+      catalogRef.current = { ...cat, wallets: rows, poolReady: true };
+      setPoolList(rows);
+      const saved = (d.wallet && d.wallet.name) || name;
+      setNodes((curr) => curr.map((n) => (
+        n.id === row.id ? { ...n, data: { ...n.data, name: saved } } : n
+      )));
+      window.dispatchEvent(new Event("wire-catalog"));
+      ping(d.message || "renamed");
+    } catch (e) {
+      ping("Rename failed: " + e.message);
+    }
+  };
+
   const deleteWallet = async (node) => {
     setMenu(null);
     try {
@@ -2587,6 +2618,9 @@ function Board() {
                   <div key={w.id} className="fund-nav">
                     <span className="dd-lab">{w.name || "Wallet"}</span>
                     <span className="dd-hint">{shortAddr(w.address)}</span>
+                    <button type="button" className="fund-ren" onClick={() => renameWallet(w)}>
+                      Rename
+                    </button>
                     <button type="button" className="fund-del" onClick={() => deleteWallet({ id: w.id })}>
                       Delete
                     </button>
