@@ -1411,6 +1411,20 @@ std::string FlaskApi::wallet_add(const std::string& name, const std::string& add
     }
 }
 
+std::string FlaskApi::wallet_rename(const std::string& id, const std::string& name) {
+    try {
+        json body = {{"op", "rename"}, {"id", id}, {"name", name}};
+        auto r = http_request(flask_host, flask_port, "POST", "/api/wire/wallets", body.dump());
+        if (!r.error.empty()) return r.error;
+        json j = parse_or(r.body);
+        if (r.status != 200 || flag(j, "ok") == false)
+            return str(j, "error", "wallet was not renamed");
+        return str(j, "message", "renamed");
+    } catch (const std::exception& e) {
+        return e.what();
+    }
+}
+
 std::string FlaskApi::wallet_delete(const std::string& id) {
     try {
         json body = {{"id", id}};

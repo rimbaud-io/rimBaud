@@ -171,7 +171,7 @@ enum Page { PgHome, PgWire, PgCondor, PgHunters, PgFunds, PgStrategy, PgSystem, 
 const char* PAGE_NAME[] = {"HOME", "WIRE", "CONDOR", "HUNTERS", "FUNDS", "STRATEGY", "SYSTEM"};
 
 struct Hit {
-    enum Kind { Idle, Nav, Hunter, NotWired, WireNode, WireEdge, WirePort, ToolCat, ToolItem, WireBoard, WireAct, Ctx, Backend, Chart, Sl, Lev, Restart, HunterGate, DeskBias, CoinBias, CoinClose, CoinOpen100, CtrlBool, CtrlKnob, CtrlSel, CtrlStd, CopyMute, CopySlots, CopyAudit, AuditClose, AuditRun, Quit, PackSave, PackRestore, WireSnap, AnnotColor, AnnotSize, InspectBack, CompileClose, CompileWork, CompileGo, PresetDrop, PresetPick, PresetSave, ApiKey, ReplYes, ReplNo, FundsDel, FundsAdd, FundsField } kind = Idle;
+    enum Kind { Idle, Nav, Hunter, NotWired, WireNode, WireEdge, WirePort, ToolCat, ToolItem, WireBoard, WireAct, Ctx, Backend, Chart, Sl, Lev, Restart, HunterGate, DeskBias, CoinBias, CoinClose, CoinOpen100, CtrlBool, CtrlKnob, CtrlSel, CtrlStd, CopyMute, CopySlots, CopyAudit, AuditClose, AuditRun, Quit, PackSave, PackRestore, WireSnap, AnnotColor, AnnotSize, InspectBack, CompileClose, CompileWork, CompileGo, PresetDrop, PresetPick, PresetSave, ApiKey, ReplYes, ReplNo, FundsDel, FundsAdd, FundsField, FundsRename } kind = Idle;
     int i = -1;
     Rect r{};
     std::string key;
@@ -803,6 +803,7 @@ struct DeskUi {
     int funds_edit = 0;
     std::string funds_name;
     std::string funds_addr;
+    std::string funds_rename_id;
     std::string api_addr;
     std::string api_exch;
     std::string api_note;
@@ -2878,7 +2879,10 @@ int run_desk(FlaskApi& api) {
             ui.wire_fitted = false;
             ui.last_wire = ui.now();
         }
-        if (p != PgFunds) ui.funds_edit = 0;
+        if (p != PgFunds) {
+            ui.funds_edit = 0;
+            ui.funds_rename_id.clear();
+        }
         if (p == PgFunds) {
             if (ui.snap.wire_nodes.empty()) ui.api->load_wire(ui.snap, "desk");
             bool any = false;
@@ -5037,11 +5041,25 @@ int run_desk(FlaskApi& api) {
                     int ni = find_node(ui.snap, e.target);
                     if (ni >= 0) r.wired = ui.snap.wire_nodes[ni].label;
                 }
-                text(dpy, buf, gc, C.text, x, y, ascii(r.name, 16));
+                bool naming = ui.funds_edit == 3 && ui.funds_rename_id == r.id;
+                if (naming) {
+                    Rect box{x - 2, y - 13, 148, 16};
+                    fill(dpy, buf, gc, C.panel, box);
+                    stroke(dpy, buf, gc, C.gold, box);
+                    text(dpy, buf, gc, C.text, box.x + 4, y, ascii(ui.funds_name + "_", 16));
+                    ui.hits.push_back({Hit::FundsField, 3, box, r.id});
+                } else {
+                    text(dpy, buf, gc, C.text, x, y, ascii(r.name, 16));
+                    ui.hits.push_back({Hit::FundsRename, -1, Rect{x, y - 12, 148, 16}, r.id});
+                }
                 text(dpy, buf, gc, C.cyan, x + 160, y, r.address);
                 text(dpy, buf, gc, C.gold, x + 560, y, r.have ? money(r.eq) : "-");
                 text(dpy, buf, gc, C.green, x + 660, y, r.have ? money(r.free) : "-");
-                text(dpy, buf, gc, r.wired.empty() ? C.muted : C.gold, x + 760, y, ascii(r.wired.empty() ? "-" : r.wired, 16));
+                text(dpy, buf, gc, r.wired.empty() ? C.muted : C.gold, x + 760, y, ascii(r.wired.empty() ? "-" : r.wired, 12));
+                Rect ren{x + 880, y - 12, 52, 16};
+                stroke(dpy, buf, gc, C.gold, ren);
+                text(dpy, buf, gc, C.gold, ren.x + 10, ren.y + 12, "REN");
+                ui.hits.push_back({Hit::FundsRename, -1, ren, r.id});
                 Rect del{x + 940, y - 12, 46, 16};
                 stroke(dpy, buf, gc, C.rose, del);
                 text(dpy, buf, gc, C.rose, del.x + 8, del.y + 12, "DEL");
@@ -5074,9 +5092,9 @@ int run_desk(FlaskApi& api) {
             text(dpy, buf, gc, C.green, add.x + 16, add.y + 15, "ADD");
             ui.hits.push_back({Hit::FundsAdd, 0, add});
             y += 36;
-            text(dpy, buf, gc, C.muted, x, y, "Click a field, type or Ctrl+V, Enter adds. DEL removes it from the wire.");
+            text(dpy, buf, gc, C.muted, x, y, "Click a name or REN, type, Enter saves. Esc cancels. DEL removes it from the wire.");
             y += 16;
-            text(dpy, buf, gc, C.muted, x, y, "A listed subaccount can wire to any controller. No key paste here. No restart. No fund move.");
+            text(dpy, buf, gc, C.muted, x, y, "A rename keeps the address and the wire. No key paste. No restart. No fund move.");
             ui.content_h = y + ui.scroll - body.y + 40;
         };
 
@@ -5802,11 +5820,12 @@ int run_desk(FlaskApi& api) {
     };
     auto accept_funds_chars = [&](const std::string& chunk) {
         if (!ui.funds_edit) return;
-        std::string& buf = ui.funds_edit == 1 ? ui.funds_name : ui.funds_addr;
-        int cap = ui.funds_edit == 1 ? 24 : 42;
+        bool naming = ui.funds_edit == 1 || ui.funds_edit == 3;
+        std::string& buf = naming ? ui.funds_name : ui.funds_addr;
+        int cap = ui.funds_edit == 3 ? 40 : (ui.funds_edit == 1 ? 24 : 42);
         for (unsigned char c : chunk) {
             if ((int)buf.size() >= cap) break;
-            if (ui.funds_edit == 1) {
+            if (naming) {
                 bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
                     || (c >= '0' && c <= '9') || c == ' ' || c == '-' || c == '_';
                 if (ok) buf.push_back(static_cast<char>(c));
@@ -5830,6 +5849,33 @@ int run_desk(FlaskApi& api) {
             ui.funds_name.clear();
             ui.funds_addr.clear();
             ui.funds_edit = 0;
+            ui.api->load_fields(ui.snap);
+        }
+    };
+    auto begin_rename = [&](const std::string& id) {
+        if (id.empty()) return;
+        if (ui.funds_rename_id != id) {
+            ui.funds_name.clear();
+            for (auto& t : ui.snap.tools) {
+                if (t.id == id) { ui.funds_name = t.label; break; }
+            }
+        }
+        ui.funds_rename_id = id;
+        ui.funds_edit = 3;
+    };
+    auto submit_rename = [&]() {
+        std::string name = ui.funds_name;
+        while (!name.empty() && name.back() == ' ') name.pop_back();
+        while (!name.empty() && name.front() == ' ') name.erase(name.begin());
+        if (ui.funds_rename_id.empty()) return;
+        if (name.empty()) { ui.say("name the subaccount"); return; }
+        std::string msg = ui.api->wallet_rename(ui.funds_rename_id, name);
+        ui.say(msg);
+        if (msg.find("renamed") != std::string::npos || msg.find("unchanged") != std::string::npos) {
+            ui.funds_name.clear();
+            ui.funds_rename_id.clear();
+            ui.funds_edit = 0;
+            ui.api->load_wire(ui.snap, "desk");
             ui.api->load_fields(ui.snap);
         }
     };
@@ -5936,14 +5982,17 @@ int run_desk(FlaskApi& api) {
                     int nch = XLookupString(&e.xkey, chs, 7, &ks, nullptr);
                     bool ctrl = (e.xkey.state & ControlMask) != 0;
                     bool shift = (e.xkey.state & ShiftMask) != 0;
-                    std::string& buf = ui.funds_edit == 1 ? ui.funds_name : ui.funds_addr;
-                    int cap = ui.funds_edit == 1 ? 24 : 42;
+                    bool naming = ui.funds_edit == 1 || ui.funds_edit == 3;
+                    std::string& buf = naming ? ui.funds_name : ui.funds_addr;
+                    int cap = ui.funds_edit == 3 ? 40 : (ui.funds_edit == 1 ? 24 : 42);
                     if (ks == XK_Escape) {
                         ui.funds_edit = 0;
+                        ui.funds_rename_id.clear();
                     } else if (ks == XK_Return || ks == XK_KP_Enter) {
-                        if (ui.funds_edit == 1) ui.funds_edit = 2;
+                        if (ui.funds_edit == 3) submit_rename();
+                        else if (ui.funds_edit == 1) ui.funds_edit = 2;
                         else submit_funds();
-                    } else if (ks == XK_Tab) {
+                    } else if (ks == XK_Tab && ui.funds_edit != 3) {
                         ui.funds_edit = ui.funds_edit == 1 ? 2 : 1;
                     } else if (ks == XK_BackSpace || ks == XK_Delete) {
                         if (!buf.empty()) buf.pop_back();
@@ -6470,8 +6519,16 @@ int run_desk(FlaskApi& api) {
                             submit_funds();
                             redraw();
                             break;
+                        } else if (h.kind == Hit::FundsRename) {
+                            begin_rename(h.key);
+                            redraw();
+                            break;
                         } else if (h.kind == Hit::FundsField) {
-                            ui.funds_edit = h.i == 2 ? 2 : 1;
+                            if (h.i == 3) ui.funds_edit = 3;
+                            else {
+                                ui.funds_rename_id.clear();
+                                ui.funds_edit = h.i == 2 ? 2 : 1;
+                            }
                             redraw();
                             break;
                         } else if (h.kind == Hit::ApiKey) {

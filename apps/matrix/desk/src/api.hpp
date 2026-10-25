@@ -453,6 +453,7 @@ public:
     std::string sleeper_stop(const std::string& id);
     // Register or remove a subaccount in the wire pool. Does not write a connector or restart a hunter.
     std::string wallet_add(const std::string& name, const std::string& address);
+    std::string wallet_rename(const std::string& id, const std::string& name);
     std::string wallet_delete(const std::string& id);
 };
 
