@@ -2452,6 +2452,36 @@ struct DeskUi {
         if (seq_armed) seq_apply();
     }
 
+    int seq_lane_at(int my) const {
+        if (seq_row_h <= 0 || my < seq_rows_y) return -1;
+        int lane = (my - seq_rows_y) / seq_row_h;
+        if (lane < 0 || lane >= static_cast<int>(seq_lane_ids.size())) return -1;
+        return lane;
+    }
+
+    void seq_begin_bias(const std::string& side, int mx, int my) {
+        if (!seq_side_ok(side)) return;
+        seq_paint = side;
+        seq_drag = 6;
+        seq_drag_i = -1;
+        seq_drag_bot.clear();
+        seq_drag_x = mx;
+        seq_drag_y = my;
+        seq_drag_moved = false;
+    }
+
+    void seq_drop_bias(int mx, int my) {
+        int lane = seq_lane_at(my);
+        if (lane < 0) {
+            say("drop " + seq_paint + " on a controller");
+            return;
+        }
+        long t = seq_now_t > 0 ? seq_now_t : static_cast<long>(time(nullptr));
+        if (seq_arr.w > 8 && mx >= seq_arr.x && mx < seq_arr.x + seq_arr.w)
+            t = seq_x_to_t(mx);
+        seq_add_trend(seq_lane_ids[lane], t);
+    }
+
     void seq_begin_pick(int lane, int mx, int my) {
         if (lane < 0 || lane >= static_cast<int>(seq_lane_ids.size())) return;
         seq_drag = 3;
@@ -2942,8 +2972,10 @@ std::string action_tip(const DeskUi& ui, const Hit& h) {
             if (h.key == "pick") return "drag this controller onto the timeline";
             if (h.key == "clip") return "drag the block. Drag the right edge to resize. Right-click removes it.";
             if (h.key == "lane") return "click to paste the selected controller on this lane";
-            if (h.key == "trend") return "click to set TREND " + ui.seq_paint + " from here. Does not close.";
-            if (h.key == "tclip") return "drag the trend. Drag the right edge to resize. Right-click removes it. Does not close.";
+            if (h.key == "trend") return "click to set TREND " + ui.seq_paint + " from here. Test only.";
+            if (h.key == "tclip") return "drag the trend. Drag the right edge to resize. Right-click removes it.";
+            if (h.key == "LONG" || h.key == "FLAT" || h.key == "SHORT")
+                return "drag " + h.key + " onto a controller. Test only. Does not close.";
             return {};
         default:
             return {};
@@ -6144,8 +6176,9 @@ int run_desk(FlaskApi& api) {
             const int bar_h = 116;
             const int rh = 50;
             const int trend_h = 18;
+            const int tb_w = 168;
             const int label_w = 168;
-            const int x0 = 12;
+            const int x0 = tb_w + 10;
             int arr_x = x0 + label_w + 8;
             int arr_w = std::max(80, W - arr_x - 16);
             ui.seq_row_h = rh;
@@ -6176,7 +6209,7 @@ int run_desk(FlaskApi& api) {
                 auto& L = lanes[i];
                 int y = ui.seq_rows_y + i * rh;
                 if (y + rh < view.y || y > view.y + view.h) continue;
-                Rect row{x0, y, W - 24, rh - 2};
+                Rect row{x0, y, std::max(40, W - x0 - 12), rh - 2};
                 fill(dpy, buf, gc, (i % 2) ? C.panel : C.bg, row);
                 int lane_y = y + trend_h;
                 int lane_h = rh - trend_h;
@@ -6246,6 +6279,8 @@ int run_desk(FlaskApi& api) {
                     if (lane_y >= view.y && lane_y + lane_h <= view.y + view.h + 4)
                         ui.hits.push_back({Hit::Seq, ci, cr, "clip"});
                 }
+                if (ui.seq_drag == 6 && ui.seq_drag_moved && ui.seq_lane_at(ui.my_last) == i)
+                    stroke(dpy, buf, gc, bias_col(C, ui.seq_paint), row);
                 if (ui.seq_drag == 3 && ui.seq_drag_moved && ui.seq_drag_bot == L.id) {
                     long t_at = ui.seq_x_to_t(ui.mx_last);
                     long dur = std::max(ui.seq_quantum(), ui.seq_span / 12);
@@ -6291,27 +6326,12 @@ int run_desk(FlaskApi& api) {
             stroke(dpy, buf, gc, C.amber, testb);
             text(dpy, buf, gc, C.amber, testb.x + 8, testb.y + 15, "TEST");
             ui.hits.push_back({Hit::Seq, 0, testb, "test"});
-            int px = sx + 66;
-            auto paint_btn = [&](const char* word, const char* key, unsigned long col) {
-                int bw = static_cast<int>(strlen(word)) * CHAR_W + 18;
-                Rect br{px, y, bw, 22};
-                bool on = ui.seq_paint == word;
-                if (on) fill(dpy, buf, gc, col, br);
-                stroke(dpy, buf, gc, col, br);
-                int tx = br.x + (br.w - static_cast<int>(strlen(word)) * CHAR_W) / 2;
-                text(dpy, buf, gc, on ? C.bg : col, tx, br.y + 15, word);
-                ui.hits.push_back({Hit::Seq, 0, br, key});
-                px += bw + 6;
-            };
-            paint_btn("LONG", "long", C.cyan);
-            paint_btn("FLAT", "flat", C.gold);
-            paint_btn("SHORT", "short", C.rose);
             text(dpy, buf, gc, C.muted, x0, body.y + 68,
                  fit_px("TEST. The green line is now and it moves across the scale. This board does not start, stop, or set bias.",
-                        W - 36));
+                        W - x0 - 24));
             text(dpy, buf, gc, C.muted, x0, body.y + 84,
-                 fit_px("Drag a name onto its lane. TREND is LONG, SHORT, or FLAT on the board only. Right-click removes a block.",
-                        W - 36));
+                 fit_px("Drag LONG, FLAT, or SHORT from the left toolbox onto a controller. Right-click removes a block.",
+                        W - x0 - 24));
 
             int ry = body.y + bar_h - 12;
             for (long tk : ticks) {
@@ -6337,6 +6357,30 @@ int run_desk(FlaskApi& api) {
             if (labx + 130 > arr_x + arr_w) labx = std::max(arr_x, nx - 130);
             text(dpy, buf, gc, C.green, labx, ry, nlab);
             fill(dpy, buf, gc, C.green, Rect{nx, body.y + bar_h, 2, std::max(0, body.h - bar_h)});
+
+            Rect tb{0, body.y, tb_w, body.h};
+            fill(dpy, buf, gc, C.panel, tb);
+            stroke(dpy, buf, gc, C.border, tb);
+            text(dpy, buf, gc, C.gold, tb.x + 12, tb.y + 22, "BIAS");
+            text(dpy, buf, gc, C.muted, tb.x + 12, tb.y + 40, "drag onto a controller");
+            const char* sides[] = {"LONG", "FLAT", "SHORT"};
+            for (int s = 0; s < 3; ++s) {
+                Rect card{tb.x + 10, tb.y + 56 + s * 48, tb.w - 20, 40};
+                unsigned long col = bias_col(C, sides[s]);
+                bool on = ui.seq_paint == sides[s];
+                fill(dpy, buf, gc, on ? rgb(dpy, cm, 16, 28, 22) : C.bg, card);
+                stroke(dpy, buf, gc, on ? C.white : col, card);
+                text(dpy, buf, gc, col, card.x + 12, card.y + 18, sides[s]);
+                text(dpy, buf, gc, C.muted, card.x + 12, card.y + 32, "bias");
+                ui.hits.push_back({Hit::Seq, s, card, sides[s]});
+            }
+            if (ui.seq_drag == 6 && ui.seq_drag_moved) {
+                unsigned long col = bias_col(C, ui.seq_paint);
+                Rect g{ui.mx_last + 10, ui.my_last - 12, 78, 24};
+                fill(dpy, buf, gc, C.bg, g);
+                stroke(dpy, buf, gc, col, g);
+                text(dpy, buf, gc, col, g.x + 8, g.y + 16, ui.seq_paint);
+            }
         };
 
         auto draw_system = [&]() {
@@ -7750,9 +7794,11 @@ int run_desk(FlaskApi& api) {
                                      && h.i < static_cast<int>(ui.seq_lane_ids.size()))
                                 ui.seq_add_trend(ui.seq_lane_ids[h.i], mx);
                             else if (h.key == "tclip") ui.seq_begin_trend(h.i, mx, my);
+                            else if (h.key == "LONG" || h.key == "FLAT" || h.key == "SHORT")
+                                ui.seq_begin_bias(h.key, mx, my);
                             else if (h.key == "long" || h.key == "flat" || h.key == "short") {
                                 ui.seq_paint = h.key == "short" ? "SHORT" : (h.key == "flat" ? "FLAT" : "LONG");
-                                ui.say("trend paint " + ui.seq_paint + ". Click the line above a controller. Does not close.");
+                                ui.say("drag " + ui.seq_paint + " from the toolbox onto a controller. Test only.");
                             }
                             redraw();
                         } else if (h.kind == Hit::Quit) {
@@ -8491,6 +8537,9 @@ int run_desk(FlaskApi& api) {
                     if (ui.seq_drag == 3) {
                         if (ui.seq_drag_moved) ui.seq_drop_new(mx, my);
                         else ui.say(ui.seq_name_of(ui.seq_drag_bot) + " selected. Drag the name, or click its lane.");
+                    } else if (ui.seq_drag == 6) {
+                        if (ui.seq_drag_moved) ui.seq_drop_bias(mx, my);
+                        else ui.say("drag " + ui.seq_paint + " onto a controller. Test only.");
                     } else {
                         ui.seq_finish_drag();
                     }
