@@ -26,7 +26,7 @@ import sqlite3
 import threading
 from datetime import datetime, timezone
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 _LOCK = threading.Lock()
 _DB_PATH = None
 
@@ -331,6 +331,18 @@ def init(path):
                 );
                 CREATE INDEX IF NOT EXISTS risk_skim_event_bot
                     ON risk_skim_event(bot_id, id);
+                CREATE TABLE IF NOT EXISTS sequencer (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    armed INTEGER NOT NULL DEFAULT 0,
+                    scope TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS sequencer_clip (
+                    clip_id TEXT PRIMARY KEY,
+                    bot TEXT NOT NULL,
+                    t0 INTEGER NOT NULL,
+                    t1 INTEGER NOT NULL
+                );
                 """
             )
             con.execute(
