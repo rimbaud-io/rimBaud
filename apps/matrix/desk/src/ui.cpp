@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "ui.hpp"
+#include "sqlite3_min.h"
 
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
@@ -36,6 +37,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <vector>
 
@@ -1751,49 +1753,211 @@ struct DeskUi {
     }
 
     std::string seq_path() const { return desk_repo() + "/conf/sequencer.json"; }
+    std::string seq_db_path() const { return desk_repo() + "/conf/matrix.db"; }
 
-    void seq_load() {
-        if (seq_ok) return;
-        seq_ok = true;
-        seq_load_v2();
+    static bool seq_keep_clip(const SeqClip& k, long now) {
+        if (!seq_id_ok(k.bot) || k.t1 <= k.t0) return false;
+        if (k.t1 - k.t0 > 21L * 24L * 3600L) return false;
+        if (k.t1 < now - 2L * 24L * 3600L) return false;
+        if (k.t0 > now + 21L * 24L * 3600L) return false;
+        return true;
+    }
+
+    static std::string seq_utc_now() {
+        time_t t = time(nullptr);
+        tm g{};
+        gmtime_r(&t, &g);
+        char b[80];
+        snprintf(b, sizeof(b), "%04d-%02d-%02d %02d:%02d:%02d",
+                 g.tm_year + 1900, g.tm_mon + 1, g.tm_mday, g.tm_hour, g.tm_min, g.tm_sec);
+        return b;
+    }
+
+    static void seq_relax_db(const std::string& path) {
+        ::chmod(path.c_str(), 0666);
+        ::chmod((path + "-wal").c_str(), 0666);
+        ::chmod((path + "-shm").c_str(), 0666);
+    }
+
+    static bool seq_exec(sqlite3* db, const char* sql) {
+        char* err = nullptr;
+        int rc = sqlite3_exec(db, sql, nullptr, nullptr, &err);
+        if (err) sqlite3_free(err);
+        return rc == SQLITE_OK;
+    }
+
+    // 1 = row in sqlite, 0 = table empty, -1 = db could not be read.
+    int seq_sql_read() {
+        std::string path = seq_db_path();
+        sqlite3* db = nullptr;
+        if (sqlite3_open_v2(path.c_str(), &db, SQLITE_OPEN_READWRITE, nullptr) != SQLITE_OK || !db) {
+            if (db) sqlite3_close(db);
+            return -1;
+        }
+        sqlite3_busy_timeout(db, 4000);
+        if (!seq_exec(db,
+                "CREATE TABLE IF NOT EXISTS sequencer ("
+                " id INTEGER PRIMARY KEY CHECK (id = 1),"
+                " armed INTEGER NOT NULL DEFAULT 0,"
+                " scope TEXT NOT NULL,"
+                " updated_at TEXT NOT NULL);"
+                "CREATE TABLE IF NOT EXISTS sequencer_clip ("
+                " clip_id TEXT PRIMARY KEY,"
+                " bot TEXT NOT NULL,"
+                " t0 INTEGER NOT NULL,"
+                " t1 INTEGER NOT NULL);")) {
+            sqlite3_close(db);
+            return -1;
+        }
+        sqlite3_stmt* st = nullptr;
+        if (sqlite3_prepare_v2(db, "SELECT armed, scope FROM sequencer WHERE id=1", -1, &st, nullptr) != SQLITE_OK) {
+            sqlite3_close(db);
+            return -1;
+        }
+        int got = 0;
+        if (sqlite3_step(st) == SQLITE_ROW) {
+            got = 1;
+            const char* armed = reinterpret_cast<const char*>(sqlite3_column_text(st, 0));
+            const char* scope = reinterpret_cast<const char*>(sqlite3_column_text(st, 1));
+            seq_armed = armed && armed[0] == '1';
+            seq_scope = (scope && std::string(scope) == "am") ? "am" : "7d";
+        }
+        sqlite3_finalize(st);
+        if (!got) {
+            sqlite3_close(db);
+            seq_relax_db(path);
+            return 0;
+        }
+        seq_clips.clear();
+        st = nullptr;
+        if (sqlite3_prepare_v2(db, "SELECT clip_id, bot, t0, t1 FROM sequencer_clip ORDER BY t0",
+                               -1, &st, nullptr) != SQLITE_OK) {
+            sqlite3_close(db);
+            return -1;
+        }
+        long now = static_cast<long>(time(nullptr));
+        while (sqlite3_step(st) == SQLITE_ROW && seq_clips.size() < 64) {
+            const char* id = reinterpret_cast<const char*>(sqlite3_column_text(st, 0));
+            const char* bot = reinterpret_cast<const char*>(sqlite3_column_text(st, 1));
+            const char* t0s = reinterpret_cast<const char*>(sqlite3_column_text(st, 2));
+            const char* t1s = reinterpret_cast<const char*>(sqlite3_column_text(st, 3));
+            SeqClip k;
+            k.id = id ? id : "";
+            k.bot = bot ? bot : "";
+            k.t0 = t0s ? std::strtol(t0s, nullptr, 10) : 0;
+            k.t1 = t1s ? std::strtol(t1s, nullptr, 10) : 0;
+            if (k.id.empty()) k.id = "s" + std::to_string(k.t0);
+            if (seq_keep_clip(k, now)) seq_clips.push_back(k);
+        }
+        sqlite3_finalize(st);
+        sqlite3_close(db);
+        seq_relax_db(path);
+        return 1;
+    }
+
+    bool seq_sql_write() {
+        std::string path = seq_db_path();
+        sqlite3* db = nullptr;
+        if (sqlite3_open_v2(path.c_str(), &db, SQLITE_OPEN_READWRITE, nullptr) != SQLITE_OK || !db) {
+            if (db) sqlite3_close(db);
+            return false;
+        }
+        sqlite3_busy_timeout(db, 4000);
+        bool ok = seq_exec(db,
+                "CREATE TABLE IF NOT EXISTS sequencer ("
+                " id INTEGER PRIMARY KEY CHECK (id = 1),"
+                " armed INTEGER NOT NULL DEFAULT 0,"
+                " scope TEXT NOT NULL,"
+                " updated_at TEXT NOT NULL);"
+                "CREATE TABLE IF NOT EXISTS sequencer_clip ("
+                " clip_id TEXT PRIMARY KEY,"
+                " bot TEXT NOT NULL,"
+                " t0 INTEGER NOT NULL,"
+                " t1 INTEGER NOT NULL);");
+        if (ok) ok = seq_exec(db, "BEGIN IMMEDIATE");
+        std::string scope = seq_scope == "am" ? "am" : "7d";
+        std::string when = seq_utc_now();
+        std::string armed = seq_armed ? "1" : "0";
+        if (ok) {
+            sqlite3_stmt* st = nullptr;
+            ok = sqlite3_prepare_v2(db,
+                    "INSERT OR REPLACE INTO sequencer(id, armed, scope, updated_at) VALUES(1, ?, ?, ?)",
+                    -1, &st, nullptr) == SQLITE_OK;
+            if (ok) {
+                sqlite3_bind_text(st, 1, armed.c_str(), static_cast<int>(armed.size()), SQLITE_TRANSIENT);
+                sqlite3_bind_text(st, 2, scope.c_str(), static_cast<int>(scope.size()), SQLITE_TRANSIENT);
+                sqlite3_bind_text(st, 3, when.c_str(), static_cast<int>(when.size()), SQLITE_TRANSIENT);
+                ok = sqlite3_step(st) == SQLITE_DONE;
+                sqlite3_finalize(st);
+            }
+        }
+        if (ok) ok = seq_exec(db, "DELETE FROM sequencer_clip");
+        long now = static_cast<long>(time(nullptr));
+        if (ok) {
+            for (auto& c : seq_clips) {
+                if (!seq_keep_clip(c, now)) continue;
+                sqlite3_stmt* st = nullptr;
+                if (sqlite3_prepare_v2(db,
+                        "INSERT OR REPLACE INTO sequencer_clip(clip_id, bot, t0, t1) VALUES(?, ?, ?, ?)",
+                        -1, &st, nullptr) != SQLITE_OK) {
+                    ok = false;
+                    break;
+                }
+                std::string t0 = std::to_string(c.t0);
+                std::string t1 = std::to_string(c.t1);
+                sqlite3_bind_text(st, 1, c.id.c_str(), static_cast<int>(c.id.size()), SQLITE_TRANSIENT);
+                sqlite3_bind_text(st, 2, c.bot.c_str(), static_cast<int>(c.bot.size()), SQLITE_TRANSIENT);
+                sqlite3_bind_text(st, 3, t0.c_str(), static_cast<int>(t0.size()), SQLITE_TRANSIENT);
+                sqlite3_bind_text(st, 4, t1.c_str(), static_cast<int>(t1.size()), SQLITE_TRANSIENT);
+                if (sqlite3_step(st) != SQLITE_DONE) ok = false;
+                sqlite3_finalize(st);
+                if (!ok) break;
+            }
+        }
+        if (ok) ok = seq_exec(db, "COMMIT");
+        else seq_exec(db, "ROLLBACK");
+        sqlite3_close(db);
+        if (ok) seq_relax_db(path);
+        return ok;
+    }
+
+    bool seq_load_json() {
         std::ifstream in(seq_path());
-        if (!in) return;
+        if (!in) return false;
         try {
             nlohmann::json j;
             in >> j;
-            if (!j.is_object()) return;
+            if (!j.is_object()) return false;
             std::string sc = j.value("scope", "7d");
             seq_scope = (sc == "am") ? "am" : "7d";
             seq_armed = j.value("armed", false);
             seq_clips.clear();
-            if (!j.contains("clips") || !j["clips"].is_array()) return;
-            long now = static_cast<long>(time(nullptr));
-            for (auto& c : j["clips"]) {
-                if (!c.is_object() || seq_clips.size() >= 64) break;
-                SeqClip k;
-                k.id = c.value("id", "");
-                k.bot = c.value("bot", "");
-                k.t0 = c.value("t0", 0L);
-                k.t1 = c.value("t1", 0L);
-                if (!seq_id_ok(k.bot) || k.t1 <= k.t0) continue;
-                if (k.t1 - k.t0 > 21L * 24L * 3600L) continue;
-                if (k.t1 < now - 2L * 24L * 3600L) continue;
-                if (k.t0 > now + 21L * 24L * 3600L) continue;
-                if (k.id.empty()) k.id = "s" + std::to_string(k.t0);
-                seq_clips.push_back(k);
+            if (j.contains("clips") && j["clips"].is_array()) {
+                long now = static_cast<long>(time(nullptr));
+                for (auto& c : j["clips"]) {
+                    if (!c.is_object() || seq_clips.size() >= 64) break;
+                    SeqClip k;
+                    k.id = c.value("id", "");
+                    k.bot = c.value("bot", "");
+                    k.t0 = c.value("t0", 0L);
+                    k.t1 = c.value("t1", 0L);
+                    if (k.id.empty()) k.id = "s" + std::to_string(k.t0);
+                    if (seq_keep_clip(k, now)) seq_clips.push_back(k);
+                }
             }
+            return true;
         } catch (...) {
             seq_clips.clear();
             seq_armed = false;
+            return false;
         }
-        seq_sync_span();
     }
 
-    void seq_save() {
-        seq_load_v2();
+    void seq_write_json() {
         nlohmann::json clips = nlohmann::json::array();
+        long now = static_cast<long>(time(nullptr));
         for (auto& c : seq_clips) {
-            if (!seq_id_ok(c.bot) || c.t1 <= c.t0) continue;
+            if (!seq_keep_clip(c, now)) continue;
             clips.push_back({{"id", c.id}, {"bot", c.bot}, {"t0", c.t0}, {"t1", c.t1}});
         }
         nlohmann::json j = {
@@ -1806,14 +1970,29 @@ struct DeskUi {
         std::string tmp = path + ".tmp";
         {
             std::ofstream out(tmp);
-            if (!out) {
-                say("could not save the sequencer");
-                return;
-            }
+            if (!out) return;
             out << j.dump(2) << "\n";
         }
-        if (std::rename(tmp.c_str(), path.c_str()) != 0)
-            say("could not save the sequencer");
+        std::rename(tmp.c_str(), path.c_str());
+    }
+
+    void seq_load() {
+        if (seq_ok) return;
+        seq_ok = true;
+        seq_load_v2();
+        int sql = seq_sql_read();
+        if (sql == 1) {
+            seq_sync_span();
+            return;
+        }
+        bool from_json = seq_load_json();
+        seq_sync_span();
+        if (sql == 0 && from_json) seq_save();
+    }
+
+    void seq_save() {
+        if (!seq_sql_write()) say("could not save the sequencer to sqlite");
+        seq_write_json();
     }
 
     void seq_probe() {
