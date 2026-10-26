@@ -827,6 +827,17 @@ struct DeskUi {
     long seq_span = 7L * 24L * 3600L;
     long seq_view_t = 0;
     std::vector<SeqClip> seq_clips;
+    struct SeqTrend {
+        std::string id;
+        std::string bot;
+        std::string side;
+        long t0 = 0;
+        long t1 = 0;
+    };
+    std::vector<SeqTrend> seq_trends;
+    int seq_tsel = -1;
+    std::string seq_paint = "LONG";
+    std::map<std::string, std::string> seq_trend_want;
     std::vector<SeqLane> seq_v2;
     bool seq_v2_ok = false;
     int seq_sel = -1;
@@ -1763,6 +1774,18 @@ struct DeskUi {
         return true;
     }
 
+    static bool seq_side_ok(const std::string& s) {
+        return s == "LONG" || s == "SHORT" || s == "FLAT";
+    }
+
+    static bool seq_keep_trend(const SeqTrend& k, long now) {
+        SeqClip c;
+        c.bot = k.bot;
+        c.t0 = k.t0;
+        c.t1 = k.t1;
+        return seq_side_ok(k.side) && seq_keep_clip(c, now);
+    }
+
     static std::string seq_utc_now() {
         time_t t = time(nullptr);
         tm g{};
@@ -1804,6 +1827,12 @@ struct DeskUi {
                 "CREATE TABLE IF NOT EXISTS sequencer_clip ("
                 " clip_id TEXT PRIMARY KEY,"
                 " bot TEXT NOT NULL,"
+                " t0 INTEGER NOT NULL,"
+                " t1 INTEGER NOT NULL);"
+                "CREATE TABLE IF NOT EXISTS sequencer_trend ("
+                " clip_id TEXT PRIMARY KEY,"
+                " bot TEXT NOT NULL,"
+                " side TEXT NOT NULL,"
                 " t0 INTEGER NOT NULL,"
                 " t1 INTEGER NOT NULL);")) {
             sqlite3_close(db);
@@ -1850,6 +1879,30 @@ struct DeskUi {
             if (seq_keep_clip(k, now)) seq_clips.push_back(k);
         }
         sqlite3_finalize(st);
+        seq_trends.clear();
+        st = nullptr;
+        if (sqlite3_prepare_v2(db,
+                "SELECT clip_id, bot, side, t0, t1 FROM sequencer_trend ORDER BY t0",
+                -1, &st, nullptr) != SQLITE_OK) {
+            sqlite3_close(db);
+            return -1;
+        }
+        while (sqlite3_step(st) == SQLITE_ROW && seq_trends.size() < 64) {
+            const char* id = reinterpret_cast<const char*>(sqlite3_column_text(st, 0));
+            const char* bot = reinterpret_cast<const char*>(sqlite3_column_text(st, 1));
+            const char* side = reinterpret_cast<const char*>(sqlite3_column_text(st, 2));
+            const char* t0s = reinterpret_cast<const char*>(sqlite3_column_text(st, 3));
+            const char* t1s = reinterpret_cast<const char*>(sqlite3_column_text(st, 4));
+            SeqTrend k;
+            k.id = id ? id : "";
+            k.bot = bot ? bot : "";
+            k.side = side ? side : "";
+            k.t0 = t0s ? std::strtol(t0s, nullptr, 10) : 0;
+            k.t1 = t1s ? std::strtol(t1s, nullptr, 10) : 0;
+            if (k.id.empty()) k.id = "t" + std::to_string(k.t0);
+            if (seq_keep_trend(k, now)) seq_trends.push_back(k);
+        }
+        sqlite3_finalize(st);
         sqlite3_close(db);
         seq_relax_db(path);
         return 1;
@@ -1872,6 +1925,12 @@ struct DeskUi {
                 "CREATE TABLE IF NOT EXISTS sequencer_clip ("
                 " clip_id TEXT PRIMARY KEY,"
                 " bot TEXT NOT NULL,"
+                " t0 INTEGER NOT NULL,"
+                " t1 INTEGER NOT NULL);"
+                "CREATE TABLE IF NOT EXISTS sequencer_trend ("
+                " clip_id TEXT PRIMARY KEY,"
+                " bot TEXT NOT NULL,"
+                " side TEXT NOT NULL,"
                 " t0 INTEGER NOT NULL,"
                 " t1 INTEGER NOT NULL);");
         if (ok) ok = seq_exec(db, "BEGIN IMMEDIATE");
@@ -1914,6 +1973,29 @@ struct DeskUi {
                 if (!ok) break;
             }
         }
+        if (ok) ok = seq_exec(db, "DELETE FROM sequencer_trend");
+        if (ok) {
+            for (auto& c : seq_trends) {
+                if (!seq_keep_trend(c, now)) continue;
+                sqlite3_stmt* st = nullptr;
+                if (sqlite3_prepare_v2(db,
+                        "INSERT OR REPLACE INTO sequencer_trend(clip_id, bot, side, t0, t1) VALUES(?, ?, ?, ?, ?)",
+                        -1, &st, nullptr) != SQLITE_OK) {
+                    ok = false;
+                    break;
+                }
+                std::string t0 = std::to_string(c.t0);
+                std::string t1 = std::to_string(c.t1);
+                sqlite3_bind_text(st, 1, c.id.c_str(), static_cast<int>(c.id.size()), SQLITE_TRANSIENT);
+                sqlite3_bind_text(st, 2, c.bot.c_str(), static_cast<int>(c.bot.size()), SQLITE_TRANSIENT);
+                sqlite3_bind_text(st, 3, c.side.c_str(), static_cast<int>(c.side.size()), SQLITE_TRANSIENT);
+                sqlite3_bind_text(st, 4, t0.c_str(), static_cast<int>(t0.size()), SQLITE_TRANSIENT);
+                sqlite3_bind_text(st, 5, t1.c_str(), static_cast<int>(t1.size()), SQLITE_TRANSIENT);
+                if (sqlite3_step(st) != SQLITE_DONE) ok = false;
+                sqlite3_finalize(st);
+                if (!ok) break;
+            }
+        }
         if (ok) ok = seq_exec(db, "COMMIT");
         else seq_exec(db, "ROLLBACK");
         sqlite3_close(db);
@@ -1932,6 +2014,7 @@ struct DeskUi {
             seq_scope = (sc == "am") ? "am" : "7d";
             seq_armed = j.value("armed", false);
             seq_clips.clear();
+            seq_trends.clear();
             if (j.contains("clips") && j["clips"].is_array()) {
                 long now = static_cast<long>(time(nullptr));
                 for (auto& c : j["clips"]) {
@@ -1945,9 +2028,24 @@ struct DeskUi {
                     if (seq_keep_clip(k, now)) seq_clips.push_back(k);
                 }
             }
+            if (j.contains("trend") && j["trend"].is_array()) {
+                long now = static_cast<long>(time(nullptr));
+                for (auto& c : j["trend"]) {
+                    if (!c.is_object() || seq_trends.size() >= 64) break;
+                    SeqTrend k;
+                    k.id = c.value("id", "");
+                    k.bot = c.value("bot", "");
+                    k.side = c.value("side", "");
+                    k.t0 = c.value("t0", 0L);
+                    k.t1 = c.value("t1", 0L);
+                    if (k.id.empty()) k.id = "t" + std::to_string(k.t0);
+                    if (seq_keep_trend(k, now)) seq_trends.push_back(k);
+                }
+            }
             return true;
         } catch (...) {
             seq_clips.clear();
+            seq_trends.clear();
             seq_armed = false;
             return false;
         }
@@ -1960,11 +2058,18 @@ struct DeskUi {
             if (!seq_keep_clip(c, now)) continue;
             clips.push_back({{"id", c.id}, {"bot", c.bot}, {"t0", c.t0}, {"t1", c.t1}});
         }
+        nlohmann::json trend = nlohmann::json::array();
+        for (auto& c : seq_trends) {
+            if (!seq_keep_trend(c, now)) continue;
+            trend.push_back({{"id", c.id}, {"bot", c.bot}, {"side", c.side},
+                             {"t0", c.t0}, {"t1", c.t1}});
+        }
         nlohmann::json j = {
             {"v", 1},
             {"armed", seq_armed},
             {"scope", seq_scope == "am" ? "am" : "7d"},
             {"clips", clips},
+            {"trend", trend},
         };
         std::string path = seq_path();
         std::string tmp = path + ".tmp";
@@ -2059,7 +2164,7 @@ struct DeskUi {
         if (!seq_armed || !api) return;
         seq_load();
         seq_load_v2();
-        if (seq_clips.empty()) return;
+        if (seq_clips.empty() && seq_trends.empty()) return;
         long now = static_cast<long>(time(nullptr));
         std::map<std::string, int> cover;
         for (auto& c : seq_clips) {
@@ -2103,6 +2208,49 @@ struct DeskUi {
             if (!seq_bad(raw) && !seq_bad(line)) seq_want[id] = on ? 1 : 0;
             lines.push_back(line);
         }
+        std::map<std::string, int> trend_have;
+        std::map<std::string, std::string> trend_side;
+        std::map<std::string, long> trend_t0;
+        for (auto& c : seq_trends) {
+            if (!seq_id_ok(c.bot) || !seq_known(c.bot) || !seq_side_ok(c.side) || c.t1 <= c.t0) continue;
+            trend_have[c.bot] = 1;
+            if (now >= c.t0 && now < c.t1) {
+                if (!trend_side.count(c.bot) || c.t0 >= trend_t0[c.bot]) {
+                    trend_side[c.bot] = c.side;
+                    trend_t0[c.bot] = c.t0;
+                }
+            }
+        }
+        for (auto& kv : trend_have) {
+            const std::string& id = kv.first;
+            std::string side = trend_side.count(id) ? trend_side[id] : "";
+            std::string prev = seq_trend_want.count(id) ? seq_trend_want[id] : "-";
+            if (prev == side) continue;
+            std::string name = seq_name_of(id);
+            if (side.empty()) {
+                seq_trend_want[id] = "";
+                continue;
+            }
+            if (Bot* b = seq_bot(id)) {
+                std::string mode = b->bias_mode.empty() ? "both" : b->bias_mode;
+                if ((mode == "long" && side == "SHORT") || (mode == "short" && side == "LONG")) {
+                    seq_trend_want[id] = side;
+                    lines.push_back(name + " trend " + side + " is not allowed. Bias stays.");
+                    continue;
+                }
+            }
+            std::string raw = api->post_bias(id, "", side);
+            bool retry = raw.find("WRITE") != std::string::npos
+                || raw.find("failed") != std::string::npos
+                || raw.find("could not") != std::string::npos;
+            if (!retry) seq_trend_want[id] = side;
+            if (raw.find("no bias") != std::string::npos || raw.find("unknown") != std::string::npos)
+                lines.push_back(name + " has no trend rail. Bias stays.");
+            else if (seq_bad(raw))
+                lines.push_back(seq_line(name, raw));
+            else
+                lines.push_back(name + " trend " + side + ". Does not close.");
+        }
         std::string summary;
         if (lines.size() == 1) summary = lines[0];
         else if (!lines.empty())
@@ -2128,15 +2276,17 @@ struct DeskUi {
         if (seq_armed) {
             seq_armed = false;
             seq_want.clear();
+            seq_trend_want.clear();
             seq_last_summary.clear();
             seq_save();
             say("sequencer stopped. Hunters stay as they are. Positions stay.");
             return;
         }
-        if (!arm("seq", "arm sequencer - click ARM again. A block is the online time. Before that block the controller goes offline. Positions stay."))
+        if (!arm("seq", "arm sequencer - click ARM again. A block is the online time. A trend block sets LONG, SHORT, or FLAT and does not close. Before an online block the controller goes offline. Positions stay."))
             return;
         seq_armed = true;
         seq_want.clear();
+        seq_trend_want.clear();
         seq_last_summary.clear();
         seq_save();
         seq_probe();
@@ -2196,6 +2346,63 @@ struct DeskUi {
         if (seq_armed) seq_apply();
     }
 
+    void seq_add_trend(const std::string& bot, long t_at) {
+        if (!seq_id_ok(bot) || !seq_known(bot)) {
+            say("that controller is not on this matrix");
+            return;
+        }
+        if (!seq_side_ok(seq_paint)) seq_paint = "LONG";
+        if (seq_trends.size() >= 64) {
+            say("64 trend blocks is the limit");
+            return;
+        }
+        seq_sync_span();
+        long end = seq_view_t + seq_span;
+        long t0 = seq_snap_t(t_at);
+        if (t0 < seq_view_t) t0 = seq_snap_t(seq_view_t);
+        if (t0 > end - 15L * 60L) t0 = seq_snap_t(end - 15L * 60L);
+        long t1 = end;
+        for (auto& o : seq_trends) {
+            if (o.bot != bot || o.t0 <= t0 || o.t0 >= t1) continue;
+            t1 = o.t0;
+        }
+        for (auto& o : seq_trends) {
+            if (o.bot != bot || o.t0 >= t0 || o.t1 <= t0) continue;
+            o.t1 = t0;
+        }
+        seq_trends.erase(std::remove_if(seq_trends.begin(), seq_trends.end(),
+            [](const SeqTrend& o) { return o.t1 <= o.t0; }), seq_trends.end());
+        if (t1 < t0 + 15L * 60L) t1 = t0 + 15L * 60L;
+        SeqTrend c;
+        c.id = "t" + std::to_string(seq_view_t) + "-" + std::to_string(seq_trends.size());
+        c.bot = bot;
+        c.side = seq_paint;
+        c.t0 = t0;
+        c.t1 = t1;
+        seq_trends.push_back(c);
+        seq_tsel = static_cast<int>(seq_trends.size()) - 1;
+        seq_sel = -1;
+        seq_trend_want.clear();
+        seq_save();
+        say(seq_name_of(bot) + " trend " + c.side + "  " + seq_clock(t0) + " - " + seq_clock(t1)
+            + ". Does not close.");
+        if (seq_armed) seq_apply();
+    }
+
+    void seq_delete_trend() {
+        if (seq_tsel < 0 || seq_tsel >= static_cast<int>(seq_trends.size())) {
+            say("select a trend block first");
+            return;
+        }
+        std::string nm = seq_name_of(seq_trends[seq_tsel].bot);
+        seq_trends.erase(seq_trends.begin() + seq_tsel);
+        seq_tsel = -1;
+        seq_trend_want.clear();
+        seq_save();
+        say(nm + " trend removed. Bias stays. Does not close.");
+        if (seq_armed) seq_apply();
+    }
+
     void seq_begin_pick(int lane, int mx, int my) {
         if (lane < 0 || lane >= static_cast<int>(seq_lane_ids.size())) return;
         seq_drag = 3;
@@ -2210,6 +2417,7 @@ struct DeskUi {
     void seq_begin_clip(int i, int mx, int my) {
         if (i < 0 || i >= static_cast<int>(seq_clips.size())) return;
         seq_sel = i;
+        seq_tsel = -1;
         seq_drag = 1;
         seq_drag_i = i;
         seq_grab_t0 = seq_clips[i].t0;
@@ -2222,29 +2430,48 @@ struct DeskUi {
         if (x1 - x0 > 28 && mx >= x1 - 10) seq_drag = 2;
     }
 
+    void seq_begin_trend(int i, int mx, int my) {
+        if (i < 0 || i >= static_cast<int>(seq_trends.size())) return;
+        seq_tsel = i;
+        seq_sel = -1;
+        seq_drag = 4;
+        seq_drag_i = i;
+        seq_grab_t0 = seq_trends[i].t0;
+        seq_grab_t1 = seq_trends[i].t1;
+        seq_drag_x = mx;
+        seq_drag_y = my;
+        seq_drag_moved = false;
+        int x1 = seq_t_to_x(seq_trends[i].t1);
+        int x0 = seq_t_to_x(seq_trends[i].t0);
+        if (x1 - x0 > 28 && mx >= x1 - 10) seq_drag = 5;
+    }
+
     void seq_drag_move(int mx) {
-        if (seq_drag_i < 0 || seq_drag_i >= static_cast<int>(seq_clips.size())) return;
         if (seq_arr.w < 8 || seq_span < 60) return;
+        bool trend = seq_drag == 4 || seq_drag == 5;
+        if (!trend && (seq_drag_i < 0 || seq_drag_i >= static_cast<int>(seq_clips.size()))) return;
+        if (trend && (seq_drag_i < 0 || seq_drag_i >= static_cast<int>(seq_trends.size()))) return;
         long dt = static_cast<long>(
             static_cast<double>(mx - seq_drag_x) / static_cast<double>(seq_arr.w)
             * static_cast<double>(seq_span));
-        auto& c = seq_clips[seq_drag_i];
-        if (seq_drag == 1) {
+        long& t0r = trend ? seq_trends[seq_drag_i].t0 : seq_clips[seq_drag_i].t0;
+        long& t1r = trend ? seq_trends[seq_drag_i].t1 : seq_clips[seq_drag_i].t1;
+        if (seq_drag == 1 || seq_drag == 4) {
             long dur = std::max(15L * 60L, seq_grab_t1 - seq_grab_t0);
             long t0 = seq_snap_t(seq_grab_t0 + dt);
             long min_t = seq_view_t - dur + 15L * 60L;
             long max_t = seq_view_t + seq_span - 15L * 60L;
             if (t0 < min_t) t0 = seq_snap_t(min_t);
             if (t0 > max_t) t0 = seq_snap_t(max_t);
-            c.t0 = t0;
-            c.t1 = t0 + dur;
-        } else if (seq_drag == 2) {
+            t0r = t0;
+            t1r = t0 + dur;
+        } else if (seq_drag == 2 || seq_drag == 5) {
             long t1 = seq_snap_t(seq_grab_t1 + dt);
             long max_t = seq_view_t + seq_span;
             if (t1 > max_t) t1 = seq_snap_t(max_t);
             if (t1 < seq_grab_t0 + 15L * 60L) t1 = seq_grab_t0 + 15L * 60L;
-            c.t0 = seq_grab_t0;
-            c.t1 = t1;
+            t0r = seq_grab_t0;
+            t1r = t1;
         }
     }
 
@@ -2272,15 +2499,20 @@ struct DeskUi {
     }
 
     void seq_finish_drag() {
-        if (seq_drag == 1 || seq_drag == 2) {
-            if (seq_drag_moved) {
-                seq_want.clear();
-                seq_save();
-                if (seq_armed) seq_apply();
-                else if (seq_drag_i >= 0 && seq_drag_i < static_cast<int>(seq_clips.size())) {
-                    auto& c = seq_clips[seq_drag_i];
-                    say(seq_name_of(c.bot) + "  " + seq_clock(c.t0) + " - " + seq_clock(c.t1));
-                }
+        bool trend = seq_drag == 4 || seq_drag == 5;
+        bool clip = seq_drag == 1 || seq_drag == 2;
+        if ((trend || clip) && seq_drag_moved) {
+            if (trend) seq_trend_want.clear();
+            else seq_want.clear();
+            seq_save();
+            if (seq_armed) seq_apply();
+            else if (clip && seq_drag_i >= 0 && seq_drag_i < static_cast<int>(seq_clips.size())) {
+                auto& c = seq_clips[seq_drag_i];
+                say(seq_name_of(c.bot) + "  " + seq_clock(c.t0) + " - " + seq_clock(c.t1));
+            } else if (trend && seq_drag_i >= 0 && seq_drag_i < static_cast<int>(seq_trends.size())) {
+                auto& c = seq_trends[seq_drag_i];
+                say(seq_name_of(c.bot) + " trend " + c.side + "  " + seq_clock(c.t0) + " - " + seq_clock(c.t1)
+                    + ". Does not close.");
             }
         }
         seq_drag = 0;
@@ -2652,12 +2884,16 @@ std::string action_tip(const DeskUi& ui, const Hit& h) {
             if (h.key == "arm")
                 return ui.seq_armed
                     ? "stop the sequencer. Hunters stay as they are. Positions stay."
-                    : "arm the sequencer. Click again. A block is online time. Positions stay.";
+                    : "arm the sequencer. Click again. A block is online time. A trend sets LONG, SHORT, or FLAT and does not close.";
             if (h.key == "7d") return "scope from now through 7 days";
             if (h.key == "am") return "scope from now until tomorrow 08:00";
+            if (h.key == "long" || h.key == "flat" || h.key == "short")
+                return "paint TREND " + h.key + ". Click the line above a controller. Does not close.";
             if (h.key == "pick") return "drag this controller onto the timeline";
             if (h.key == "clip") return "drag the block. Drag the right edge to resize. Right-click removes it.";
             if (h.key == "lane") return "click to paste the selected controller on this lane";
+            if (h.key == "trend") return "click to set TREND " + ui.seq_paint + " from here. Does not close.";
+            if (h.key == "tclip") return "drag the trend. Drag the right edge to resize. Right-click removes it. Does not close.";
             return {};
         default:
             return {};
@@ -5855,8 +6091,9 @@ int run_desk(FlaskApi& api) {
             ui.seq_load();
             ui.seq_sync_span();
             auto lanes = ui.seq_lanes();
-            const int bar_h = 100;
-            const int rh = 30;
+            const int bar_h = 116;
+            const int rh = 50;
+            const int trend_h = 18;
             const int label_w = 168;
             const int x0 = 12;
             int arr_x = x0 + label_w + 8;
@@ -5890,23 +6127,54 @@ int run_desk(FlaskApi& api) {
                 if (y + rh < view.y || y > view.y + view.h) continue;
                 Rect row{x0, y, W - 24, rh - 2};
                 fill(dpy, buf, gc, (i % 2) ? C.panel : C.bg, row);
+                int lane_y = y + trend_h;
+                int lane_h = rh - trend_h;
+                text(dpy, buf, gc, C.muted, x0 + 18, y + 12, "TREND");
                 int st = ui.seq_state(L.id);
                 unsigned long dot = st == 1 ? C.green : (st == 2 ? C.rose : C.muted);
-                fill(dpy, buf, gc, dot, Rect{x0 + 4, y + 11, 8, 8});
+                fill(dpy, buf, gc, dot, Rect{x0 + 4, lane_y + 12, 8, 8});
                 unsigned long nc = (ui.seq_pick == L.id) ? C.gold : C.text;
-                text(dpy, buf, gc, nc, x0 + 18, y + 19, fit_px(L.name, label_w - 24));
-                Rect name{x0, y, label_w, rh - 2};
-                if (y >= view.y && y + rh <= view.y + view.h + rh)
+                text(dpy, buf, gc, nc, x0 + 18, lane_y + 20, fit_px(L.name, label_w - 24));
+                Rect name{x0, lane_y, label_w, lane_h - 2};
+                if (lane_y >= view.y && lane_y + lane_h <= view.y + view.h + lane_h)
                     ui.hits.push_back({Hit::Seq, i, name, "pick"});
-                Rect lane{arr_x, y + 2, arr_w, rh - 6};
+                Rect trend{arr_x, y + 1, arr_w, trend_h - 2};
+                fill(dpy, buf, gc, C.navy, trend);
+                stroke(dpy, buf, gc, C.border, trend);
+                if (y >= view.y && y + trend_h <= view.y + view.h)
+                    ui.hits.push_back({Hit::Seq, i, trend, "trend"});
+                for (int ti = 0; ti < static_cast<int>(ui.seq_trends.size()); ++ti) {
+                    auto& c = ui.seq_trends[ti];
+                    if (c.bot != L.id || c.t1 <= c.t0) continue;
+                    int x1 = ui.seq_t_to_x(c.t0);
+                    int x2 = ui.seq_t_to_x(c.t1);
+                    if (x2 < arr_x || x1 > arr_x + arr_w) continue;
+                    int vx1 = std::max(arr_x + 1, x1);
+                    int vx2 = std::min(arr_x + arr_w - 1, x2);
+                    if (vx2 - vx1 < 2) continue;
+                    bool live = ui.seq_view_t >= c.t0 && ui.seq_view_t < c.t1;
+                    unsigned long sc = bias_col(C, c.side);
+                    unsigned long fc = C.navy;
+                    if (c.side == "LONG") fc = rgb(dpy, cm, 8, live ? 42 : 28, live ? 50 : 34);
+                    else if (c.side == "SHORT") fc = rgb(dpy, cm, live ? 50 : 34, 10, 16);
+                    else fc = rgb(dpy, cm, live ? 44 : 30, live ? 34 : 24, 8);
+                    Rect cr{vx1, y + 2, vx2 - vx1, trend_h - 4};
+                    fill(dpy, buf, gc, fc, cr);
+                    stroke(dpy, buf, gc, (ui.seq_tsel == ti) ? C.white : sc, cr);
+                    if (cr.w > 40)
+                        text(dpy, buf, gc, sc, cr.x + 4, cr.y + 11, c.side);
+                    if (y >= view.y && y + trend_h <= view.y + view.h + 4)
+                        ui.hits.push_back({Hit::Seq, ti, cr, "tclip"});
+                }
+                Rect lane{arr_x, lane_y + 1, arr_w, lane_h - 4};
                 fill(dpy, buf, gc, C.navy, lane);
                 stroke(dpy, buf, gc, C.border, lane);
                 for (long tk : ticks) {
                     int tx = ui.seq_t_to_x(tk);
                     if (tx <= arr_x || tx >= arr_x + arr_w) continue;
-                    fill(dpy, buf, gc, C.border, Rect{tx, y + 2, 1, rh - 6});
+                    fill(dpy, buf, gc, C.border, Rect{tx, lane_y + 1, 1, lane_h - 4});
                 }
-                if (y >= view.y && y + rh - 2 <= view.y + view.h)
+                if (lane_y >= view.y && lane_y + lane_h - 2 <= view.y + view.h)
                     ui.hits.push_back({Hit::Seq, i, lane, "lane"});
                 unsigned long col = parse_hex(dpy, cm, L.color, C.gold);
                 for (int ci = 0; ci < static_cast<int>(ui.seq_clips.size()); ++ci) {
@@ -5919,12 +6187,12 @@ int run_desk(FlaskApi& api) {
                     int vx2 = std::min(arr_x + arr_w - 1, x2);
                     if (vx2 - vx1 < 2) continue;
                     bool live = ui.seq_view_t >= c.t0 && ui.seq_view_t < c.t1;
-                    Rect cr{vx1, y + 5, vx2 - vx1, rh - 12};
+                    Rect cr{vx1, lane_y + 4, vx2 - vx1, lane_h - 10};
                     fill(dpy, buf, gc, live ? rgb(dpy, cm, 12, 48, 28) : rgb(dpy, cm, 28, 32, 18), cr);
                     stroke(dpy, buf, gc, (ui.seq_sel == ci) ? C.white : (live ? C.green : col), cr);
                     if (cr.w > 36)
                         text(dpy, buf, gc, C.text, cr.x + 4, cr.y + 14, fit_px(L.name, cr.w - 8));
-                    if (y >= view.y && y + rh <= view.y + view.h + 4)
+                    if (lane_y >= view.y && lane_y + lane_h <= view.y + view.h + 4)
                         ui.hits.push_back({Hit::Seq, ci, cr, "clip"});
                 }
                 if (ui.seq_drag == 3 && ui.seq_drag_moved && ui.seq_drag_bot == L.id) {
@@ -5935,7 +6203,7 @@ int run_desk(FlaskApi& api) {
                     gx1 = std::max(arr_x + 1, gx1);
                     gx2 = std::min(arr_x + arr_w - 1, gx2);
                     if (gx2 - gx1 > 4)
-                        stroke(dpy, buf, gc, C.gold, Rect{gx1, y + 5, gx2 - gx1, rh - 12});
+                        stroke(dpy, buf, gc, C.gold, Rect{gx1, lane_y + 4, gx2 - gx1, lane_h - 10});
                 }
             }
             set_clip(dpy, gc, body);
@@ -5948,7 +6216,8 @@ int run_desk(FlaskApi& api) {
             text(dpy, buf, gc, C.cyan, x0 + 110, y, fit_px(end, 280));
             std::string state = ui.seq_armed ? "ARMED" : "stopped";
             text(dpy, buf, gc, ui.seq_armed ? C.green : C.muted, x0 + 400, y,
-                 state + "   " + std::to_string(ui.seq_clips.size()) + " blocks");
+                 state + "   " + std::to_string(ui.seq_clips.size()) + " blocks   "
+                 + std::to_string(ui.seq_trends.size()) + " trends");
             y += 14;
             Rect b7{x0, y, 78, 22};
             if (ui.seq_scope != "am") fill(dpy, buf, gc, rgb(dpy, cm, 40, 32, 8), b7);
@@ -5966,8 +6235,26 @@ int run_desk(FlaskApi& api) {
             text(dpy, buf, gc, ui.seq_armed ? C.green : C.gold, barm.x + (ui.seq_armed ? 16 : 22), barm.y + 15,
                  ui.seq_armed ? "STOP" : "ARM");
             ui.hits.push_back({Hit::Seq, 0, barm, "arm"});
+            int px = x0 + 304;
+            auto paint_btn = [&](const char* word, const char* key, unsigned long col) {
+                int bw = static_cast<int>(strlen(word)) * CHAR_W + 18;
+                Rect br{px, y, bw, 22};
+                bool on = ui.seq_paint == word;
+                if (on) fill(dpy, buf, gc, col, br);
+                stroke(dpy, buf, gc, col, br);
+                int tx = br.x + (br.w - static_cast<int>(strlen(word)) * CHAR_W) / 2;
+                text(dpy, buf, gc, on ? C.bg : col, tx, br.y + 15, word);
+                ui.hits.push_back({Hit::Seq, 0, br, key});
+                px += bw + 6;
+            };
+            paint_btn("LONG", "long", C.cyan);
+            paint_btn("FLAT", "flat", C.gold);
+            paint_btn("SHORT", "short", C.rose);
             text(dpy, buf, gc, C.muted, x0, body.y + 68,
-                 fit_px("Drag a name onto its lane. A block is online. Outside it a hunter pauses, a V2 stops. Positions stay. Right-click removes a block.",
+                 fit_px("Drag a name onto its lane. A block is online. Outside it a hunter pauses, a V2 stops. Positions stay.",
+                        W - 36));
+            text(dpy, buf, gc, C.muted, x0, body.y + 84,
+                 fit_px("TREND above the lane sets LONG, SHORT, or FLAT and does not close. Right-click removes a block.",
                         W - 36));
 
             int ry = body.y + bar_h - 12;
@@ -6827,12 +7114,17 @@ int run_desk(FlaskApi& api) {
                         && ui.seq_drag_i >= 0 && ui.seq_drag_i < (int)ui.seq_clips.size()) {
                         ui.seq_clips[ui.seq_drag_i].t0 = ui.seq_grab_t0;
                         ui.seq_clips[ui.seq_drag_i].t1 = ui.seq_grab_t1;
+                    } else if ((ui.seq_drag == 4 || ui.seq_drag == 5)
+                        && ui.seq_drag_i >= 0 && ui.seq_drag_i < (int)ui.seq_trends.size()) {
+                        ui.seq_trends[ui.seq_drag_i].t0 = ui.seq_grab_t0;
+                        ui.seq_trends[ui.seq_drag_i].t1 = ui.seq_grab_t1;
                     }
                     ui.seq_drag = 0;
                     ui.seq_drag_moved = false;
                     redraw();
                 } else if (ui.page == PgStrategy && (ks == XK_Delete || ks == XK_BackSpace)) {
-                    ui.seq_delete_sel();
+                    if (ui.seq_tsel >= 0) ui.seq_delete_trend();
+                    else ui.seq_delete_sel();
                     redraw();
                 } else if (ui.funds_edit && ui.page == PgFunds) {
                     char chs[8]{};
@@ -7166,8 +7458,16 @@ int run_desk(FlaskApi& api) {
                 } else if (e.xbutton.button == 3 && ui.page == PgStrategy) {
                     for (int hi = static_cast<int>(ui.hits.size()) - 1; hi >= 0; --hi) {
                         auto& h = ui.hits[hi];
-                        if (!inside(h.r, mx, my) || h.kind != Hit::Seq || h.key != "clip") continue;
+                        if (!inside(h.r, mx, my) || h.kind != Hit::Seq) continue;
+                        if (h.key == "tclip") {
+                            ui.seq_tsel = h.i;
+                            ui.seq_sel = -1;
+                            ui.seq_delete_trend();
+                            break;
+                        }
+                        if (h.key != "clip") continue;
                         ui.seq_sel = h.i;
+                        ui.seq_tsel = -1;
                         ui.seq_delete_sel();
                         break;
                     }
@@ -7375,6 +7675,14 @@ int run_desk(FlaskApi& api) {
                             else if (h.key == "pick") ui.seq_begin_pick(h.i, mx, my);
                             else if (h.key == "clip") ui.seq_begin_clip(h.i, mx, my);
                             else if (h.key == "lane") ui.seq_paste_lane(h.i, mx);
+                            else if (h.key == "trend" && h.i >= 0
+                                     && h.i < static_cast<int>(ui.seq_lane_ids.size()))
+                                ui.seq_add_trend(ui.seq_lane_ids[h.i], mx);
+                            else if (h.key == "tclip") ui.seq_begin_trend(h.i, mx, my);
+                            else if (h.key == "long" || h.key == "flat" || h.key == "short") {
+                                ui.seq_paint = h.key == "short" ? "SHORT" : (h.key == "flat" ? "FLAT" : "LONG");
+                                ui.say("trend paint " + ui.seq_paint + ". Click the line above a controller. Does not close.");
+                            }
                             redraw();
                         } else if (h.kind == Hit::Quit) {
                             run = false;
@@ -7977,7 +8285,8 @@ int run_desk(FlaskApi& api) {
                 if (ui.seq_drag) {
                     if (std::abs(e.xmotion.x - ui.seq_drag_x) + std::abs(e.xmotion.y - ui.seq_drag_y) > 4)
                         ui.seq_drag_moved = true;
-                    if ((ui.seq_drag == 1 || ui.seq_drag == 2) && ui.seq_drag_moved)
+                    if ((ui.seq_drag == 1 || ui.seq_drag == 2 || ui.seq_drag == 4 || ui.seq_drag == 5)
+                        && ui.seq_drag_moved)
                         ui.seq_drag_move(e.xmotion.x);
                     redraw();
                 } else if (ui.knob_drag) {
