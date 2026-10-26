@@ -171,7 +171,7 @@ enum Page { PgHome, PgWire, PgCondor, PgHunters, PgFunds, PgStrategy, PgSystem, 
 const char* PAGE_NAME[] = {"HOME", "WIRE", "CONDOR", "HUNTERS", "FUNDS", "STRATEGY", "SYSTEM"};
 
 struct Hit {
-    enum Kind { Idle, Nav, Hunter, NotWired, WireNode, WireEdge, WirePort, ToolCat, ToolItem, WireBoard, WireAct, Ctx, Backend, Chart, Sl, Lev, Restart, HunterGate, DeskBias, CoinBias, CoinClose, CoinOpen100, CtrlBool, CtrlKnob, CtrlSel, CtrlStd, CopyMute, CopySlots, CopyAudit, AuditClose, AuditRun, Quit, PackSave, PackRestore, WireSnap, AnnotColor, AnnotSize, InspectBack, CompileClose, CompileWork, CompileGo, PresetDrop, PresetPick, PresetSave, ApiKey, ReplYes, ReplNo, FundsDel, FundsAdd, FundsField, FundsRename } kind = Idle;
+    enum Kind { Idle, Nav, Hunter, NotWired, WireNode, WireEdge, WirePort, ToolCat, ToolItem, WireBoard, WireAct, Ctx, Backend, Chart, Sl, Lev, Restart, HunterGate, DeskBias, CoinBias, CoinClose, CoinOpen100, CtrlBool, CtrlKnob, CtrlSel, CtrlStd, CopyMute, CopySlots, CopyAudit, AuditClose, AuditRun, Quit, PackSave, PackRestore, WireSnap, AnnotColor, AnnotSize, InspectBack, CompileClose, CompileWork, CompileGo, PresetDrop, PresetPick, PresetSave, ApiKey, ReplYes, ReplNo, FundsDel, FundsAdd, FundsField, FundsRename, Seq } kind = Idle;
     int i = -1;
     Rect r{};
     std::string key;
@@ -807,6 +807,44 @@ struct DeskUi {
     std::string api_addr;
     std::string api_exch;
     std::string api_note;
+
+    struct SeqClip {
+        std::string id;
+        std::string bot;
+        long t0 = 0;
+        long t1 = 0;
+    };
+    struct SeqLane {
+        std::string id;
+        std::string name;
+        std::string color;
+    };
+    bool seq_ok = false;
+    bool seq_armed = false;
+    std::string seq_scope = "7d";
+    long seq_span = 7L * 24L * 3600L;
+    long seq_view_t = 0;
+    std::vector<SeqClip> seq_clips;
+    std::vector<SeqLane> seq_v2;
+    bool seq_v2_ok = false;
+    int seq_sel = -1;
+    std::string seq_pick;
+    int seq_drag = 0;
+    int seq_drag_i = -1;
+    std::string seq_drag_bot;
+    long seq_grab_t0 = 0;
+    long seq_grab_t1 = 0;
+    int seq_drag_x = 0;
+    int seq_drag_y = 0;
+    bool seq_drag_moved = false;
+    Rect seq_arr{};
+    Rect seq_view{};
+    int seq_row_h = 30;
+    int seq_rows_y = 0;
+    std::vector<std::string> seq_lane_ids;
+    std::map<std::string, int> seq_live;
+    std::map<std::string, int> seq_want;
+    std::string seq_last_summary;
 
     double now() {
         timespec ts{};
@@ -1569,6 +1607,506 @@ struct DeskUi {
         pan_y = miny - (canvas.h / zoom - bh) * 0.5;
         wire_fitted = true;
     }
+
+    // Sequencer. A block is when that controller is online. Empty lanes are
+    // left alone. ARM is off until the operator clicks it twice. Positions stay.
+    static bool seq_id_ok(const std::string& id) {
+        if (id.empty() || id.size() > 64) return false;
+        for (unsigned char c : id) {
+            bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                || (c >= '0' && c <= '9') || c == '-' || c == '_';
+            if (!ok) return false;
+        }
+        return true;
+    }
+
+    static long seq_snap_t(long t) {
+        const long q = 15L * 60L;
+        if (t < 0) return 0;
+        return (t / q) * q;
+    }
+
+    static std::string seq_clock(long t) {
+        time_t tt = static_cast<time_t>(t);
+        tm loc{};
+        localtime_r(&tt, &loc);
+        static const char* mon[] = {
+            "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+        int mi = loc.tm_mon;
+        if (mi < 0 || mi > 11) mi = 0;
+        char b[40];
+        snprintf(b, sizeof(b), "%02d %s %02d:%02d", loc.tm_mday, mon[mi], loc.tm_hour, loc.tm_min);
+        return b;
+    }
+
+    static long seq_morning_span() {
+        time_t now = time(nullptr);
+        tm loc{};
+        localtime_r(&now, &loc);
+        loc.tm_mday += 1;
+        loc.tm_hour = 8;
+        loc.tm_min = 0;
+        loc.tm_sec = 0;
+        loc.tm_isdst = -1;
+        time_t goal = mktime(&loc);
+        long span = static_cast<long>(difftime(goal, now));
+        if (span < 3600) span = 3600;
+        if (span > 40L * 3600L) span = 40L * 3600L;
+        return span;
+    }
+
+    void seq_sync_span() {
+        seq_view_t = static_cast<long>(time(nullptr));
+        if (seq_scope == "am") seq_span = seq_morning_span();
+        else {
+            seq_scope = "7d";
+            seq_span = 7L * 24L * 3600L;
+        }
+    }
+
+    long seq_x_to_t(int x) const {
+        long t0 = seq_view_t > 0 ? seq_view_t : static_cast<long>(time(nullptr));
+        long span = seq_span > 60 ? seq_span : 60;
+        if (seq_arr.w < 8) return t0;
+        double u = static_cast<double>(x - seq_arr.x) / static_cast<double>(seq_arr.w);
+        if (u < 0) u = 0;
+        if (u > 1) u = 1;
+        return t0 + static_cast<long>(u * static_cast<double>(span));
+    }
+
+    int seq_t_to_x(long t) const {
+        long t0 = seq_view_t;
+        long span = seq_span > 60 ? seq_span : 60;
+        if (seq_arr.w < 8) return seq_arr.x;
+        double u = static_cast<double>(t - t0) / static_cast<double>(span);
+        return seq_arr.x + static_cast<int>(u * static_cast<double>(seq_arr.w));
+    }
+
+    void seq_load_v2() {
+        if (seq_v2_ok) return;
+        seq_v2_ok = true;
+        std::ifstream in(desk_repo() + "/conf/v2_sleepers.json");
+        if (!in) return;
+        try {
+            nlohmann::json j;
+            in >> j;
+            if (!j.contains("sleepers") || !j["sleepers"].is_array()) return;
+            for (auto& s : j["sleepers"]) {
+                if (!s.is_object()) continue;
+                SeqLane L;
+                L.id = s.value("id", "");
+                L.name = s.value("name", L.id);
+                L.color = s.value("color", "#9dffc0");
+                if (!seq_id_ok(L.id)) continue;
+                seq_v2.push_back(L);
+            }
+        } catch (...) {
+            seq_v2.clear();
+        }
+    }
+
+    std::vector<SeqLane> seq_lanes() {
+        seq_load_v2();
+        std::vector<SeqLane> out;
+        std::set<std::string> seen;
+        for (auto& b : snap.bots) {
+            if (!seq_id_ok(b.id) || seen.count(b.id)) continue;
+            seen.insert(b.id);
+            SeqLane L;
+            L.id = b.id;
+            L.name = b.name.empty() ? b.id : b.name;
+            L.color = b.color.empty() ? "#9dffc0" : b.color;
+            out.push_back(L);
+        }
+        for (auto& v : seq_v2) {
+            if (seen.count(v.id)) continue;
+            seen.insert(v.id);
+            out.push_back(v);
+        }
+        return out;
+    }
+
+    std::string seq_name_of(const std::string& id) {
+        for (auto& b : snap.bots)
+            if (b.id == id && !b.name.empty()) return b.name;
+        for (auto& v : seq_v2)
+            if (v.id == id && !v.name.empty()) return v.name;
+        return id;
+    }
+
+    bool seq_known(const std::string& id) {
+        seq_load_v2();
+        for (auto& b : snap.bots)
+            if (b.id == id) return true;
+        for (auto& v : seq_v2)
+            if (v.id == id) return true;
+        return false;
+    }
+
+    Bot* seq_bot(const std::string& id) {
+        for (auto& b : snap.bots)
+            if (b.id == id) return &b;
+        return nullptr;
+    }
+
+    std::string seq_path() const { return desk_repo() + "/conf/sequencer.json"; }
+
+    void seq_load() {
+        if (seq_ok) return;
+        seq_ok = true;
+        seq_load_v2();
+        std::ifstream in(seq_path());
+        if (!in) return;
+        try {
+            nlohmann::json j;
+            in >> j;
+            if (!j.is_object()) return;
+            std::string sc = j.value("scope", "7d");
+            seq_scope = (sc == "am") ? "am" : "7d";
+            seq_armed = j.value("armed", false);
+            seq_clips.clear();
+            if (!j.contains("clips") || !j["clips"].is_array()) return;
+            long now = static_cast<long>(time(nullptr));
+            for (auto& c : j["clips"]) {
+                if (!c.is_object() || seq_clips.size() >= 64) break;
+                SeqClip k;
+                k.id = c.value("id", "");
+                k.bot = c.value("bot", "");
+                k.t0 = c.value("t0", 0L);
+                k.t1 = c.value("t1", 0L);
+                if (!seq_id_ok(k.bot) || k.t1 <= k.t0) continue;
+                if (k.t1 - k.t0 > 21L * 24L * 3600L) continue;
+                if (k.t1 < now - 2L * 24L * 3600L) continue;
+                if (k.t0 > now + 21L * 24L * 3600L) continue;
+                if (k.id.empty()) k.id = "s" + std::to_string(k.t0);
+                seq_clips.push_back(k);
+            }
+        } catch (...) {
+            seq_clips.clear();
+            seq_armed = false;
+        }
+        seq_sync_span();
+    }
+
+    void seq_save() {
+        seq_load_v2();
+        nlohmann::json clips = nlohmann::json::array();
+        for (auto& c : seq_clips) {
+            if (!seq_id_ok(c.bot) || c.t1 <= c.t0) continue;
+            clips.push_back({{"id", c.id}, {"bot", c.bot}, {"t0", c.t0}, {"t1", c.t1}});
+        }
+        nlohmann::json j = {
+            {"v", 1},
+            {"armed", seq_armed},
+            {"scope", seq_scope == "am" ? "am" : "7d"},
+            {"clips", clips},
+        };
+        std::string path = seq_path();
+        std::string tmp = path + ".tmp";
+        {
+            std::ofstream out(tmp);
+            if (!out) {
+                say("could not save the sequencer");
+                return;
+            }
+            out << j.dump(2) << "\n";
+        }
+        if (std::rename(tmp.c_str(), path.c_str()) != 0)
+            say("could not save the sequencer");
+    }
+
+    void seq_probe() {
+        FILE* fp = popen(
+            "docker ps -a --filter name=hummingbot --format '{{.Names}} {{.Status}}' 2>/dev/null",
+            "r");
+        if (!fp) return;
+        std::map<std::string, int> found;
+        char line[320];
+        while (fgets(line, sizeof(line), fp)) {
+            std::string row = line;
+            while (!row.empty() && (row.back() == '\n' || row.back() == '\r')) row.pop_back();
+            auto sp = row.find(' ');
+            if (sp == std::string::npos || sp == 0) continue;
+            std::string name = row.substr(0, sp);
+            std::string status = row.substr(sp + 1);
+            int st = 0;
+            if (status.rfind("Up", 0) == 0)
+                st = (status.find("Paused") != std::string::npos) ? 2 : 1;
+            if (seq_id_ok(name)) found[name] = st;
+        }
+        pclose(fp);
+        seq_live.swap(found);
+    }
+
+    int seq_state(const std::string& id) {
+        if (Bot* b = seq_bot(id)) {
+            if (b->deactivated) return 2;
+            if (b->running) return 1;
+            return 0;
+        }
+        auto it = seq_live.find(id);
+        if (it == seq_live.end()) return 0;
+        return it->second;
+    }
+
+    static std::string seq_line(const std::string& name, const std::string& raw) {
+        if (raw.find("cap") != std::string::npos)
+            return "V2 cap is full. Stop one controller first. Positions stay.";
+        if (raw.find("WRITE") != std::string::npos)
+            return "enable WRITE MODE in springctl. Positions stay.";
+        if (raw.find("started") != std::string::npos || raw.find("ACTIVE") != std::string::npos)
+            return name + " online. Positions stay.";
+        if (raw.find("asleep") != std::string::npos || raw.find("DEACTIVATED") != std::string::npos
+            || raw.find("offline") != std::string::npos)
+            return name + " offline. Positions stay.";
+        if (raw.find("failed") != std::string::npos || raw.find("not a") != std::string::npos)
+            return "could not change " + name + ". Positions stay.";
+        if (raw.find("does not start") != std::string::npos)
+            return name + " is off. Sequencer does not start a stopped hunter. Positions stay.";
+        return ascii(raw, 140);
+    }
+
+    static bool seq_bad(const std::string& raw) {
+        return raw.find("failed") != std::string::npos
+            || raw.find("cap") != std::string::npos
+            || raw.find("WRITE") != std::string::npos
+            || raw.find("not a") != std::string::npos
+            || raw.find("does not start") != std::string::npos
+            || raw.find("could not") != std::string::npos;
+    }
+
+    void seq_apply() {
+        if (!seq_armed || !api) return;
+        seq_load();
+        seq_load_v2();
+        if (seq_clips.empty()) return;
+        long now = static_cast<long>(time(nullptr));
+        std::map<std::string, int> cover;
+        for (auto& c : seq_clips) {
+            if (!seq_id_ok(c.bot) || !seq_known(c.bot) || c.t1 <= c.t0) continue;
+            if (!cover.count(c.bot)) cover[c.bot] = 0;
+            if (now >= c.t0 && now < c.t1) cover[c.bot] = 1;
+        }
+        std::vector<std::string> lines;
+        for (auto& kv : cover) {
+            const std::string& id = kv.first;
+            bool on = kv.second == 1;
+            int prev = seq_want.count(id) ? seq_want[id] : -1;
+            if (prev == (on ? 1 : 0)) continue;
+            int st = seq_state(id);
+            bool v2 = id.rfind("hummingbot-v2-", 0) == 0;
+            std::string name = seq_name_of(id);
+            std::string raw;
+            if (on) {
+                if (st == 1) {
+                    seq_want[id] = 1;
+                    continue;
+                }
+                if (st == 2) raw = api->post_hunter_gate(id, true);
+                else if (v2) raw = api->sleeper_start(id);
+                else raw = name + " is off. Sequencer does not start a stopped hunter.";
+            } else if (v2) {
+                if (st == 0) {
+                    seq_want[id] = 0;
+                    continue;
+                }
+                raw = api->sleeper_stop(id);
+                if (seq_bad(raw) && st == 1) raw = api->post_hunter_gate(id, false);
+            } else {
+                if (st != 1) {
+                    seq_want[id] = 0;
+                    continue;
+                }
+                raw = api->post_hunter_gate(id, false);
+            }
+            std::string line = seq_line(name, raw);
+            if (!seq_bad(raw) && !seq_bad(line)) seq_want[id] = on ? 1 : 0;
+            lines.push_back(line);
+        }
+        std::string summary;
+        if (lines.size() == 1) summary = lines[0];
+        else if (!lines.empty())
+            summary = "sequencer updated " + std::to_string(lines.size()) + " controllers. Positions stay.";
+        if (!summary.empty() && summary != seq_last_summary) {
+            say(summary);
+            seq_last_summary = summary;
+        } else if (summary.empty()) {
+            seq_last_summary.clear();
+        }
+    }
+
+    void seq_set_scope(const std::string& scope) {
+        seq_scope = (scope == "am") ? "am" : "7d";
+        seq_sync_span();
+        seq_save();
+        say(seq_scope == "am"
+            ? ("scope until tomorrow 08:00  -  " + seq_clock(seq_view_t + seq_span))
+            : "scope from now through 7 days");
+    }
+
+    void seq_toggle_arm() {
+        if (seq_armed) {
+            seq_armed = false;
+            seq_want.clear();
+            seq_last_summary.clear();
+            seq_save();
+            say("sequencer stopped. Hunters stay as they are. Positions stay.");
+            return;
+        }
+        if (!arm("seq", "arm sequencer - click ARM again. A block is the online time. Before that block the controller goes offline. Positions stay."))
+            return;
+        seq_armed = true;
+        seq_want.clear();
+        seq_last_summary.clear();
+        seq_save();
+        seq_probe();
+        seq_apply();
+        if (seq_last_summary.empty())
+            say("sequencer armed. Positions stay. Stops wait while a controller is offline.");
+    }
+
+    void seq_add_block(const std::string& bot, long t_at) {
+        if (!seq_id_ok(bot) || !seq_known(bot)) {
+            say("that controller is not on this matrix");
+            return;
+        }
+        if (seq_clips.size() >= 64) {
+            say("64 blocks is the limit");
+            return;
+        }
+        seq_sync_span();
+        long dur = seq_span / 12;
+        if (dur < 30L * 60L) dur = 30L * 60L;
+        dur = (dur / (15L * 60L)) * (15L * 60L);
+        if (dur < 15L * 60L) dur = 15L * 60L;
+        long t0 = seq_snap_t(t_at);
+        long t1 = t0 + dur;
+        long end = seq_view_t + seq_span;
+        if (t1 > end) t1 = seq_snap_t(end);
+        if (t1 < t0 + 15L * 60L) {
+            t1 = end;
+            t0 = t1 - 15L * 60L;
+        }
+        if (t0 < seq_view_t - 15L * 60L) t0 = seq_snap_t(seq_view_t);
+        if (t1 <= t0) t1 = t0 + 15L * 60L;
+        SeqClip c;
+        c.id = "s" + std::to_string(seq_view_t) + "-" + std::to_string(seq_clips.size());
+        c.bot = bot;
+        c.t0 = t0;
+        c.t1 = t1;
+        seq_clips.push_back(c);
+        seq_sel = static_cast<int>(seq_clips.size()) - 1;
+        seq_want.clear();
+        seq_save();
+        say(seq_name_of(bot) + "  " + seq_clock(t0) + " - " + seq_clock(t1) + ". Positions stay.");
+        if (seq_armed) seq_apply();
+    }
+
+    void seq_delete_sel() {
+        if (seq_sel < 0 || seq_sel >= static_cast<int>(seq_clips.size())) {
+            say("select a block first");
+            return;
+        }
+        std::string nm = seq_name_of(seq_clips[seq_sel].bot);
+        seq_clips.erase(seq_clips.begin() + seq_sel);
+        seq_sel = -1;
+        seq_want.clear();
+        seq_save();
+        say(nm + " block removed. Positions stay.");
+        if (seq_armed) seq_apply();
+    }
+
+    void seq_begin_pick(int lane, int mx, int my) {
+        if (lane < 0 || lane >= static_cast<int>(seq_lane_ids.size())) return;
+        seq_drag = 3;
+        seq_drag_i = lane;
+        seq_drag_bot = seq_lane_ids[lane];
+        seq_pick = seq_drag_bot;
+        seq_drag_x = mx;
+        seq_drag_y = my;
+        seq_drag_moved = false;
+    }
+
+    void seq_begin_clip(int i, int mx, int my) {
+        if (i < 0 || i >= static_cast<int>(seq_clips.size())) return;
+        seq_sel = i;
+        seq_drag = 1;
+        seq_drag_i = i;
+        seq_grab_t0 = seq_clips[i].t0;
+        seq_grab_t1 = seq_clips[i].t1;
+        seq_drag_x = mx;
+        seq_drag_y = my;
+        seq_drag_moved = false;
+        int x1 = seq_t_to_x(seq_clips[i].t1);
+        int x0 = seq_t_to_x(seq_clips[i].t0);
+        if (x1 - x0 > 28 && mx >= x1 - 10) seq_drag = 2;
+    }
+
+    void seq_drag_move(int mx) {
+        if (seq_drag_i < 0 || seq_drag_i >= static_cast<int>(seq_clips.size())) return;
+        if (seq_arr.w < 8 || seq_span < 60) return;
+        long dt = static_cast<long>(
+            static_cast<double>(mx - seq_drag_x) / static_cast<double>(seq_arr.w)
+            * static_cast<double>(seq_span));
+        auto& c = seq_clips[seq_drag_i];
+        if (seq_drag == 1) {
+            long dur = std::max(15L * 60L, seq_grab_t1 - seq_grab_t0);
+            long t0 = seq_snap_t(seq_grab_t0 + dt);
+            long min_t = seq_view_t - dur + 15L * 60L;
+            long max_t = seq_view_t + seq_span - 15L * 60L;
+            if (t0 < min_t) t0 = seq_snap_t(min_t);
+            if (t0 > max_t) t0 = seq_snap_t(max_t);
+            c.t0 = t0;
+            c.t1 = t0 + dur;
+        } else if (seq_drag == 2) {
+            long t1 = seq_snap_t(seq_grab_t1 + dt);
+            long max_t = seq_view_t + seq_span;
+            if (t1 > max_t) t1 = seq_snap_t(max_t);
+            if (t1 < seq_grab_t0 + 15L * 60L) t1 = seq_grab_t0 + 15L * 60L;
+            c.t0 = seq_grab_t0;
+            c.t1 = t1;
+        }
+    }
+
+    void seq_drop_new(int mx, int my) {
+        if (seq_arr.w < 8 || mx < seq_arr.x || mx >= seq_arr.x + seq_arr.w
+            || my < seq_view.y || my >= seq_view.y + seq_view.h) {
+            say("drop on the timeline");
+            return;
+        }
+        seq_add_block(seq_drag_bot, seq_x_to_t(mx));
+    }
+
+    void seq_paste_lane(int lane, int mx) {
+        if (seq_pick.empty()) {
+            say("drag a controller name onto the timeline");
+            return;
+        }
+        if (lane < 0 || lane >= static_cast<int>(seq_lane_ids.size())) return;
+        if (seq_lane_ids[lane] != seq_pick) {
+            say("selected " + seq_name_of(seq_pick) + ". Click that lane, or drag the name.");
+            return;
+        }
+        seq_sync_span();
+        seq_add_block(seq_pick, seq_x_to_t(mx));
+    }
+
+    void seq_finish_drag() {
+        if (seq_drag == 1 || seq_drag == 2) {
+            if (seq_drag_moved) {
+                seq_want.clear();
+                seq_save();
+                if (seq_armed) seq_apply();
+                else if (seq_drag_i >= 0 && seq_drag_i < static_cast<int>(seq_clips.size())) {
+                    auto& c = seq_clips[seq_drag_i];
+                    say(seq_name_of(c.bot) + "  " + seq_clock(c.t0) + " - " + seq_clock(c.t1));
+                }
+            }
+        }
+        seq_drag = 0;
+        seq_drag_moved = false;
+    }
 };
 
 void fill(Display* d, Drawable dr, GC gc, unsigned long c, const Rect& r) {
@@ -1931,6 +2469,17 @@ std::string action_tip(const DeskUi& ui, const Hit& h) {
             if (h.i == 2) return "remove this wire";
             if (h.i == 3) return "start a wire from this node";
             return "add tool from menu";
+        case Hit::Seq:
+            if (h.key == "arm")
+                return ui.seq_armed
+                    ? "stop the sequencer. Hunters stay as they are. Positions stay."
+                    : "arm the sequencer. Click again. A block is online time. Positions stay.";
+            if (h.key == "7d") return "scope from now through 7 days";
+            if (h.key == "am") return "scope from now until tomorrow 08:00";
+            if (h.key == "pick") return "drag this controller onto the timeline";
+            if (h.key == "clip") return "drag the block. Drag the right edge to resize. Right-click removes it.";
+            if (h.key == "lane") return "click to paste the selected controller on this lane";
+            return {};
         default:
             return {};
     }
@@ -2869,6 +3418,7 @@ int run_desk(FlaskApi& api) {
     DeskUi ui;
     ui.api = &api;
     ui.refresh(true);
+    ui.seq_load();
 
     auto goto_page = [&](Page p) {
         ui.page = p;
@@ -2895,6 +3445,7 @@ int run_desk(FlaskApi& api) {
             ui.api->load_qa(ui.snap);
             ui.qa_ok = true;
         }
+        if (p == PgStrategy) ui.seq_probe();
         if (p == PgSystem && !ui.backup_ok) {
             ui.api->load_backup(ui.snap);
             ui.api->load_version(ui.snap);
@@ -5122,41 +5673,133 @@ int run_desk(FlaskApi& api) {
         };
 
         auto draw_strategy = [&]() {
-            int y = body.y + 16 - ui.scroll;
-            int x = 18;
-            text(dpy, buf, gc, C.gold, x, y, "JANESTREET");
-            text(dpy, buf, gc, C.muted, x + 130, y, ascii(ui.snap.qa_message.empty()
-                ? "weekly overlay  ·  dry run  ·  add/delete not wired"
-                : ui.snap.qa_message, 90));
-            y += 24;
-            const char* days[] = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
-            text(dpy, buf, gc, C.muted, x, y, "day");
-            text(dpy, buf, gc, C.muted, x + 60, y, "min");
-            text(dpy, buf, gc, C.muted, x + 120, y, "dur");
-            text(dpy, buf, gc, C.muted, x + 180, y, "kind");
-            text(dpy, buf, gc, C.muted, x + 280, y, "bot");
-            text(dpy, buf, gc, C.muted, x + 460, y, "label");
-            y += 18;
-            if (ui.snap.qa.empty()) {
-                text(dpy, buf, gc, C.muted, x, y, "no JaneStreet blocks  ·  overlay is not armed");
-                y += 18;
+            ui.seq_load();
+            ui.seq_sync_span();
+            auto lanes = ui.seq_lanes();
+            const int bar_h = 100;
+            const int rh = 30;
+            const int label_w = 168;
+            const int x0 = 12;
+            int arr_x = x0 + label_w + 8;
+            int arr_w = std::max(80, W - arr_x - 16);
+            ui.seq_row_h = rh;
+            ui.seq_arr = Rect{arr_x, body.y + bar_h, arr_w, std::max(40, body.h - bar_h)};
+            ui.seq_view = ui.seq_arr;
+            ui.seq_lane_ids.clear();
+            for (auto& L : lanes) ui.seq_lane_ids.push_back(L.id);
+            ui.content_h = bar_h + static_cast<int>(lanes.size()) * rh + 28;
+            int maxs = std::max(0, ui.content_h - body.h);
+            if (ui.scroll > maxs) ui.scroll = maxs;
+            if (ui.scroll < 0) ui.scroll = 0;
+            ui.seq_rows_y = body.y + bar_h - ui.scroll;
+
+            Rect view{0, body.y + bar_h, W, std::max(20, body.h - bar_h)};
+            set_clip(dpy, gc, view);
+            long step = 3600;
+            if (ui.seq_span > 48L * 3600L) step = 12L * 3600L;
+            else if (ui.seq_span > 18L * 3600L) step = 3L * 3600L;
+            else if (ui.seq_span <= 6L * 3600L) step = 15L * 60L;
+            std::vector<long> ticks;
+            long tmark = ui.seq_view_t - (ui.seq_view_t % step);
+            if (tmark < ui.seq_view_t) tmark += step;
+            for (int n = 0; tmark < ui.seq_view_t + ui.seq_span && n < 48; tmark += step, ++n)
+                ticks.push_back(tmark);
+
+            for (int i = 0; i < static_cast<int>(lanes.size()); ++i) {
+                auto& L = lanes[i];
+                int y = ui.seq_rows_y + i * rh;
+                if (y + rh < view.y || y > view.y + view.h) continue;
+                Rect row{x0, y, W - 24, rh - 2};
+                fill(dpy, buf, gc, (i % 2) ? C.panel : C.bg, row);
+                int st = ui.seq_state(L.id);
+                unsigned long dot = st == 1 ? C.green : (st == 2 ? C.rose : C.muted);
+                fill(dpy, buf, gc, dot, Rect{x0 + 4, y + 11, 8, 8});
+                unsigned long nc = (ui.seq_pick == L.id) ? C.gold : C.text;
+                text(dpy, buf, gc, nc, x0 + 18, y + 19, fit_px(L.name, label_w - 24));
+                Rect name{x0, y, label_w, rh - 2};
+                if (y >= view.y && y + rh <= view.y + view.h + rh)
+                    ui.hits.push_back({Hit::Seq, i, name, "pick"});
+                Rect lane{arr_x, y + 2, arr_w, rh - 6};
+                fill(dpy, buf, gc, C.navy, lane);
+                stroke(dpy, buf, gc, C.border, lane);
+                for (long tk : ticks) {
+                    int tx = ui.seq_t_to_x(tk);
+                    if (tx <= arr_x || tx >= arr_x + arr_w) continue;
+                    fill(dpy, buf, gc, C.border, Rect{tx, y + 2, 1, rh - 6});
+                }
+                if (y >= view.y && y + rh - 2 <= view.y + view.h)
+                    ui.hits.push_back({Hit::Seq, i, lane, "lane"});
+                unsigned long col = parse_hex(dpy, cm, L.color, C.gold);
+                for (int ci = 0; ci < static_cast<int>(ui.seq_clips.size()); ++ci) {
+                    auto& c = ui.seq_clips[ci];
+                    if (c.bot != L.id || c.t1 <= c.t0) continue;
+                    int x1 = ui.seq_t_to_x(c.t0);
+                    int x2 = ui.seq_t_to_x(c.t1);
+                    if (x2 < arr_x || x1 > arr_x + arr_w) continue;
+                    int vx1 = std::max(arr_x + 1, x1);
+                    int vx2 = std::min(arr_x + arr_w - 1, x2);
+                    if (vx2 - vx1 < 2) continue;
+                    bool live = ui.seq_view_t >= c.t0 && ui.seq_view_t < c.t1;
+                    Rect cr{vx1, y + 5, vx2 - vx1, rh - 12};
+                    fill(dpy, buf, gc, live ? rgb(dpy, cm, 12, 48, 28) : rgb(dpy, cm, 28, 32, 18), cr);
+                    stroke(dpy, buf, gc, (ui.seq_sel == ci) ? C.white : (live ? C.green : col), cr);
+                    if (cr.w > 36)
+                        text(dpy, buf, gc, C.text, cr.x + 4, cr.y + 14, fit_px(L.name, cr.w - 8));
+                    if (y >= view.y && y + rh <= view.y + view.h + 4)
+                        ui.hits.push_back({Hit::Seq, ci, cr, "clip"});
+                }
+                if (ui.seq_drag == 3 && ui.seq_drag_moved && ui.seq_drag_bot == L.id) {
+                    long t_at = ui.seq_x_to_t(ui.mx_last);
+                    long dur = std::max(15L * 60L, ui.seq_span / 12);
+                    int gx1 = ui.seq_t_to_x(ui.seq_snap_t(t_at));
+                    int gx2 = ui.seq_t_to_x(ui.seq_snap_t(t_at) + dur);
+                    gx1 = std::max(arr_x + 1, gx1);
+                    gx2 = std::min(arr_x + arr_w - 1, gx2);
+                    if (gx2 - gx1 > 4)
+                        stroke(dpy, buf, gc, C.gold, Rect{gx1, y + 5, gx2 - gx1, rh - 12});
+                }
             }
-            for (auto& q : ui.snap.qa) {
-                const char* day = (q.weekday >= 0 && q.weekday < 7) ? days[q.weekday] : "?";
-                text(dpy, buf, gc, C.gold, x, y, day);
-                char b[32];
-                snprintf(b, sizeof(b), "%d", q.minute);
-                text(dpy, buf, gc, C.text, x + 60, y, b);
-                snprintf(b, sizeof(b), "%d", q.duration_min);
-                text(dpy, buf, gc, C.text, x + 120, y, b);
-                text(dpy, buf, gc, q.kind == "close_all" ? C.rose : C.cyan, x + 180, y, ascii(q.kind, 10));
-                text(dpy, buf, gc, C.muted, x + 280, y, ascii(q.bot_id, 20));
-                text(dpy, buf, gc, C.text, x + 460, y, ascii(q.label.empty() ? q.coin + " " + q.value : q.label, 40));
-                y += 16;
+            set_clip(dpy, gc, body);
+            fill(dpy, buf, gc, C.bg, Rect{0, body.y, W, bar_h});
+            int y = body.y + 18;
+            text(dpy, buf, gc, C.gold, x0, y, "SEQUENCER");
+            long hours = (ui.seq_span + 1800L) / 3600L;
+            std::string end = "ends " + ui.seq_clock(ui.seq_view_t + ui.seq_span)
+                + "   " + std::to_string(hours) + "h";
+            text(dpy, buf, gc, C.cyan, x0 + 110, y, fit_px(end, 280));
+            std::string state = ui.seq_armed ? "ARMED" : "stopped";
+            text(dpy, buf, gc, ui.seq_armed ? C.green : C.muted, x0 + 400, y,
+                 state + "   " + std::to_string(ui.seq_clips.size()) + " blocks");
+            y += 14;
+            Rect b7{x0, y, 78, 22};
+            if (ui.seq_scope != "am") fill(dpy, buf, gc, rgb(dpy, cm, 40, 32, 8), b7);
+            stroke(dpy, buf, gc, C.gold, b7);
+            text(dpy, buf, gc, C.gold, b7.x + 12, b7.y + 15, "7 DAYS");
+            ui.hits.push_back({Hit::Seq, 0, b7, "7d"});
+            Rect bam{x0 + 86, y, 124, 22};
+            if (ui.seq_scope == "am") fill(dpy, buf, gc, rgb(dpy, cm, 8, 32, 40), bam);
+            stroke(dpy, buf, gc, C.cyan, bam);
+            text(dpy, buf, gc, C.cyan, bam.x + 8, bam.y + 15, "TOMORROW AM");
+            ui.hits.push_back({Hit::Seq, 0, bam, "am"});
+            Rect barm{x0 + 220, y, 72, 22};
+            if (ui.seq_armed) fill(dpy, buf, gc, rgb(dpy, cm, 10, 48, 22), barm);
+            stroke(dpy, buf, gc, ui.seq_armed ? C.green : C.gold, barm);
+            text(dpy, buf, gc, ui.seq_armed ? C.green : C.gold, barm.x + (ui.seq_armed ? 16 : 22), barm.y + 15,
+                 ui.seq_armed ? "STOP" : "ARM");
+            ui.hits.push_back({Hit::Seq, 0, barm, "arm"});
+            text(dpy, buf, gc, C.muted, x0, body.y + 68,
+                 fit_px("Drag a name onto its lane. A block is online. Outside it a hunter pauses, a V2 stops. Positions stay. Right-click removes a block.",
+                        W - 36));
+
+            int ry = body.y + bar_h - 12;
+            text(dpy, buf, gc, C.green, arr_x, ry, "NOW");
+            for (long tk : ticks) {
+                int tx = ui.seq_t_to_x(tk);
+                if (tx < arr_x + 28 || tx > arr_x + arr_w - 40) continue;
+                std::string lab = (step >= 12L * 3600L) ? ui.seq_clock(tk).substr(0, 6) : ui.seq_clock(tk).substr(7);
+                text(dpy, buf, gc, C.muted, tx - 8, ry, lab);
             }
-            y += 16;
-            text(dpy, buf, gc, C.amber, x, y, "armed = false on Flask  ·  this UI will not POST /api/qa/item");
-            ui.content_h = y + ui.scroll - body.y + 40;
+            fill(dpy, buf, gc, C.green, Rect{arr_x, body.y + bar_h, 2, std::max(0, body.h - bar_h)});
         };
 
         auto draw_system = [&]() {
@@ -6000,7 +6643,19 @@ int run_desk(FlaskApi& api) {
                     }
                 }
                 if (annot_keys) { /* caption edit owns keys */ }
-                else if (ui.funds_edit && ui.page == PgFunds) {
+                else if (ui.page == PgStrategy && ui.seq_drag && ks == XK_Escape) {
+                    if ((ui.seq_drag == 1 || ui.seq_drag == 2)
+                        && ui.seq_drag_i >= 0 && ui.seq_drag_i < (int)ui.seq_clips.size()) {
+                        ui.seq_clips[ui.seq_drag_i].t0 = ui.seq_grab_t0;
+                        ui.seq_clips[ui.seq_drag_i].t1 = ui.seq_grab_t1;
+                    }
+                    ui.seq_drag = 0;
+                    ui.seq_drag_moved = false;
+                    redraw();
+                } else if (ui.page == PgStrategy && (ks == XK_Delete || ks == XK_BackSpace)) {
+                    ui.seq_delete_sel();
+                    redraw();
+                } else if (ui.funds_edit && ui.page == PgFunds) {
                     char chs[8]{};
                     int nch = XLookupString(&e.xkey, chs, 7, &ks, nullptr);
                     bool ctrl = (e.xkey.state & ControlMask) != 0;
@@ -6329,6 +6984,15 @@ int run_desk(FlaskApi& api) {
                     redraw();
                 } else if (e.xbutton.button == 3 && ui.compile_win) {
                     redraw();
+                } else if (e.xbutton.button == 3 && ui.page == PgStrategy) {
+                    for (int hi = static_cast<int>(ui.hits.size()) - 1; hi >= 0; --hi) {
+                        auto& h = ui.hits[hi];
+                        if (!inside(h.r, mx, my) || h.kind != Hit::Seq || h.key != "clip") continue;
+                        ui.seq_sel = h.i;
+                        ui.seq_delete_sel();
+                        break;
+                    }
+                    redraw();
                 } else if (e.xbutton.button == 3 && ui.page == PgWire) {
                     if (ui.repl_on) {
                         ui.repl_on = false;
@@ -6524,6 +7188,14 @@ int run_desk(FlaskApi& api) {
                         hit = true;
                         if (h.kind == Hit::Nav) {
                             goto_page(static_cast<Page>(h.i));
+                            redraw();
+                        } else if (h.kind == Hit::Seq) {
+                            if (h.key == "7d") ui.seq_set_scope("7d");
+                            else if (h.key == "am") ui.seq_set_scope("am");
+                            else if (h.key == "arm") ui.seq_toggle_arm();
+                            else if (h.key == "pick") ui.seq_begin_pick(h.i, mx, my);
+                            else if (h.key == "clip") ui.seq_begin_clip(h.i, mx, my);
+                            else if (h.key == "lane") ui.seq_paste_lane(h.i, mx);
                             redraw();
                         } else if (h.kind == Hit::Quit) {
                             run = false;
@@ -7123,7 +7795,13 @@ int run_desk(FlaskApi& api) {
             } else if (e.type == MotionNotify) {
                 ui.mx_last = e.xmotion.x;
                 ui.my_last = e.xmotion.y;
-                if (ui.knob_drag) {
+                if (ui.seq_drag) {
+                    if (std::abs(e.xmotion.x - ui.seq_drag_x) + std::abs(e.xmotion.y - ui.seq_drag_y) > 4)
+                        ui.seq_drag_moved = true;
+                    if ((ui.seq_drag == 1 || ui.seq_drag == 2) && ui.seq_drag_moved)
+                        ui.seq_drag_move(e.xmotion.x);
+                    redraw();
+                } else if (ui.knob_drag) {
                     double px = (e.xmotion.state & ShiftMask) ? 4.2 : 1.15;
                     double delta = (e.xmotion.x - ui.knob_mx - (e.xmotion.y - ui.knob_my)) / px;
                     double span = (ui.knob_max > ui.knob_min) ? (ui.knob_max - ui.knob_min) : 1;
@@ -7250,7 +7928,17 @@ int run_desk(FlaskApi& api) {
                 }
             } else if (e.type == ButtonRelease) {
                 int mx = e.xbutton.x, my = e.xbutton.y;
-                if (ui.knob_drag) {
+                if (ui.seq_drag) {
+                    if (ui.seq_drag == 3) {
+                        if (ui.seq_drag_moved) ui.seq_drop_new(mx, my);
+                        else ui.say(ui.seq_name_of(ui.seq_drag_bot) + " selected. Drag the name, or click its lane.");
+                    } else {
+                        ui.seq_finish_drag();
+                    }
+                    ui.seq_drag = 0;
+                    ui.seq_drag_moved = false;
+                    redraw();
+                } else if (ui.knob_drag) {
                     auto f = field_of(ui.knob_bot, ui.knob_key);
                     if (!f.key.empty()) post_knob(ui.knob_bot, f, ui.knob_live);
                     if (std::fabs(ui.knob_live - ui.knob_start) > 1e-6)
@@ -7382,8 +8070,10 @@ int run_desk(FlaskApi& api) {
             if (!ui.api_edit && !ui.api_busy) show_pub();
             if (ui.audit_win || ui.compile_win) {
                 /* overlay owns the snap — home poll would wipe audit/compile rows */
-            } else if (!ui.knob_drag && !ui.knob_edit) {
+            } else if (!ui.knob_drag && !ui.knob_edit && ui.seq_drag == 0) {
                 ui.refresh(false);
+                if (ui.page == PgStrategy || ui.seq_armed) ui.seq_probe();
+                if (ui.seq_armed) ui.seq_apply();
                 redraw();
             }
         }
