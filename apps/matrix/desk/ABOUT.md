@@ -19,4 +19,4 @@ limitations under the License.
 Native desk for Home, Wire, Hunters, and Funds. Build it with make.
 
 X11 window. The wire connects a shared Hyperliquid subaccount pool to any controller. The desk does not sign an order.
-<!-- archy-folder 0.2g9 -->
+<!-- archy-folder 0.2g10 -->
