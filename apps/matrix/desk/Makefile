@@ -13,8 +13,9 @@
 # limitations under the License.
 
 CXX ?= g++
-CXXFLAGS ?= -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -I../../../third_party -Isrc
+CXXFLAGS ?= -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -I../../../third_party -Isrc -I../freiquell_server_c++/src
 LDFLAGS ?= -lX11 -lpthread
+SQL ?= /lib/x86_64-linux-gnu/libsqlite3.so.0
 
 SRC = src/main.cpp src/http.cpp src/api.cpp src/ui.cpp
 BIN = rimbaud-desk
@@ -25,7 +26,7 @@ CHART = rimbaud-chart
 all: $(BIN) $(CHART)
 
 $(BIN): $(SRC) src/http.hpp src/api.hpp src/ui.hpp ../../../third_party/nlohmann/json.hpp
-	$(CXX) $(CXXFLAGS) -o $@ $(SRC) $(LDFLAGS)
+	$(CXX) $(CXXFLAGS) -o $@ $(SRC) $(LDFLAGS) $(SQL)
 
 $(CHART): src/chart.cpp src/http.cpp src/https.cpp src/http.hpp src/https.hpp ../../../third_party/nlohmann/json.hpp
 	$(CXX) $(CXXFLAGS) -o $@ src/chart.cpp src/http.cpp src/https.cpp $(LDFLAGS) -lssl -lcrypto
