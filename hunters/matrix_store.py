@@ -26,7 +26,7 @@ import sqlite3
 import threading
 from datetime import datetime, timezone
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 _LOCK = threading.Lock()
 _DB_PATH = None
 
@@ -340,6 +340,13 @@ def init(path):
                 CREATE TABLE IF NOT EXISTS sequencer_clip (
                     clip_id TEXT PRIMARY KEY,
                     bot TEXT NOT NULL,
+                    t0 INTEGER NOT NULL,
+                    t1 INTEGER NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS sequencer_trend (
+                    clip_id TEXT PRIMARY KEY,
+                    bot TEXT NOT NULL,
+                    side TEXT NOT NULL,
                     t0 INTEGER NOT NULL,
                     t1 INTEGER NOT NULL
                 );
