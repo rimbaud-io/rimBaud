@@ -826,6 +826,9 @@ struct DeskUi {
     std::string seq_scope = "7d";
     long seq_span = 7L * 24L * 3600L;
     long seq_view_t = 0;
+    long seq_now_t = 0;
+    bool seq_sends = false;
+    double seq_board_t = 0;
     std::vector<SeqClip> seq_clips;
     struct SeqTrend {
         std::string id;
@@ -1621,8 +1624,9 @@ struct DeskUi {
         wire_fitted = true;
     }
 
-    // Sequencer. A block is when that controller is online. Empty lanes are
-    // left alone. ARM is off until the operator clicks it twice. Positions stay.
+    // Sequencer test board. Scales are 1h, 24h, 3d, and 7d. The green line is
+    // now and it moves across the scale. seq_sends stays false, so this board
+    // does not start, stop, or set bias. Positions stay.
     static bool seq_id_ok(const std::string& id) {
         if (id.empty() || id.size() > 64) return false;
         for (unsigned char c : id) {
@@ -1633,10 +1637,37 @@ struct DeskUi {
         return true;
     }
 
-    static long seq_snap_t(long t) {
-        const long q = 15L * 60L;
+    static std::string seq_norm_scope(const std::string& s) {
+        if (s == "1h" || s == "24h" || s == "3d" || s == "7d") return s;
+        if (s == "am") return "24h";
+        return "7d";
+    }
+
+    static long seq_span_of(const std::string& scope) {
+        if (scope == "1h") return 3600;
+        if (scope == "24h") return 24L * 3600L;
+        if (scope == "3d") return 3L * 24L * 3600L;
+        return 7L * 24L * 3600L;
+    }
+
+    long seq_quantum() const {
+        if (seq_span <= 3600) return 60;
+        if (seq_span <= 6L * 3600L) return 5L * 60L;
+        return 15L * 60L;
+    }
+
+    long seq_snap_t(long t) const {
+        long q = seq_quantum();
+        if (q < 1) q = 60;
         if (t < 0) return 0;
         return (t / q) * q;
+    }
+
+    std::string seq_scale_name() const {
+        if (seq_scope == "1h") return "1 hour";
+        if (seq_scope == "24h") return "24 hours";
+        if (seq_scope == "3d") return "3 days";
+        return "7 days";
     }
 
     static std::string seq_clock(long t) {
@@ -1653,29 +1684,31 @@ struct DeskUi {
         return b;
     }
 
-    static long seq_morning_span() {
-        time_t now = time(nullptr);
+    long seq_window_origin(long now) const {
+        time_t tt = static_cast<time_t>(now);
         tm loc{};
-        localtime_r(&now, &loc);
-        loc.tm_mday += 1;
-        loc.tm_hour = 8;
-        loc.tm_min = 0;
-        loc.tm_sec = 0;
+        localtime_r(&tt, &loc);
         loc.tm_isdst = -1;
-        time_t goal = mktime(&loc);
-        long span = static_cast<long>(difftime(goal, now));
-        if (span < 3600) span = 3600;
-        if (span > 40L * 3600L) span = 40L * 3600L;
-        return span;
+        if (seq_scope == "1h") {
+            loc.tm_min = 0;
+            loc.tm_sec = 0;
+        } else {
+            loc.tm_hour = 0;
+            loc.tm_min = 0;
+            loc.tm_sec = 0;
+        }
+        time_t origin = mktime(&loc);
+        if (origin == static_cast<time_t>(-1)) return now;
+        return static_cast<long>(origin);
     }
 
     void seq_sync_span() {
-        seq_view_t = static_cast<long>(time(nullptr));
-        if (seq_scope == "am") seq_span = seq_morning_span();
-        else {
-            seq_scope = "7d";
-            seq_span = 7L * 24L * 3600L;
-        }
+        seq_scope = seq_norm_scope(seq_scope);
+        seq_span = seq_span_of(seq_scope);
+        seq_now_t = static_cast<long>(time(nullptr));
+        seq_view_t = seq_window_origin(seq_now_t);
+        if (seq_now_t < seq_view_t) seq_view_t = seq_now_t;
+        if (seq_now_t >= seq_view_t + seq_span) seq_view_t = seq_now_t - seq_span + seq_quantum();
     }
 
     long seq_x_to_t(int x) const {
@@ -1849,7 +1882,7 @@ struct DeskUi {
             const char* armed = reinterpret_cast<const char*>(sqlite3_column_text(st, 0));
             const char* scope = reinterpret_cast<const char*>(sqlite3_column_text(st, 1));
             seq_armed = armed && armed[0] == '1';
-            seq_scope = (scope && std::string(scope) == "am") ? "am" : "7d";
+            seq_scope = seq_norm_scope(scope ? scope : "");
         }
         sqlite3_finalize(st);
         if (!got) {
@@ -1934,7 +1967,7 @@ struct DeskUi {
                 " t0 INTEGER NOT NULL,"
                 " t1 INTEGER NOT NULL);");
         if (ok) ok = seq_exec(db, "BEGIN IMMEDIATE");
-        std::string scope = seq_scope == "am" ? "am" : "7d";
+        std::string scope = seq_norm_scope(seq_scope);
         std::string when = seq_utc_now();
         std::string armed = seq_armed ? "1" : "0";
         if (ok) {
@@ -2011,7 +2044,7 @@ struct DeskUi {
             in >> j;
             if (!j.is_object()) return false;
             std::string sc = j.value("scope", "7d");
-            seq_scope = (sc == "am") ? "am" : "7d";
+            seq_scope = seq_norm_scope(sc);
             seq_armed = j.value("armed", false);
             seq_clips.clear();
             seq_trends.clear();
@@ -2067,7 +2100,7 @@ struct DeskUi {
         nlohmann::json j = {
             {"v", 1},
             {"armed", seq_armed},
-            {"scope", seq_scope == "am" ? "am" : "7d"},
+            {"scope", seq_norm_scope(seq_scope)},
             {"clips", clips},
             {"trend", trend},
         };
@@ -2086,13 +2119,18 @@ struct DeskUi {
         seq_ok = true;
         seq_load_v2();
         int sql = seq_sql_read();
+        bool hold = seq_armed && !seq_sends;
+        if (!seq_sends) seq_armed = false;
         if (sql == 1) {
             seq_sync_span();
+            if (hold) seq_save();
             return;
         }
         bool from_json = seq_load_json();
+        hold = hold || (seq_armed && !seq_sends);
+        if (!seq_sends) seq_armed = false;
         seq_sync_span();
-        if (sql == 0 && from_json) seq_save();
+        if ((sql == 0 && from_json) || hold) seq_save();
     }
 
     void seq_save() {
@@ -2161,6 +2199,7 @@ struct DeskUi {
     }
 
     void seq_apply() {
+        if (!seq_sends) return;
         if (!seq_armed || !api) return;
         seq_load();
         seq_load_v2();
@@ -2264,15 +2303,23 @@ struct DeskUi {
     }
 
     void seq_set_scope(const std::string& scope) {
-        seq_scope = (scope == "am") ? "am" : "7d";
+        seq_scope = seq_norm_scope(scope);
         seq_sync_span();
         seq_save();
-        say(seq_scope == "am"
-            ? ("scope until tomorrow 08:00  -  " + seq_clock(seq_view_t + seq_span))
-            : "scope from now through 7 days");
+        say("scale " + seq_scale_name() + ". The green line is now. Test only. Hunters stay.");
     }
 
     void seq_toggle_arm() {
+        if (!seq_sends) {
+            if (seq_armed) {
+                seq_armed = false;
+                seq_want.clear();
+                seq_trend_want.clear();
+                seq_save();
+            }
+            say("sequencer is a test. It does not start, stop, or set bias. Positions stay.");
+            return;
+        }
         if (seq_armed) {
             seq_armed = false;
             seq_want.clear();
@@ -2305,20 +2352,21 @@ struct DeskUi {
             return;
         }
         seq_sync_span();
+        long q = seq_quantum();
         long dur = seq_span / 12;
-        if (dur < 30L * 60L) dur = 30L * 60L;
-        dur = (dur / (15L * 60L)) * (15L * 60L);
-        if (dur < 15L * 60L) dur = 15L * 60L;
+        if (dur < q) dur = q;
+        dur = (dur / q) * q;
+        if (dur < q) dur = q;
         long t0 = seq_snap_t(t_at);
         long t1 = t0 + dur;
         long end = seq_view_t + seq_span;
         if (t1 > end) t1 = seq_snap_t(end);
-        if (t1 < t0 + 15L * 60L) {
+        if (t1 < t0 + q) {
             t1 = end;
-            t0 = t1 - 15L * 60L;
+            t0 = t1 - q;
         }
-        if (t0 < seq_view_t - 15L * 60L) t0 = seq_snap_t(seq_view_t);
-        if (t1 <= t0) t1 = t0 + 15L * 60L;
+        if (t0 < seq_view_t) t0 = seq_snap_t(seq_view_t);
+        if (t1 <= t0) t1 = t0 + q;
         SeqClip c;
         c.id = "s" + std::to_string(seq_view_t) + "-" + std::to_string(seq_clips.size());
         c.bot = bot;
@@ -2357,10 +2405,11 @@ struct DeskUi {
             return;
         }
         seq_sync_span();
+        long q = seq_quantum();
         long end = seq_view_t + seq_span;
         long t0 = seq_snap_t(t_at);
         if (t0 < seq_view_t) t0 = seq_snap_t(seq_view_t);
-        if (t0 > end - 15L * 60L) t0 = seq_snap_t(end - 15L * 60L);
+        if (t0 > end - q) t0 = seq_snap_t(end - q);
         long t1 = end;
         for (auto& o : seq_trends) {
             if (o.bot != bot || o.t0 <= t0 || o.t0 >= t1) continue;
@@ -2372,7 +2421,7 @@ struct DeskUi {
         }
         seq_trends.erase(std::remove_if(seq_trends.begin(), seq_trends.end(),
             [](const SeqTrend& o) { return o.t1 <= o.t0; }), seq_trends.end());
-        if (t1 < t0 + 15L * 60L) t1 = t0 + 15L * 60L;
+        if (t1 < t0 + q) t1 = t0 + q;
         SeqTrend c;
         c.id = "t" + std::to_string(seq_view_t) + "-" + std::to_string(seq_trends.size());
         c.bot = bot;
@@ -2456,11 +2505,12 @@ struct DeskUi {
             * static_cast<double>(seq_span));
         long& t0r = trend ? seq_trends[seq_drag_i].t0 : seq_clips[seq_drag_i].t0;
         long& t1r = trend ? seq_trends[seq_drag_i].t1 : seq_clips[seq_drag_i].t1;
+        long q = seq_quantum();
         if (seq_drag == 1 || seq_drag == 4) {
-            long dur = std::max(15L * 60L, seq_grab_t1 - seq_grab_t0);
+            long dur = std::max(q, seq_grab_t1 - seq_grab_t0);
             long t0 = seq_snap_t(seq_grab_t0 + dt);
-            long min_t = seq_view_t - dur + 15L * 60L;
-            long max_t = seq_view_t + seq_span - 15L * 60L;
+            long min_t = seq_view_t;
+            long max_t = seq_view_t + seq_span - q;
             if (t0 < min_t) t0 = seq_snap_t(min_t);
             if (t0 > max_t) t0 = seq_snap_t(max_t);
             t0r = t0;
@@ -2469,7 +2519,7 @@ struct DeskUi {
             long t1 = seq_snap_t(seq_grab_t1 + dt);
             long max_t = seq_view_t + seq_span;
             if (t1 > max_t) t1 = seq_snap_t(max_t);
-            if (t1 < seq_grab_t0 + 15L * 60L) t1 = seq_grab_t0 + 15L * 60L;
+            if (t1 < seq_grab_t0 + q) t1 = seq_grab_t0 + q;
             t0r = seq_grab_t0;
             t1r = t1;
         }
@@ -2881,12 +2931,12 @@ std::string action_tip(const DeskUi& ui, const Hit& h) {
             if (h.i == 3) return "start a wire from this node";
             return "add tool from menu";
         case Hit::Seq:
-            if (h.key == "arm")
-                return ui.seq_armed
-                    ? "stop the sequencer. Hunters stay as they are. Positions stay."
-                    : "arm the sequencer. Click again. A block is online time. A trend sets LONG, SHORT, or FLAT and does not close.";
-            if (h.key == "7d") return "scope from now through 7 days";
-            if (h.key == "am") return "scope from now until tomorrow 08:00";
+            if (h.key == "arm" || h.key == "test")
+                return "test board. It does not start, stop, or set bias. Positions stay.";
+            if (h.key == "1h") return "scale 1 hour. The green line moves across this hour.";
+            if (h.key == "24h") return "scale 24 hours from local midnight. The green line is now.";
+            if (h.key == "3d") return "scale 3 days from local midnight. The green line is now.";
+            if (h.key == "7d") return "scale 7 days from local midnight. The green line is now.";
             if (h.key == "long" || h.key == "flat" || h.key == "short")
                 return "paint TREND " + h.key + ". Click the line above a controller. Does not close.";
             if (h.key == "pick") return "drag this controller onto the timeline";
@@ -6111,10 +6161,11 @@ int run_desk(FlaskApi& api) {
 
             Rect view{0, body.y + bar_h, W, std::max(20, body.h - bar_h)};
             set_clip(dpy, gc, view);
-            long step = 3600;
-            if (ui.seq_span > 48L * 3600L) step = 12L * 3600L;
-            else if (ui.seq_span > 18L * 3600L) step = 3L * 3600L;
+            long step = 24L * 3600L;
+            if (ui.seq_span <= 3600) step = 5L * 60L;
             else if (ui.seq_span <= 6L * 3600L) step = 15L * 60L;
+            else if (ui.seq_span <= 26L * 3600L) step = 2L * 3600L;
+            else if (ui.seq_span <= 4L * 24L * 3600L) step = 12L * 3600L;
             std::vector<long> ticks;
             long tmark = ui.seq_view_t - (ui.seq_view_t % step);
             if (tmark < ui.seq_view_t) tmark += step;
@@ -6152,7 +6203,7 @@ int run_desk(FlaskApi& api) {
                     int vx1 = std::max(arr_x + 1, x1);
                     int vx2 = std::min(arr_x + arr_w - 1, x2);
                     if (vx2 - vx1 < 2) continue;
-                    bool live = ui.seq_view_t >= c.t0 && ui.seq_view_t < c.t1;
+                    bool live = ui.seq_now_t >= c.t0 && ui.seq_now_t < c.t1;
                     unsigned long sc = bias_col(C, c.side);
                     unsigned long fc = C.navy;
                     if (c.side == "LONG") fc = rgb(dpy, cm, 8, live ? 42 : 28, live ? 50 : 34);
@@ -6186,7 +6237,7 @@ int run_desk(FlaskApi& api) {
                     int vx1 = std::max(arr_x + 1, x1);
                     int vx2 = std::min(arr_x + arr_w - 1, x2);
                     if (vx2 - vx1 < 2) continue;
-                    bool live = ui.seq_view_t >= c.t0 && ui.seq_view_t < c.t1;
+                    bool live = ui.seq_now_t >= c.t0 && ui.seq_now_t < c.t1;
                     Rect cr{vx1, lane_y + 4, vx2 - vx1, lane_h - 10};
                     fill(dpy, buf, gc, live ? rgb(dpy, cm, 12, 48, 28) : rgb(dpy, cm, 28, 32, 18), cr);
                     stroke(dpy, buf, gc, (ui.seq_sel == ci) ? C.white : (live ? C.green : col), cr);
@@ -6197,7 +6248,7 @@ int run_desk(FlaskApi& api) {
                 }
                 if (ui.seq_drag == 3 && ui.seq_drag_moved && ui.seq_drag_bot == L.id) {
                     long t_at = ui.seq_x_to_t(ui.mx_last);
-                    long dur = std::max(15L * 60L, ui.seq_span / 12);
+                    long dur = std::max(ui.seq_quantum(), ui.seq_span / 12);
                     int gx1 = ui.seq_t_to_x(ui.seq_snap_t(t_at));
                     int gx2 = ui.seq_t_to_x(ui.seq_snap_t(t_at) + dur);
                     gx1 = std::max(arr_x + 1, gx1);
@@ -6214,28 +6265,33 @@ int run_desk(FlaskApi& api) {
             std::string end = "ends " + ui.seq_clock(ui.seq_view_t + ui.seq_span)
                 + "   " + std::to_string(hours) + "h";
             text(dpy, buf, gc, C.cyan, x0 + 110, y, fit_px(end, 280));
-            std::string state = ui.seq_armed ? "ARMED" : "stopped";
-            text(dpy, buf, gc, ui.seq_armed ? C.green : C.muted, x0 + 400, y,
-                 state + "   " + std::to_string(ui.seq_clips.size()) + " blocks   "
+            text(dpy, buf, gc, C.muted, x0 + 400, y,
+                 "TEST   " + std::to_string(ui.seq_clips.size()) + " blocks   "
                  + std::to_string(ui.seq_trends.size()) + " trends");
             y += 14;
-            Rect b7{x0, y, 78, 22};
-            if (ui.seq_scope != "am") fill(dpy, buf, gc, rgb(dpy, cm, 40, 32, 8), b7);
-            stroke(dpy, buf, gc, C.gold, b7);
-            text(dpy, buf, gc, C.gold, b7.x + 12, b7.y + 15, "7 DAYS");
-            ui.hits.push_back({Hit::Seq, 0, b7, "7d"});
-            Rect bam{x0 + 86, y, 124, 22};
-            if (ui.seq_scope == "am") fill(dpy, buf, gc, rgb(dpy, cm, 8, 32, 40), bam);
-            stroke(dpy, buf, gc, C.cyan, bam);
-            text(dpy, buf, gc, C.cyan, bam.x + 8, bam.y + 15, "TOMORROW AM");
-            ui.hits.push_back({Hit::Seq, 0, bam, "am"});
-            Rect barm{x0 + 220, y, 72, 22};
-            if (ui.seq_armed) fill(dpy, buf, gc, rgb(dpy, cm, 10, 48, 22), barm);
-            stroke(dpy, buf, gc, ui.seq_armed ? C.green : C.gold, barm);
-            text(dpy, buf, gc, ui.seq_armed ? C.green : C.gold, barm.x + (ui.seq_armed ? 16 : 22), barm.y + 15,
-                 ui.seq_armed ? "STOP" : "ARM");
-            ui.hits.push_back({Hit::Seq, 0, barm, "arm"});
-            int px = x0 + 304;
+            struct ScaleBtn { const char* key; const char* label; int w; };
+            ScaleBtn scales[] = {
+                {"1h", "1H", 44},
+                {"24h", "24H", 52},
+                {"3d", "3 DAYS", 84},
+                {"7d", "7 DAYS", 78},
+            };
+            int sx = x0;
+            for (auto& sc : scales) {
+                Rect br{sx, y, sc.w, 22};
+                bool on = ui.seq_scope == sc.key;
+                if (on) fill(dpy, buf, gc, rgb(dpy, cm, 40, 32, 8), br);
+                stroke(dpy, buf, gc, on ? C.gold : C.border, br);
+                int tw = static_cast<int>(strlen(sc.label)) * CHAR_W;
+                text(dpy, buf, gc, on ? C.gold : C.muted, br.x + std::max(4, (br.w - tw) / 2), br.y + 15, sc.label);
+                ui.hits.push_back({Hit::Seq, 0, br, sc.key});
+                sx += sc.w + 6;
+            }
+            Rect testb{sx, y, 58, 22};
+            stroke(dpy, buf, gc, C.amber, testb);
+            text(dpy, buf, gc, C.amber, testb.x + 8, testb.y + 15, "TEST");
+            ui.hits.push_back({Hit::Seq, 0, testb, "test"});
+            int px = sx + 66;
             auto paint_btn = [&](const char* word, const char* key, unsigned long col) {
                 int bw = static_cast<int>(strlen(word)) * CHAR_W + 18;
                 Rect br{px, y, bw, 22};
@@ -6251,21 +6307,36 @@ int run_desk(FlaskApi& api) {
             paint_btn("FLAT", "flat", C.gold);
             paint_btn("SHORT", "short", C.rose);
             text(dpy, buf, gc, C.muted, x0, body.y + 68,
-                 fit_px("Drag a name onto its lane. A block is online. Outside it a hunter pauses, a V2 stops. Positions stay.",
+                 fit_px("TEST. The green line is now and it moves across the scale. This board does not start, stop, or set bias.",
                         W - 36));
             text(dpy, buf, gc, C.muted, x0, body.y + 84,
-                 fit_px("TREND above the lane sets LONG, SHORT, or FLAT and does not close. Right-click removes a block.",
+                 fit_px("Drag a name onto its lane. TREND is LONG, SHORT, or FLAT on the board only. Right-click removes a block.",
                         W - 36));
 
             int ry = body.y + bar_h - 12;
-            text(dpy, buf, gc, C.green, arr_x, ry, "NOW");
             for (long tk : ticks) {
                 int tx = ui.seq_t_to_x(tk);
-                if (tx < arr_x + 28 || tx > arr_x + arr_w - 40) continue;
+                if (tx < arr_x + 8 || tx > arr_x + arr_w - 36) continue;
                 std::string lab = (step >= 12L * 3600L) ? ui.seq_clock(tk).substr(0, 6) : ui.seq_clock(tk).substr(7);
                 text(dpy, buf, gc, C.muted, tx - 8, ry, lab);
             }
-            fill(dpy, buf, gc, C.green, Rect{arr_x, body.y + bar_h, 2, std::max(0, body.h - bar_h)});
+            long nowl = ui.seq_now_t > 0 ? ui.seq_now_t : static_cast<long>(time(nullptr));
+            int nx = ui.seq_t_to_x(nowl);
+            if (nx < arr_x) nx = arr_x;
+            if (nx > arr_x + arr_w - 2) nx = arr_x + arr_w - 2;
+            std::string nlab = "NOW " + ui.seq_clock(nowl);
+            if (ui.seq_scope == "1h") {
+                time_t tt = static_cast<time_t>(nowl);
+                tm loc{};
+                localtime_r(&tt, &loc);
+                char b[20];
+                snprintf(b, sizeof(b), "NOW %02d:%02d:%02d", loc.tm_hour, loc.tm_min, loc.tm_sec);
+                nlab = b;
+            }
+            int labx = nx + 6;
+            if (labx + 130 > arr_x + arr_w) labx = std::max(arr_x, nx - 130);
+            text(dpy, buf, gc, C.green, labx, ry, nlab);
+            fill(dpy, buf, gc, C.green, Rect{nx, body.y + bar_h, 2, std::max(0, body.h - bar_h)});
         };
 
         auto draw_system = [&]() {
@@ -7669,9 +7740,9 @@ int run_desk(FlaskApi& api) {
                             goto_page(static_cast<Page>(h.i));
                             redraw();
                         } else if (h.kind == Hit::Seq) {
-                            if (h.key == "7d") ui.seq_set_scope("7d");
-                            else if (h.key == "am") ui.seq_set_scope("am");
-                            else if (h.key == "arm") ui.seq_toggle_arm();
+                            if (h.key == "1h" || h.key == "24h" || h.key == "3d" || h.key == "7d")
+                                ui.seq_set_scope(h.key);
+                            else if (h.key == "arm" || h.key == "test") ui.seq_toggle_arm();
                             else if (h.key == "pick") ui.seq_begin_pick(h.i, mx, my);
                             else if (h.key == "clip") ui.seq_begin_clip(h.i, mx, my);
                             else if (h.key == "lane") ui.seq_paste_lane(h.i, mx);
@@ -8560,10 +8631,18 @@ int run_desk(FlaskApi& api) {
                 /* overlay owns the snap — home poll would wipe audit/compile rows */
             } else if (!ui.knob_drag && !ui.knob_edit && ui.seq_drag == 0) {
                 ui.refresh(false);
-                if (ui.page == PgStrategy || ui.seq_armed) ui.seq_probe();
-                if (ui.seq_armed) ui.seq_apply();
+                if (ui.page == PgStrategy) {
+                    ui.seq_probe();
+                    ui.seq_board_t = ui.now();
+                }
+                if (ui.seq_sends && ui.seq_armed) ui.seq_apply();
                 redraw();
             }
+        }
+        if (ui.page == PgStrategy && ui.seq_drag == 0 && !ui.knob_drag && !ui.knob_edit
+            && ui.now() - ui.seq_board_t > 1.0) {
+            ui.seq_board_t = ui.now();
+            redraw();
         }
         if (ui.page == PgWire && !ui.dirty && ui.now() - ui.last_wire > 8.0) {
             ui.last_wire = ui.now();
