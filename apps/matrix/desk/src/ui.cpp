@@ -1630,8 +1630,8 @@ struct DeskUi {
         wire_fitted = true;
     }
 
-    // Sequencer test board. Scales are 1h, 24h, 3d, and 7d. The green line is
-    // now and it moves across the scale. seq_sends stays false, so this board
+    // Sequencer test board. Scales are 1h, 24h, 3d, and 7d. 24h starts at this
+    // hour and shows the next 24 hours. seq_sends stays false, so this board
     // does not start, stop, or set bias. Positions stay.
     static bool seq_id_ok(const std::string& id) {
         if (id.empty() || id.size() > 64) return false;
@@ -1695,7 +1695,7 @@ struct DeskUi {
         tm loc{};
         localtime_r(&tt, &loc);
         loc.tm_isdst = -1;
-        if (seq_scope == "1h") {
+        if (seq_scope == "1h" || seq_scope == "24h") {
             loc.tm_min = 0;
             loc.tm_sec = 0;
         } else {
@@ -2380,7 +2380,10 @@ struct DeskUi {
         seq_scope = seq_norm_scope(scope);
         seq_sync_span();
         seq_save();
-        say("scale " + seq_scale_name() + ". The green line is now. Test only. Hunters stay.");
+        if (seq_scope == "24h")
+            say("scale 24 hours from now. Test only. Hunters stay.");
+        else
+            say("scale " + seq_scale_name() + ". The green line is now. Test only. Hunters stay.");
     }
 
     void seq_toggle_arm() {
@@ -3119,7 +3122,7 @@ std::string action_tip(const DeskUi& ui, const Hit& h) {
             if (h.key == "arm" || h.key == "test")
                 return "test board. It does not start, stop, or set bias. Positions stay.";
             if (h.key == "1h") return "scale 1 hour. The green line moves across this hour.";
-            if (h.key == "24h") return "scale 24 hours from local midnight. The green line is now.";
+            if (h.key == "24h") return "scale the next 24 hours from this hour. The green line is now.";
             if (h.key == "3d") return "scale 3 days from local midnight. The green line is now.";
             if (h.key == "7d") return "scale 7 days from local midnight. The green line is now.";
             if (h.key == "long" || h.key == "flat" || h.key == "short")
@@ -6522,34 +6525,62 @@ int run_desk(FlaskApi& api) {
             text(dpy, buf, gc, C.amber, testb.x + 8, testb.y + 15, "TEST");
             ui.hits.push_back({Hit::Seq, 0, testb, "test"});
             text(dpy, buf, gc, C.muted, x0, body.y + 68,
-                 fit_px("TEST. The green line is now and it moves across the scale. This board does not start, stop, or set bias.",
+                 fit_px(ui.seq_scope == "24h"
+                        ? "TEST. 24H is the next 24 hours from this hour. The green line is now. This board does not start, stop, or set bias."
+                        : "TEST. The green line is now and it moves across the scale. This board does not start, stop, or set bias.",
                         W - x0 - 24));
             text(dpy, buf, gc, C.muted, x0, body.y + 84,
                  fit_px("Drag BIAS onto a controller. Drag RISK CLOSE onto the time scale for a red close line. Positions stay.",
                         W - x0 - 24));
 
             int ry = body.y + bar_h - 12;
-            for (long tk : ticks) {
-                int tx = ui.seq_t_to_x(tk);
-                if (tx < arr_x + 8 || tx > arr_x + arr_w - 36) continue;
-                std::string lab = (step >= 12L * 3600L) ? ui.seq_clock(tk).substr(0, 6) : ui.seq_clock(tk).substr(7);
-                text(dpy, buf, gc, C.muted, tx - 8, ry, lab);
-            }
             long nowl = ui.seq_now_t > 0 ? ui.seq_now_t : static_cast<long>(time(nullptr));
             int nx = ui.seq_t_to_x(nowl);
             if (nx < arr_x) nx = arr_x;
             if (nx > arr_x + arr_w - 2) nx = arr_x + arr_w - 2;
             std::string nlab = "NOW " + ui.seq_clock(nowl);
-            if (ui.seq_scope == "1h") {
+            if (ui.seq_scope == "1h" || ui.seq_scope == "24h") {
                 time_t tt = static_cast<time_t>(nowl);
                 tm loc{};
                 localtime_r(&tt, &loc);
-                char b[20];
-                snprintf(b, sizeof(b), "NOW %02d:%02d:%02d", loc.tm_hour, loc.tm_min, loc.tm_sec);
+                char b[24];
+                if (ui.seq_scope == "1h")
+                    snprintf(b, sizeof(b), "NOW %02d:%02d:%02d", loc.tm_hour, loc.tm_min, loc.tm_sec);
+                else
+                    snprintf(b, sizeof(b), "NOW %02d:%02d", loc.tm_hour, loc.tm_min);
                 nlab = b;
             }
+            int nlab_w = static_cast<int>(nlab.size()) * CHAR_W;
             int labx = nx + 6;
-            if (labx + 130 > arr_x + arr_w) labx = std::max(arr_x, nx - 130);
+            if (labx + nlab_w > arr_x + arr_w - 4) labx = std::max(arr_x, nx - nlab_w - 6);
+            int prev_day = -1;
+            {
+                time_t ot = static_cast<time_t>(ui.seq_view_t);
+                tm ol{};
+                localtime_r(&ot, &ol);
+                prev_day = ol.tm_mday;
+            }
+            for (long tk : ticks) {
+                int tx = ui.seq_t_to_x(tk);
+                if (tx < arr_x + 8 || tx > arr_x + arr_w - 8) continue;
+                time_t tt = static_cast<time_t>(tk);
+                tm loc{};
+                localtime_r(&tt, &loc);
+                std::string lab;
+                if (step >= 12L * 3600L) lab = ui.seq_clock(tk).substr(0, 6);
+                else if (loc.tm_mday != prev_day) {
+                    char b[24];
+                    snprintf(b, sizeof(b), "%02d %02d:%02d", loc.tm_mday, loc.tm_hour, loc.tm_min);
+                    lab = b;
+                } else if (ui.seq_clock(tk).size() > 7) lab = ui.seq_clock(tk).substr(7);
+                else lab = ui.seq_clock(tk);
+                int lx = tx - 8;
+                int lw = static_cast<int>(lab.size()) * CHAR_W;
+                if (lx < labx + nlab_w + 6 && lx + lw > labx - 4) continue;
+                if (lx + lw > arr_x + arr_w - 4) continue;
+                prev_day = loc.tm_mday;
+                text(dpy, buf, gc, C.muted, lx, ry, lab);
+            }
             text(dpy, buf, gc, C.green, labx, ry, nlab);
             fill(dpy, buf, gc, C.green, Rect{nx, body.y + bar_h, 2, std::max(0, body.h - bar_h)});
             int line_h = std::max(0, body.h - bar_h);
