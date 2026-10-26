@@ -6174,8 +6174,9 @@ int run_desk(FlaskApi& api) {
             ui.seq_sync_span();
             auto lanes = ui.seq_lanes();
             const int bar_h = 116;
-            const int rh = 50;
+            const int rh = 66;
             const int trend_h = 18;
+            const int roe_h = 16;
             const int tb_w = 168;
             const int label_w = 168;
             const int x0 = tb_w + 10;
@@ -6212,7 +6213,7 @@ int run_desk(FlaskApi& api) {
                 Rect row{x0, y, std::max(40, W - x0 - 12), rh - 2};
                 fill(dpy, buf, gc, (i % 2) ? C.panel : C.bg, row);
                 int lane_y = y + trend_h;
-                int lane_h = rh - trend_h;
+                int lane_h = rh - trend_h - roe_h;
                 text(dpy, buf, gc, C.muted, x0 + 18, y + 12, "TREND");
                 int st = ui.seq_state(L.id);
                 unsigned long dot = st == 1 ? C.green : (st == 2 ? C.rose : C.muted);
@@ -6281,6 +6282,41 @@ int run_desk(FlaskApi& api) {
                 }
                 if (ui.seq_drag == 6 && ui.seq_drag_moved && ui.seq_lane_at(ui.my_last) == i)
                     stroke(dpy, buf, gc, bias_col(C, ui.seq_paint), row);
+                int roe_y = y + trend_h + lane_h;
+                std::string funds = "ROE  -";
+                unsigned long fc = C.muted;
+                if (Bot* b = ui.seq_bot(L.id)) {
+                    double pnl = 0;
+                    int npos = 0;
+                    std::string coins;
+                    for (auto& p : ui.snap.positions) {
+                        if (p.bot_id != b->id || npos >= 4) continue;
+                        char one[72];
+                        snprintf(one, sizeof(one), "   %s %+.1f%% %s$%.2f",
+                                 p.coin.c_str(), p.roe,
+                                 p.pnl < 0 ? "-" : "+", std::fabs(p.pnl));
+                        coins += one;
+                        pnl += p.pnl;
+                        ++npos;
+                    }
+                    char head[96];
+                    if (npos == 0) {
+                        pnl = b->upnl;
+                        if (std::fabs(pnl) < 0.005)
+                            snprintf(head, sizeof(head), "funds $%.2f   ROE flat", std::fabs(b->equity));
+                        else
+                            snprintf(head, sizeof(head), "funds $%.2f   ROE %s$%.2f",
+                                     std::fabs(b->equity), pnl < 0 ? "-" : "+", std::fabs(pnl));
+                    } else {
+                        snprintf(head, sizeof(head), "funds $%.2f   ROE %s$%.2f",
+                                 std::fabs(b->equity), pnl < 0 ? "-" : "+", std::fabs(pnl));
+                    }
+                    funds = std::string(head) + coins;
+                    if (std::fabs(pnl) < 0.005) fc = C.muted;
+                    else if (pnl < 0) fc = C.rose;
+                    else fc = C.green;
+                }
+                text(dpy, buf, gc, fc, x0 + 8, roe_y + 12, fit_px(funds, std::max(40, row.w - 16)));
                 if (ui.seq_drag == 3 && ui.seq_drag_moved && ui.seq_drag_bot == L.id) {
                     long t_at = ui.seq_x_to_t(ui.mx_last);
                     long dur = std::max(ui.seq_quantum(), ui.seq_span / 12);
