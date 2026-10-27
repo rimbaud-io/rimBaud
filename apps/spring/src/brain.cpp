@@ -32,13 +32,13 @@
 #include <mutex>
 #include <set>
 #include <sstream>
+#include <vector>
 #include <unistd.h>
 #include <dirent.h>
 #include <fcntl.h>
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <sys/statvfs.h>
-#include <vector>
 
 using nlohmann::json;
 
@@ -351,6 +351,157 @@ static json ctrl_file(const Brain& br, const std::string& id) {
     return read_json(join(br.conf, id + "_ctrl.json"));
 }
 
+static std::string yml_scalar(const std::string& text, const std::string& key) {
+    std::istringstream in(text);
+    std::string line;
+    std::string prefix = key + ":";
+    while (std::getline(in, line)) {
+        size_t i = 0;
+        while (i < line.size() && (line[i] == ' ' || line[i] == '\t')) i++;
+        if (line.compare(i, prefix.size(), prefix) != 0) continue;
+        std::string v = line.substr(i + prefix.size());
+        while (!v.empty() && (v.front() == ' ' || v.front() == '\t')) v.erase(v.begin());
+        while (!v.empty() && (v.back() == '\r' || v.back() == ' ')) v.pop_back();
+        if (v.size() >= 2 && ((v.front() == '"' && v.back() == '"') || (v.front() == '\'' && v.back() == '\'')))
+            v = v.substr(1, v.size() - 2);
+        return v;
+    }
+    return {};
+}
+
+static double yml_double(const std::string& text, const std::string& key, double fb) {
+    auto v = yml_scalar(text, key);
+    if (v.empty()) return fb;
+    try { return std::stod(v); } catch (...) { return fb; }
+}
+
+static std::string fmt_frac(double v) {
+    char b[32];
+    snprintf(b, sizeof(b), "%.6f", v);
+    std::string s = b;
+    while (s.size() > 1 && s.back() == '0') s.pop_back();
+    if (!s.empty() && s.back() == '.') s.push_back('0');
+    return s;
+}
+
+static void set_if_absent(json& out, const char* k, const json& v) {
+    if (!out.contains(k) || out[k].is_null()) out[k] = v;
+}
+
+// Official DMan V3 knobs. Missing desk keys take the controller yml, then the class defaults.
+static void fill_dman_v3_knobs(const Brain& br, json& out) {
+    std::ifstream in(join(br.conf, "controllers/conf_v2_dman-v3.yml"));
+    std::stringstream buf;
+    buf << in.rdbuf();
+    std::string yml = buf.str();
+    double arm = 0.015, delta = 0.005;
+    auto ts = yml_scalar(yml, "trailing_stop");
+    if (!ts.empty()) {
+        auto comma = ts.find(',');
+        if (comma != std::string::npos) {
+            try { arm = std::stod(ts.substr(0, comma)); } catch (...) {}
+            try { delta = std::stod(ts.substr(comma + 1)); } catch (...) {}
+        }
+    }
+    double dca[4] = {0.001, 0.018, 0.15, 0.25};
+    auto ds = yml_scalar(yml, "dca_spreads");
+    if (!ds.empty()) {
+        int n = 0;
+        std::stringstream ss(ds);
+        std::string part;
+        while (n < 4 && std::getline(ss, part, ',')) {
+            try { dca[n] = std::stod(part); } catch (...) {}
+            n++;
+        }
+    }
+    set_if_absent(out, "stop_loss", yml_double(yml, "stop_loss", 0.03));
+    set_if_absent(out, "take_profit", yml_double(yml, "take_profit", 0.02));
+    set_if_absent(out, "trail_activation", arm);
+    set_if_absent(out, "trail_delta", delta);
+    set_if_absent(out, "dca_spread_1", dca[0]);
+    set_if_absent(out, "dca_spread_2", dca[1]);
+    set_if_absent(out, "dca_spread_3", dca[2]);
+    set_if_absent(out, "dca_spread_4", dca[3]);
+    set_if_absent(out, "bb_length", (int)std::lround(yml_double(yml, "bb_length", 100)));
+    set_if_absent(out, "bb_std", yml_double(yml, "bb_std", 2.0));
+    set_if_absent(out, "bb_long_threshold", yml_double(yml, "bb_long_threshold", 0.0));
+    set_if_absent(out, "bb_short_threshold", yml_double(yml, "bb_short_threshold", 1.0));
+    set_if_absent(out, "dynamic_order_spread", false);
+    set_if_absent(out, "dynamic_target", false);
+    set_if_absent(out, "margin_pct", 1.0);
+}
+
+static std::string yml_key_of(const std::string& line) {
+    size_t i = 0;
+    while (i < line.size() && (line[i] == ' ' || line[i] == '\t')) i++;
+    auto c = line.find(':', i);
+    if (c == std::string::npos) return {};
+    return line.substr(i, c - i);
+}
+
+// The running official controller reloads this file about every 10 seconds.
+// Pair, size, and leverage stay as they are. A knob does not place an order.
+static void patch_dman_v3_yml(const Brain& br, const json& row) {
+    std::string path = join(br.conf, "controllers/conf_v2_dman-v3.yml");
+    std::ifstream in(path);
+    if (!in) return;
+    std::vector<std::string> lines;
+    std::string line;
+    while (std::getline(in, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        lines.push_back(line);
+    }
+    in.close();
+    auto num_of = [&](const char* k, double fb) {
+        if (row.contains(k) && row[k].is_number()) return row[k].get<double>();
+        return fb;
+    };
+    auto flag_of = [&](const char* k) {
+        if (!row.contains(k)) return std::string();
+        if (row[k].is_boolean()) return row[k].get<bool>() ? std::string("true") : std::string("false");
+        if (row[k].is_number()) return row[k].get<double>() >= 0.5 ? std::string("true") : std::string("false");
+        return std::string();
+    };
+    std::map<std::string, std::string> set;
+    set["stop_loss"] = fmt_frac(num_of("stop_loss", 0.03));
+    set["take_profit"] = fmt_frac(num_of("take_profit", 0.02));
+    set["bb_length"] = std::to_string((int)std::lround(num_of("bb_length", 100)));
+    set["bb_std"] = fmt_frac(num_of("bb_std", 2.0));
+    set["bb_long_threshold"] = fmt_frac(num_of("bb_long_threshold", 0));
+    set["bb_short_threshold"] = fmt_frac(num_of("bb_short_threshold", 1));
+    set["trailing_stop"] = "\"" + fmt_frac(num_of("trail_activation", 0.015)) + ","
+        + fmt_frac(num_of("trail_delta", 0.005)) + "\"";
+    set["dca_spreads"] = "\"" + fmt_frac(num_of("dca_spread_1", 0.001)) + ","
+        + fmt_frac(num_of("dca_spread_2", 0.018)) + ","
+        + fmt_frac(num_of("dca_spread_3", 0.15)) + ","
+        + fmt_frac(num_of("dca_spread_4", 0.25)) + "\"";
+    auto dyn = flag_of("dynamic_order_spread");
+    if (!dyn.empty()) set["dynamic_order_spread"] = dyn;
+    auto tgt = flag_of("dynamic_target");
+    if (!tgt.empty()) set["dynamic_target"] = tgt;
+    for (auto& kv : set) {
+        bool found = false;
+        for (auto& ln : lines) {
+            if (yml_key_of(ln) == kv.first) {
+                ln = kv.first + ": " + kv.second;
+                found = true;
+                break;
+            }
+        }
+        if (!found) lines.push_back(kv.first + ": " + kv.second);
+    }
+    std::string tmp = path + ".tmp";
+    std::ofstream out(tmp, std::ios::trunc);
+    if (!out) return;
+    for (auto& ln : lines) out << ln << "\n";
+    out.close();
+    if (!out) {
+        std::remove(tmp.c_str());
+        return;
+    }
+    if (std::rename(tmp.c_str(), path.c_str()) != 0) std::remove(tmp.c_str());
+}
+
 static json merge_controller(const Brain& br, const std::string& id, const json& status, const json& sl) {
     json out = json::object();
     if (status.is_object()) {
@@ -389,6 +540,7 @@ static json merge_controller(const Brain& br, const std::string& id, const json&
             }
         }
     }
+    if (id == "hummingbot-v2-dman-v3") fill_dman_v3_knobs(br, out);
     return out;
 }
 
@@ -2222,6 +2374,19 @@ static json api_ctrl_post(const Brain& br, const json& data) {
         return {{"ok", false}, {"error", "no controller keys"}, {"closes", false}};
     if (!write_json(join(br.conf, id + "_ctrl.json"), row))
         return {{"ok", false}, {"error", "write ctrl failed"}};
+    if (id == "hummingbot-v2-dman-v3") {
+        bool touch = false;
+        for (auto& k : changed) {
+            if (!k.is_string()) continue;
+            std::string s = k.get<std::string>();
+            if (s == "stop_loss" || s == "take_profit" || s == "trail_activation" || s == "trail_delta"
+                || s == "dca_spread_1" || s == "dca_spread_2" || s == "dca_spread_3" || s == "dca_spread_4"
+                || s == "bb_length" || s == "bb_std" || s == "bb_long_threshold" || s == "bb_short_threshold"
+                || s == "dynamic_order_spread" || s == "dynamic_target")
+                touch = true;
+        }
+        if (touch) patch_dman_v3_yml(br, row);
+    }
     {
         std::lock_guard<std::mutex> lk(g_live_mu);
         json live = g_live_knobs.contains(id) && g_live_knobs[id].is_object()
@@ -2612,6 +2777,13 @@ static json api_home_open_post(const Brain& br, const json& data) {
     }
     if (side != "LONG" && side != "SHORT")
         return {{"ok", false}, {"queued", false}, {"error", "set " + coin + " BIAS to LONG or SHORT before 100%"}};
+    // Official V2 sleeper does not read this queue, and its connector dir is empty.
+    if (id == "hummingbot-v2-dman-v3")
+        return {
+            {"ok", false}, {"queued", false}, {"closes", false}, {"positions_untouched", true},
+            {"error", "DMan V3 cannot sign a 100% " + side + " " + coin
+                + ". No Hyperliquid key in the sleeper. Load the wired wallet on /confiig and restart that container. Nothing was sent."},
+        };
     json payload = {{"coin", coin}, {"side", side}, {"pct", 1.0}, {"source", "spring"}};
     if (!sql_apply(br, {{"op", "command"}, {"bot_id", id}, {"kind", "open"}, {"payload", payload}}))
         return {{"ok", false}, {"queued", false}, {"error", "sqlite command queue failed"}};
