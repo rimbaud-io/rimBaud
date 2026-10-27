@@ -67,6 +67,25 @@ struct Overlay {
     int lev = 1;
     bool ghost = false;       // projected clip from knobs (no live size)
     bool official_dman = false;
+    std::string bias;          // LONG, SHORT, or FLAT from the desk
+    std::string pair;          // sleeper trading pair, when Spring publishes it
+    std::string entry_iv;
+    std::string trend_iv;
+    int bb_len = 0;
+    double bb_std = 0;
+    double bb_long = 0;
+    double bb_short = 1;
+    bool bb_th_set = false;
+    int bb_ddof = 0;           // 0 = TA-Lib / DMan population, 1 = sample (PMM)
+    int st_len = 0;
+    double st_mult = 0;
+    double st_dist = -1;       // < 0 means the script default
+    int trend_len = 0;
+    int pivot_left = 0;
+    double wave_min = 0;
+    double wave_max = 0;
+    double size_quote = -1;    // < 0 unknown
+    int entry_kind = 0;        // 0 none, 1 BB, 2 swing BB, 3 short BB, 4 supertrend, 5 wave, 6 market
     bool is_short() const { return side == "SHORT"; }
     double stop_price() const {
         double s = frac(stop_frac);
@@ -376,6 +395,44 @@ static unsigned long rgb(Display* d, Colormap cm, int r, int g, int b) {
     return WhitePixel(d, DefaultScreen(d));
 }
 
+// Same 24-step wheel as the mothership HOME card. Phase marches at 18 Hz.
+static void hsv_rgb(double h, double s, double v, int& r, int& g, int& b) {
+    if (h < 0) h = 0;
+    h = std::fmod(h, 360.0);
+    if (h < 0) h += 360.0;
+    double c = v * s;
+    double x = c * (1.0 - std::fabs(std::fmod(h / 60.0, 2.0) - 1.0));
+    double m = v - c;
+    double rf = 0, gf = 0, bf = 0;
+    if (h < 60) { rf = c; gf = x; }
+    else if (h < 120) { rf = x; gf = c; }
+    else if (h < 180) { gf = c; bf = x; }
+    else if (h < 240) { gf = x; bf = c; }
+    else if (h < 300) { rf = x; bf = c; }
+    else { rf = c; bf = x; }
+    r = (int)std::lround((rf + m) * 255.0);
+    g = (int)std::lround((gf + m) * 255.0);
+    b = (int)std::lround((bf + m) * 255.0);
+    if (r < 0) r = 0;
+    if (r > 255) r = 255;
+    if (g < 0) g = 0;
+    if (g > 255) g = 255;
+    if (b < 0) b = 0;
+    if (b > 255) b = 255;
+}
+
+static unsigned long g_rainbow[24];
+static bool g_rainbow_ok = false;
+static void ensure_rainbow(Display* d, Colormap cm) {
+    if (g_rainbow_ok) return;
+    for (int i = 0; i < 24; ++i) {
+        int rr, gg, bb;
+        hsv_rgb(i * 15.0, 1.0, 1.0, rr, gg, bb);
+        g_rainbow[i] = rgb(d, cm, rr, gg, bb);
+    }
+    g_rainbow_ok = true;
+}
+
 static unsigned long shade(Display* d, Colormap cm, int r, int g, int b, double k) {
     auto clip = [](int x) { return std::max(0, std::min(255, x)); };
     if (k <= 1.0) {
@@ -490,13 +547,26 @@ static std::vector<Candle> parse_hl(const std::string& body) {
     return out;
 }
 
-static std::vector<Candle> fetch_binance(const std::string& coin, const std::string& iv, std::string& err) {
-    auto path = "/api/v3/klines?symbol=" + binance_sym(coin) + "&interval=" + iv + "&limit=96";
+static bool binance_iv_ok(const std::string& iv) {
+    return iv == "1m" || iv == "3m" || iv == "5m" || iv == "15m" || iv == "30m"
+        || iv == "1h" || iv == "2h" || iv == "4h" || iv == "1d";
+}
+
+static std::vector<Candle> fetch_binance_n(const std::string& coin, const std::string& iv, int limit, std::string& err) {
+    if (limit < 1) limit = 1;
+    if (limit > 500) limit = 500;
+    std::string use = binance_iv_ok(iv) ? iv : "3m";
+    auto path = "/api/v3/klines?symbol=" + binance_sym(coin) + "&interval=" + use
+        + "&limit=" + std::to_string(limit);
     auto r = https_request("api.binance.com", 443, "GET", path);
     if (!r.error.empty()) { err = r.error; return {}; }
     if (r.status != 200) { err = "binance HTTP " + std::to_string(r.status); return {}; }
     err.clear();
     return parse_binance(r.body);
+}
+
+static std::vector<Candle> fetch_binance(const std::string& coin, const std::string& iv, std::string& err) {
+    return fetch_binance_n(coin, iv, 96, err);
 }
 
 static std::vector<Candle> fetch_hl(const std::string& coin, const std::string& iv, std::string& err) {
@@ -512,6 +582,9 @@ static std::vector<Candle> fetch_hl(const std::string& coin, const std::string& 
     err.clear();
     return parse_hl(r.body);
 }
+
+static void read_entry_knobs(Overlay& o, const json& ctrl);
+static void apply_entry_defaults(Overlay& o);
 
 static bool apply_pmm_live(std::vector<Overlay>& ov, const std::string& bot_id) {
     if (bot_id.empty()) return false;
@@ -553,6 +626,16 @@ static bool apply_pmm_live(std::vector<Overlay>& ov, const std::string& bot_id) 
                 double dv = jn(j, dk[i], 0);
                 if (dv > 0) setd(o.dca[i], dv);
             }
+        }
+        {
+            int bn = o.bb_len;
+            double bl = o.bb_long, bs = o.bb_short, bd = o.bb_std, sd = o.st_dist;
+            read_entry_knobs(o, j);
+            apply_entry_defaults(o);
+            if (bn != o.bb_len || std::fabs(bl - o.bb_long) > 1e-12
+                || std::fabs(bs - o.bb_short) > 1e-12 || std::fabs(bd - o.bb_std) > 1e-12
+                || std::fabs(sd - o.st_dist) > 1e-12)
+                ch = true;
         }
         double old_r = o.rebuy_pct;
         double new_r = jn(j, "rebuy_pct", o.rebuy_pct);
@@ -606,6 +689,481 @@ static int lev_for_coin(const std::string& coin) {
     return 10;
 }
 
+static std::string bias_of(const json& b, const std::string& coin) {
+    if (!b.contains("bias") || !b["bias"].is_object()) return "FLAT";
+    std::string v = b["bias"].value(coin, std::string());
+    for (char& ch : v) if (ch >= 'a' && ch <= 'z') ch = static_cast<char>(ch - 32);
+    if (v == "LONG" || v == "SHORT" || v == "FLAT") return v;
+    return "FLAT";
+}
+
+static void read_entry_knobs(Overlay& o, const json& ctrl) {
+    if (!ctrl.is_object()) return;
+    if (ctrl.contains("bb_length")) {
+        int n = (int)std::lround(jn(ctrl, "bb_length", 0));
+        if (n >= 2 && n <= 500) o.bb_len = n;
+    }
+    if (ctrl.contains("bb_std")) {
+        double s = jn(ctrl, "bb_std", 0);
+        if (s > 0 && s <= 8) o.bb_std = s;
+    }
+    if (ctrl.contains("bb_long_threshold")) {
+        o.bb_long = jn(ctrl, "bb_long_threshold", 0);
+        o.bb_th_set = true;
+    }
+    if (ctrl.contains("bb_short_threshold")) {
+        o.bb_short = jn(ctrl, "bb_short_threshold", 1);
+        o.bb_th_set = true;
+    }
+    if (ctrl.contains("interval") && ctrl["interval"].is_string()) {
+        std::string iv = ctrl["interval"].get<std::string>();
+        if (binance_iv_ok(iv)) o.entry_iv = iv;
+    }
+    if (ctrl.contains("trading_pair") && ctrl["trading_pair"].is_string())
+        o.pair = ctrl["trading_pair"].get<std::string>();
+    if (ctrl.contains("total_amount_quote") && ctrl["total_amount_quote"].is_number())
+        o.size_quote = ctrl["total_amount_quote"].get<double>();
+    if (ctrl.contains("st_length")) {
+        int n = (int)std::lround(jn(ctrl, "st_length", 0));
+        if (n >= 2 && n <= 200) o.st_len = n;
+    }
+    if (ctrl.contains("st_mult")) {
+        double m = jn(ctrl, "st_mult", 0);
+        if (m > 0 && m <= 20) o.st_mult = m;
+    }
+    if (ctrl.contains("st_max_dist")) {
+        double d = jn(ctrl, "st_max_dist", -1);
+        if (d > 0 && d < 1) o.st_dist = d;
+    }
+    if (ctrl.contains("percentage_threshold")) {
+        double d = jn(ctrl, "percentage_threshold", -1);
+        if (d > 1.0) d /= 100.0;
+        if (d > 0 && d < 1) o.st_dist = d;
+    }
+    if (ctrl.contains("trend_sma_length")) {
+        int n = (int)std::lround(jn(ctrl, "trend_sma_length", 0));
+        if (n >= 2 && n <= 500) o.trend_len = n;
+    }
+}
+
+// Class defaults of the running script. A published knob wins when it is set.
+static void apply_entry_defaults(Overlay& o) {
+    const std::string& id = o.bot_id;
+    if (id == "hummingbot-hl") { o.entry_kind = 0; return; }
+    if (id == "hummingbot-dman-maker") { o.entry_kind = 6; return; }
+    if (id == "hummingbot-helliot") {
+        o.entry_kind = 5;
+        if (o.entry_iv.empty()) o.entry_iv = "15m";
+        if (o.pivot_left < 1) o.pivot_left = 3;
+        if (o.wave_min <= 0) o.wave_min = 0.382;
+        if (o.wave_max <= 0) o.wave_max = 0.786;
+        return;
+    }
+    if (id == "hummingbot-surfn") {
+        o.entry_kind = 4;
+        if (o.entry_iv.empty()) o.entry_iv = "3m";
+        if (o.st_len < 2) o.st_len = 20;
+        if (o.st_mult <= 0) o.st_mult = 4;
+        if (o.st_dist < 0) o.st_dist = 0.01;
+        return;
+    }
+    if (id == "hummingbot-onlyup") {
+        o.entry_kind = 4;
+        if (o.entry_iv.empty()) o.entry_iv = "15m";
+        if (o.st_len < 2) o.st_len = 10;
+        if (o.st_mult <= 0) o.st_mult = 3;
+        if (o.st_dist < 0) o.st_dist = 0.012;
+        if (o.trend_iv.empty()) o.trend_iv = "1h";
+        if (o.trend_len < 2) o.trend_len = 50;
+        return;
+    }
+    if (id == "hummingbot-shortn") {
+        o.entry_kind = 3;
+        if (o.entry_iv.empty()) o.entry_iv = "15m";
+        if (o.bb_len < 2) o.bb_len = 20;
+        if (o.bb_std <= 0) o.bb_std = 2;
+        if (!o.bb_th_set) o.bb_short = 0.75;
+        o.bb_ddof = 0;
+        if (o.trend_iv.empty()) o.trend_iv = "1h";
+        if (o.trend_len < 2) o.trend_len = 50;
+        return;
+    }
+    if (id == "hummingbot-bn-swing") {
+        o.entry_kind = 2;
+        if (o.entry_iv.empty()) o.entry_iv = "15m";
+        if (o.bb_len < 2) o.bb_len = 20;
+        if (o.bb_std <= 0) o.bb_std = 2;
+        if (!o.bb_th_set) { o.bb_long = 0.25; o.bb_short = 0.75; }
+        o.bb_ddof = 1;
+        if (o.trend_iv.empty()) o.trend_iv = "1h";
+        if (o.trend_len < 2) o.trend_len = 50;
+        return;
+    }
+    if (id == "hummingbot-dman" || id == "hummingbot-v2-dman-v3") {
+        o.entry_kind = 1;
+        if (o.entry_iv.empty()) o.entry_iv = id == "hummingbot-v2-dman-v3" ? "3m" : "15m";
+        if (o.bb_len < 2) o.bb_len = 100;
+        if (o.bb_std <= 0) o.bb_std = 2;
+        if (!o.bb_th_set) { o.bb_long = 0; o.bb_short = 1; }
+        o.bb_ddof = 0;
+        return;
+    }
+    if (o.bb_len >= 2 && o.bb_std > 0) {
+        o.entry_kind = 1;
+        o.bb_ddof = 0;
+        if (o.entry_iv.empty()) o.entry_iv = "3m";
+        if (!o.bb_th_set) { o.bb_long = 0; o.bb_short = 1; }
+    }
+}
+
+struct NextEntry {
+    double px = 0;
+    double watch_px = 0;
+    std::string what;
+    std::string watch_what;
+    std::string rule;
+    std::string note;
+    bool now = false;
+    bool watch_now = false;
+    bool ok = false;
+    bool watch_ok = false;
+};
+
+struct BarSet {
+    std::string key;
+    std::vector<Candle> cs;
+};
+
+static int entry_limit(const Overlay& o) {
+    int n = 40;
+    if (o.entry_kind == 1 || o.entry_kind == 2 || o.entry_kind == 3) n = o.bb_len + 2;
+    else if (o.entry_kind == 4) n = o.st_len + 40;
+    else if (o.entry_kind == 5) n = 180;
+    else if (o.entry_kind == 6) n = 2;
+    if (n < 2) n = 2;
+    if (n > 500) n = 500;
+    return n;
+}
+
+static std::string bar_key(const std::string& coin, const std::string& iv, int limit) {
+    return coin + "|" + iv + "|" + std::to_string(limit);
+}
+
+static const std::vector<Candle>* bars_of(const std::vector<BarSet>& sets, const std::string& coin,
+                                          const std::string& iv, int limit) {
+    std::string key = bar_key(coin, iv, limit);
+    for (auto& s : sets)
+        if (s.key == key) return &s.cs;
+    return nullptr;
+}
+
+static void remember_bars(std::vector<BarSet>& sets, const std::string& coin, const std::string& iv, int limit) {
+    if (coin.empty() || !binance_iv_ok(iv) || limit < 2) return;
+    if (limit > 500) limit = 500;
+    if (bars_of(sets, coin, iv, limit)) return;
+    std::string err;
+    BarSet s;
+    s.key = bar_key(coin, iv, limit);
+    s.cs = fetch_binance_n(coin, iv, limit, err);
+    sets.push_back(std::move(s));
+}
+
+static void refresh_entry_sets(std::vector<BarSet>& sets, const std::vector<Overlay>& ov,
+                               const std::string& coin, const std::string& bot_id) {
+    sets.clear();
+    for (auto& o : ov) {
+        if (!bot_id.empty() && o.bot_id != bot_id && o.bot != bot_id) continue;
+        if (o.entry_kind <= 0) continue;
+        std::string iv = binance_iv_ok(o.entry_iv) ? o.entry_iv : "15m";
+        int lim = entry_limit(o);
+        if (o.entry_kind != 6) remember_bars(sets, coin, iv, lim);
+        if (o.trend_len >= 2 && binance_iv_ok(o.trend_iv))
+            remember_bars(sets, coin, o.trend_iv, std::min(500, o.trend_len + 2));
+        if (o.entry_kind == 1 && !o.pair.empty()) {
+            std::string wc = norm_coin(o.pair);
+            if (!wc.empty() && wc != coin) remember_bars(sets, wc, iv, lim);
+        }
+    }
+}
+
+static const std::vector<Candle>& bars_or(const std::vector<BarSet>& sets, const std::string& coin,
+                                          const std::string& iv, int limit) {
+    static const std::vector<Candle> empty;
+    auto* p = bars_of(sets, coin, iv, limit);
+    return p ? *p : empty;
+}
+
+static bool band_of(const std::vector<Candle>& cs, int len, double sd, int ddof,
+                    double& lower, double& upper, double& last) {
+    if (len < 2 || (int)cs.size() < len || sd <= 0) return false;
+    if (ddof < 0 || ddof >= len) ddof = 0;
+    int i0 = (int)cs.size() - len;
+    double sum = 0;
+    for (int i = i0; i < (int)cs.size(); ++i) sum += cs[i].c;
+    double mean = sum / (double)len;
+    double acc = 0;
+    for (int i = i0; i < (int)cs.size(); ++i) {
+        double d = cs[i].c - mean;
+        acc += d * d;
+    }
+    double denom = (double)(len - ddof);
+    if (denom < 1) return false;
+    double sdev = std::sqrt(acc / denom);
+    lower = mean - sd * sdev;
+    upper = mean + sd * sdev;
+    last = cs.back().c;
+    return upper > lower && lower > 0 && last > 0;
+}
+
+static double sma_last(const std::vector<Candle>& cs, int n) {
+    if (n < 1 || (int)cs.size() < n) return 0;
+    double s = 0;
+    for (int i = (int)cs.size() - n; i < (int)cs.size(); ++i) s += cs[i].c;
+    return s / (double)n;
+}
+
+static bool supertrend_of(const std::vector<Candle>& cs, int length, double mult,
+                          int& dir, double& line, double& dist) {
+    int n = (int)cs.size();
+    if (length < 2 || n < length + 3 || mult <= 0) return false;
+    std::vector<double> trs;
+    trs.reserve((size_t)n - 1);
+    for (int i = 1; i < n; ++i) {
+        double h = cs[i].h, l = cs[i].l, pc = cs[i - 1].c;
+        trs.push_back(std::max(h - l, std::max(std::fabs(h - pc), std::fabs(l - pc))));
+    }
+    double atr = 0;
+    for (int i = 0; i < length; ++i) atr += trs[i];
+    atr /= (double)length;
+    dir = 1;
+    double st = (cs[length].h + cs[length].l) / 2.0;
+    for (int i = length; i < n; ++i) {
+        double hl2 = (cs[i].h + cs[i].l) / 2.0;
+        if (i > length) atr = (atr * (length - 1) + trs[i - 1]) / (double)length;
+        double upper = hl2 + mult * atr;
+        double lower = hl2 - mult * atr;
+        double prev = st;
+        double close = cs[i].c;
+        if (dir == 1) st = close > prev ? std::max(lower, prev) : upper;
+        else st = close < prev ? std::min(upper, prev) : lower;
+        if (close > st) dir = 1;
+        else if (close < st) dir = -1;
+    }
+    double close = cs.back().c;
+    if (close <= 0 || st <= 0) return false;
+    line = st;
+    dist = std::fabs(close - st) / close;
+    return true;
+}
+
+struct Piv { int i; char kind; double price; };
+
+static std::vector<Piv> pivots_of(const std::vector<Candle>& cs, int left) {
+    std::vector<Piv> raw, merged;
+    int n = (int)cs.size();
+    if (left < 1 || n < left * 2 + 1) return merged;
+    for (int i = left; i < n - left; ++i) {
+        bool is_h = true, is_l = true;
+        for (int j = 1; j <= left; ++j) {
+            if (!(cs[i].h > cs[i - j].h && cs[i].h >= cs[i + j].h)) is_h = false;
+            if (!(cs[i].l < cs[i - j].l && cs[i].l <= cs[i + j].l)) is_l = false;
+        }
+        if (is_h) raw.push_back({i, 'H', cs[i].h});
+        else if (is_l) raw.push_back({i, 'L', cs[i].l});
+    }
+    if (raw.empty()) return merged;
+    merged.push_back(raw[0]);
+    for (size_t k = 1; k < raw.size(); ++k) {
+        auto& last = merged.back();
+        if (raw[k].kind == last.kind) {
+            if (raw[k].kind == 'H' && raw[k].price >= last.price) last = raw[k];
+            else if (raw[k].kind == 'L' && raw[k].price <= last.price) last = raw[k];
+        } else {
+            merged.push_back(raw[k]);
+        }
+    }
+    return merged;
+}
+
+static int want_side(const Overlay& o) {
+    if (o.bias == "LONG") return 1;
+    if (o.bias == "SHORT") return -1;
+    if (!o.ghost && o.side == "SHORT") return -1;
+    if (!o.ghost && o.side == "LONG") return 1;
+    return 0;
+}
+
+static NextEntry bb_entry(const Overlay& o, const std::vector<Candle>& cs, const std::vector<Candle>& trend,
+                          bool leq) {
+    NextEntry e;
+    double lower = 0, upper = 0, last = 0;
+    if (!band_of(cs, o.bb_len, o.bb_std, o.bb_ddof, lower, upper, last)) {
+        e.note = "band not ready";
+        return e;
+    }
+    double width = upper - lower;
+    double long_px = lower + o.bb_long * width;
+    double short_px = lower + o.bb_short * width;
+    double bbp = (last - lower) / width;
+    bool long_now = leq ? bbp <= o.bb_long : bbp < o.bb_long;
+    bool short_now = leq ? bbp >= o.bb_short : bbp > o.bb_short;
+    if (o.trend_len >= 2) {
+        double sma = sma_last(trend, o.trend_len);
+        if (sma > 0) {
+            if (last <= sma) long_now = false;
+            if (last >= sma) short_now = false;
+        }
+    }
+    int side = want_side(o);
+    if (o.entry_kind == 3) side = -1;
+    bool use_long = side > 0 || (side == 0 && std::fabs(long_px - last) <= std::fabs(short_px - last));
+    if (side < 0) use_long = false;
+    e.px = use_long ? long_px : short_px;
+    e.now = use_long ? long_now : short_now;
+    e.what = use_long ? "long under" : "short over";
+    e.ok = e.px > 0;
+    e.rule = (binance_iv_ok(o.entry_iv) ? o.entry_iv : std::string("3m"))
+        + " x " + std::to_string(o.bb_len);
+    if (o.trend_len >= 2 && !e.now) {
+        double sma = sma_last(trend, o.trend_len);
+        if (sma > 0 && use_long && last <= sma) e.note = "needs 1h trend up";
+        if (sma > 0 && !use_long && last >= sma) e.note = "needs 1h trend down";
+    }
+    if (o.bias == "FLAT") {
+        if (!e.note.empty()) e.note += " - ";
+        e.note += "bias flat";
+        e.now = false;
+    }
+    return e;
+}
+
+static NextEntry make_entry(const Overlay& o, const std::vector<BarSet>& sets,
+                            const std::string& coin, double last_px) {
+    NextEntry e;
+    if (o.bot_id == "hummingbot-hl") {
+        e.note = "copies the master - no price entry";
+        return e;
+    }
+    if (o.entry_kind <= 0) {
+        e.note = "no price entry";
+        return e;
+    }
+    std::string iv = binance_iv_ok(o.entry_iv) ? o.entry_iv : "15m";
+    int lim = entry_limit(o);
+    const auto& cs = bars_or(sets, coin, iv, lim);
+    const auto& trend = bars_or(sets, coin, o.trend_iv, std::min(500, o.trend_len + 2));
+    if (o.entry_kind == 1 || o.entry_kind == 2 || o.entry_kind == 3) {
+        e = bb_entry(o, cs, trend, o.entry_kind == 2 || o.entry_kind == 3);
+    } else if (o.entry_kind == 4) {
+        int dir = 0;
+        double line = 0, dist = 0;
+        if (!supertrend_of(cs, o.st_len, o.st_mult, dir, line, dist)) {
+            e.note = "supertrend not ready";
+            return e;
+        }
+        e.px = line;
+        e.ok = line > 0;
+        e.what = "supertrend";
+        e.rule = iv + " x " + std::to_string(o.st_len);
+        bool near = dist <= (o.st_dist < 0 ? 0.01 : o.st_dist);
+        bool trend_ok = true;
+        if (o.trend_len >= 2) {
+            double sma = sma_last(trend, o.trend_len);
+            double last = cs.empty() ? last_px : cs.back().c;
+            if (sma > 0 && last > 0 && last <= sma) trend_ok = false;
+        }
+        int side = want_side(o);
+        if (o.bot_id == "hummingbot-onlyup") side = 1;
+        bool dir_ok = side == 0 || (side > 0 && dir == 1) || (side < 0 && dir == -1);
+        e.now = near && trend_ok && dir_ok && (o.bias == "LONG" || o.bias == "SHORT");
+        if (o.bias == "FLAT" || o.bias.empty()) e.note = "bias flat";
+        else if (!dir_ok) e.note = dir == 1 ? "supertrend up" : "supertrend down";
+        else if (!trend_ok) e.note = "1h trend down";
+        else if (!near) e.note = "wait for the line";
+    } else if (o.entry_kind == 5) {
+        auto pv = pivots_of(cs, o.pivot_left < 1 ? 3 : o.pivot_left);
+        if (pv.size() < 3 || cs.empty()) {
+            e.note = "wave not ready";
+            return e;
+        }
+        auto a = pv[pv.size() - 3], b = pv[pv.size() - 2], c = pv[pv.size() - 1];
+        double price = cs.back().c;
+        double wmin = o.wave_min > 0 ? o.wave_min : 0.382;
+        double wmax = o.wave_max > 0 ? o.wave_max : 0.786;
+        bool up = a.kind == 'L' && b.kind == 'H' && c.kind == 'L';
+        bool dn = a.kind == 'H' && b.kind == 'L' && c.kind == 'H';
+        if (!up && !dn) {
+            e.note = "wave not ready";
+            return e;
+        }
+        double w1 = up ? (b.price - a.price) : (a.price - b.price);
+        if (w1 <= 0) { e.note = "wave not ready"; return e; }
+        double zone_lo = up ? b.price - wmax * w1 : b.price + wmin * w1;
+        double zone_hi = up ? b.price - wmin * w1 : b.price + wmax * w1;
+        double retr = up ? (b.price - c.price) / w1 : (c.price - b.price) / w1;
+        bool in_zone = retr >= wmin && retr <= wmax;
+        bool bounced = up ? (price > c.price && price < b.price) : (price < c.price && price > b.price);
+        e.what = up ? "wave long" : "wave short";
+        e.rule = iv;
+        if (in_zone && bounced) {
+            e.px = price;
+            e.now = (up && o.bias == "LONG") || (!up && o.bias == "SHORT");
+        } else if (up && price > zone_hi) e.px = zone_hi;
+        else if (!up && price < zone_lo) e.px = zone_lo;
+        else if (up && price < zone_lo) e.px = zone_lo;
+        else if (!up && price > zone_hi) e.px = zone_hi;
+        else e.px = c.price;
+        e.ok = e.px > 0;
+        if (o.bias == "FLAT" || o.bias.empty()) e.note = "bias flat";
+    } else if (o.entry_kind == 6) {
+        e.px = last_px > 0 ? last_px : (cs.empty() ? 0 : cs.back().c);
+        e.ok = e.px > 0;
+        if (!o.ghost) {
+            e.what = "market";
+            e.note = "in a clip - next entry is market after flat";
+        } else if (o.bias == "LONG" || o.bias == "SHORT") {
+            e.what = o.bias == "SHORT" ? "market short" : "market long";
+            e.now = true;
+        } else {
+            e.what = "market";
+            e.note = "set LONG or SHORT";
+        }
+    }
+    if (o.entry_kind == 1 && !o.pair.empty()) {
+        std::string wc = norm_coin(o.pair);
+        if (!wc.empty() && wc != coin) {
+            const auto& wcs = bars_or(sets, wc, iv, lim);
+            auto w = bb_entry(o, wcs, {}, false);
+            e.watch_ok = w.ok;
+            e.watch_px = w.px;
+            e.watch_what = w.what;
+            e.watch_now = w.now && o.bias != "FLAT";
+        }
+    }
+    return e;
+}
+
+static std::string entry_line_text(const Overlay& o, const NextEntry& e) {
+    if (!e.ok) return e.note.empty() ? std::string("no price entry") : e.note;
+    std::string s = e.now ? "NOW " : "NEXT ";
+    s += e.what;
+    s += " ";
+    s += fmt_px(e.px);
+    if (!e.rule.empty()) { s += " - "; s += e.rule; }
+    if (o.size_quote >= 0 && o.size_quote < 1e-9) s += " - size 0, nothing sent";
+    if (e.watch_ok) {
+        s += " - he watches ";
+        s += o.pair;
+        s += " ";
+        s += e.watch_now ? "NOW " : "NEXT ";
+        s += e.watch_what;
+        s += " ";
+        s += fmt_px(e.watch_px);
+    }
+    if (!e.note.empty()) { s += " - "; s += e.note; }
+    return s;
+}
+
 static void fill_ctrl(Overlay& o, const json& b) {
     o.sl_roe = jn(b, "sl_roe_pct", o.sl_roe);
     o.color = b.value("color", o.color);
@@ -654,6 +1212,9 @@ static void fill_ctrl(Overlay& o, const json& b) {
     }
     double from_next = first_dollar(rebuy);
     if (from_next > 0 && rebuy.find(o.coin) != std::string::npos) o.rebuy_px = from_next;
+    read_entry_knobs(o, ctrl);
+    apply_entry_defaults(o);
+    o.bias = bias_of(b, o.coin);
 }
 
 static std::vector<Overlay> overlays_for(const json& home, const std::string& coin,
@@ -706,12 +1267,8 @@ static std::vector<Overlay> overlays_for(const json& home, const std::string& co
                 o.lev = lev_for_coin(coin);
                 if (o.lev < 1) o.lev = 1;
                 o.side = "LONG";
-                if (b.contains("bias") && b["bias"].is_object()) {
-                    std::string v = b["bias"].value(coin, std::string());
-                    for (char& ch : v)
-                        if (ch >= 'a' && ch <= 'z') ch = static_cast<char>(ch - 32);
-                    if (v == "SHORT" || v == "LONG") o.side = v;
-                }
+                o.bias = bias_of(b, coin);
+                if (o.bias == "SHORT" || o.bias == "LONG") o.side = o.bias;
                 o.rebuy_pct = 0;
                 o.sl_roe = jn(b, "sl_roe_pct", 20);
                 color_from_id(o.bot_id, o.cr, o.cg, o.cb);
@@ -813,6 +1370,13 @@ int main(int argc, char** argv) {
                    o.bot.c_str(), o.side.c_str(), o.entry, o.win_px(), o.sl_px(), o.stop_price(),
                    o.arm_px(), o.trail_now_px(), o.dca_px(0), o.dca_px(1), o.dca_px(2), o.dca_px(3),
                    o.next_in_px(), o.close_px, o.ghost ? " ghost" : "");
+        std::vector<BarSet> sets;
+        refresh_entry_sets(sets, ovd, c, bot_id);
+        double last_px = k.empty() ? 0 : k.back().c;
+        for (auto& o : ovd) {
+            auto e = make_entry(o, sets, c, last_px);
+            printf("  %s\n", entry_line_text(o, e).c_str());
+        }
         if (!k.empty()) printf("  last close %.4g  t=%lld\n", k.back().c, k.back().t);
         return err.empty() && !k.empty() ? 0 : 1;
     }
@@ -881,7 +1445,9 @@ int main(int argc, char** argv) {
     Drawable buf = win;
 
     std::vector<Candle> candles;
+    std::vector<BarSet> entry_sets;
     std::vector<Overlay> ov;
+    int blink_phase = -1;
     json home;
     std::vector<std::string> coins = {"BTC", "ETH", "LTC", "TAO"};
     std::string err, note;
@@ -967,6 +1533,7 @@ int main(int argc, char** argv) {
         else candles = fetch_binance(coin, iv, err);
         note = use_hl ? "HL candles (REST tokens)" : "Binance candles (no HL tokens)";
         if (!err.empty()) note = err;
+        refresh_entry_sets(entry_sets, ov, coin, bot_id);
     };
 
     auto paint = [&]() {
@@ -1049,7 +1616,12 @@ int main(int argc, char** argv) {
                 if (o.entry > 0) { lo = std::min(lo, o.entry); hi = std::max(hi, o.entry); }
             }
         }
-        for (auto& o : ov) {
+        double last_px = candles.empty() ? 0 : candles.back().c;
+        std::vector<NextEntry> nexts;
+        nexts.reserve(ov.size());
+        for (auto& o : ov) nexts.push_back(make_entry(o, entry_sets, coin, last_px));
+        for (int oi_n = 0; oi_n < (int)ov.size(); ++oi_n) {
+            auto& o = ov[oi_n];
             auto bump = [&](double p) {
                 if (p > 0) { lo = std::min(lo, p); hi = std::max(hi, p); }
             };
@@ -1062,6 +1634,7 @@ int main(int argc, char** argv) {
             };
             near(o.stop_price());
             for (int di = 0; di < 4; ++di) near(o.dca_px(di));
+            if (oi_n < (int)nexts.size()) near(nexts[oi_n].px);
             if (o.rebuy_px > 0) bump(o.rebuy_px);
             if (o.close_px > 0) bump(o.close_px);
         }
@@ -1144,6 +1717,19 @@ int main(int argc, char** argv) {
             XSetLineAttributes(dpy, gc, hot ? 2 : 1, hot ? LineSolid : LineOnOffDash, CapButt, JoinMiter);
             XDrawLine(dpy, buf, gc, plot.x + 2, y, plot.x + plot.w - 2, y);
             XSetLineAttributes(dpy, gc, 1, LineSolid, CapButt, JoinMiter);
+        };
+        auto rainbow_hline = [&](int x0, int x1, int y) {
+            ensure_rainbow(dpy, cm);
+            int phase = (int)(nowm() * 18.0) % 24;
+            const int step = 10;
+            const int t = 4;
+            int yy = y - t / 2;
+            for (int x = x0; x < x1; x += step) {
+                int idx = (phase + (x / 2) + 48) % 24;
+                XSetForeground(dpy, gc, g_rainbow[idx]);
+                int w = std::min(step, x1 - x);
+                if (w > 0) XFillRectangle(dpy, buf, gc, x, yy, (unsigned)w, (unsigned)t);
+            }
         };
         auto add_line_hit = [&](int oi, int line, double px) {
             if (px <= 0 || bot_id.empty()) return;
@@ -1235,6 +1821,14 @@ int main(int argc, char** argv) {
                     add_line_hit(oi, ln, px);
                 }
             }
+            if (oi < (int)nexts.size() && nexts[oi].ok && nexts[oi].px > 0) {
+                int y = y_for(nexts[oi].px);
+                rainbow_hline(plot.x + 2, plot.x + plot.w - 2, y);
+                char tagb[48];
+                snprintf(tagb, sizeof(tagb), "%s %s", nexts[oi].now ? "NOW" : "NEXT",
+                         nexts[oi].what.c_str());
+                add_mk(plot.x + plot.w - 12, nexts[oi].px, white, tagb);
+            }
             (void)rcol;
         }
         const int gap = FH + 4;
@@ -1272,27 +1866,23 @@ int main(int argc, char** argv) {
             fill(rgb(dpy, cm, 6, 18, 10), {tx - 3, ly - FH + 4, tw + 6, FH});
             txt2(m.col, tx, ly, m.lab);
         }
-        if (!bot_id.empty()) {
-            if (drag_line >= 0)
-                txt(gold, 12, H - 10, "dragging line — drop to set hunter knobs via Spring · no HL close/open");
-            else if (hover_line >= 0)
-                txt(gold, 12, H - 10, "drag this line to move SL / WIN / ARM / TRAIL / NEXT IN / MOON");
-            else {
-                bool ghost = false;
-                for (auto& o : ov) if (o.ghost) ghost = true;
-                if (ghost)
-                    txt(gold, 12, H - 10, "flat - lines are this hunter's knobs. Drag writes the desk. Positions stay.");
-                else {
-                    char hud[128];
-                    double sls = ov.empty() ? 0 : ov[0].sl_roe;
-                    snprintf(hud, sizeof(hud),
-                             "SL %.0f%% ROE  -  drag lines  -  Spring live  -  clips stay",
-                             sls);
-                    txt(gold, 12, H - 10, hud);
-                }
-            }
-        } else
-            txt(white, 12, H - 10, "CLOSE or window X  ·  pick a hunter in the dropdown to edit knobs");
+        std::string foot;
+        for (int i = 0; i < (int)ov.size() && i < (int)nexts.size(); ++i) {
+            if (!nexts[i].ok && nexts[i].note.empty()) continue;
+            if (!bot_id.empty() && ov[i].bot_id != bot_id && ov[i].bot != bot_id) continue;
+            foot = entry_line_text(ov[i], nexts[i]);
+            break;
+        }
+        if (drag_line >= 0)
+            txt(gold, 12, H - 10, "dragging line - drop to set hunter knobs via Spring. no HL close/open");
+        else if (hover_line >= 0)
+            txt(gold, 12, H - 10, "drag this line to move SL / WIN / ARM / TRAIL / NEXT IN / MOON");
+        else if (!foot.empty())
+            txt(gold, 12, H - 10, ascii(foot, std::max(24, (W - 24) / 9)));
+        else if (!bot_id.empty())
+            txt(gold, 12, H - 10, "flat - lines are this hunter's knobs. Drag writes the desk. Positions stay.");
+        else
+            txt(white, 12, H - 10, "CLOSE or window X  -  pick a hunter in the dropdown to edit knobs");
         if (hunter_menu && !hunters.empty()) {
             int row_h = 22;
             int mh = 10 + (int)hunters.size() * row_h;
@@ -1472,6 +2062,15 @@ int main(int argc, char** argv) {
             last = nowm();
             load_candles();
             paint();
+        }
+        {
+            int phase = (int)(nowm() * 18.0) % 24;
+            if (phase != blink_phase) {
+                blink_phase = phase;
+                bool any = false;
+                for (auto& o : ov) if (o.entry_kind > 0) any = true;
+                if (any && drag_line < 0) paint();
+            }
         }
         struct timespec sl{0, (!bot_id.empty() ? 2 : 20) * 1000 * 1000};
         nanosleep(&sl, nullptr);
