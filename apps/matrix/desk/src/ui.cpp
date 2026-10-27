@@ -494,6 +494,25 @@ std::vector<CtrlField> standard_fields(const std::string& id) {
         fs.push_back(mkf("executor_refresh_time", "Refresh sec", "num", 1, 10, 600));
         fs.push_back(mkf("sl_roe_pct", "Stop loss ROE %", "num", 1, 1, 200));
         fs.push_back(mkf("margin_pct", "Margin % leftover", "pct_frac", 1, 0, 100));
+    } else if (id == "hummingbot-v2-dman-v3") {
+        // Official directional DMan V3. Price knobs match the controller yml.
+        // SL ROE stays the desk stop. Stop % is the executor price stop.
+        fs.push_back(mkf("stop_loss", "Stop %", "price_pct", 0.1, 0.5, 20));
+        fs.push_back(mkf("take_profit", "Take profit %", "price_pct", 0.1, 0.4, 20));
+        fs.push_back(mkf("trail_activation", "Trail ARM %", "price_pct", 0.1, 0.2, 10));
+        fs.push_back(mkf("trail_delta", "Trail %", "price_pct", 0.05, 0.1, 5));
+        fs.push_back(mkf("dca_spread_1", "DCA 1 %", "price_pct", 0.01, 0.05, 40));
+        fs.push_back(mkf("dca_spread_2", "DCA 2 %", "price_pct", 0.01, 0.05, 40));
+        fs.push_back(mkf("dca_spread_3", "DCA 3 %", "price_pct", 0.1, 0.5, 40));
+        fs.push_back(mkf("dca_spread_4", "DCA 4 %", "price_pct", 0.1, 0.5, 40));
+        fs.push_back(mkf("bb_length", "BB length", "num", 1, 10, 300));
+        fs.push_back(mkf("bb_std", "BB std", "num", 0.1, 0.5, 4));
+        fs.push_back(mkf("bb_long_threshold", "Long BBP <=", "num", 0.01, 0, 1.2));
+        fs.push_back(mkf("bb_short_threshold", "Short BBP >=", "num", 0.01, 0, 1.2));
+        fs.push_back(mkf("margin_pct", "Size % left", "pct_frac", 1, 10, 100));
+        fs.push_back(mkf("sl_roe_pct", "SL ROE %", "num", 1, 1, 200));
+        fs.push_back(mkf("dynamic_order_spread", "Dynamic spread", "bool"));
+        fs.push_back(mkf("dynamic_target", "Dynamic target", "bool"));
     }
     return fs;
 }
@@ -3043,6 +3062,13 @@ std::string action_tip(const DeskUi& ui, const Hit& h) {
             if (h.i >= 0 && h.i < (int)ui.snap.bots.size()) {
                 auto& b = ui.snap.bots[h.i];
                 if (b.bias.count(h.key)) side = b.bias.at(h.key);
+            }
+            if (h.i >= 0 && h.i < (int)ui.snap.bots.size()
+                && ui.snap.bots[h.i].id == "hummingbot-v2-dman-v3") {
+                if (side != "LONG" && side != "SHORT")
+                    return "set " + h.key + " BIAS to LONG or SHORT first";
+                return "DMan V3 cannot sign a 100% " + side
+                    + ". No Hyperliquid key in the sleeper. Load the wired wallet on /confiig and restart that container. Nothing is sent.";
             }
             if (side == "LONG" || side == "SHORT")
                 return "queue 100% leftover " + side + " " + h.key + " on " + n;
@@ -5829,7 +5855,7 @@ int run_desk(FlaskApi& api) {
                     if (!pmm_knobs && kx + cellw > right) { kx = x; ky += cellh; }
                     auto stored = b->controller.contains(f.key) ? b->controller[f.key] : nlohmann::json();
                     double dv = display_value(f, stored);
-                    if (f.key == "trail_delta") {
+                    if (pmm_knobs && f.key == "trail_delta") {
                         PmmDisp pd = pmm_read(*b);
                         dv = pmm_trail_display(dv, pd.arm);
                     }
@@ -8395,6 +8421,35 @@ int run_desk(FlaskApi& api) {
                             redraw();
                         } else if (h.kind == Hit::CtrlStd) {
                             if (h.i >= 0 && h.i < (int)ui.snap.bots.size()
+                                && ui.snap.bots[h.i].id == "hummingbot-v2-dman-v3") {
+                                auto& bstd = ui.snap.bots[h.i];
+                                nlohmann::json m = {
+                                    {"stop_loss", 0.03},
+                                    {"take_profit", 0.02},
+                                    {"trail_activation", 0.015},
+                                    {"trail_delta", 0.005},
+                                    {"dca_spread_1", 0.001},
+                                    {"dca_spread_2", 0.018},
+                                    {"dca_spread_3", 0.15},
+                                    {"dca_spread_4", 0.25},
+                                    {"bb_length", 100},
+                                    {"bb_std", 2.0},
+                                    {"bb_long_threshold", 0.0},
+                                    {"bb_short_threshold", 1.0},
+                                    {"dynamic_order_spread", false},
+                                    {"dynamic_target", false},
+                                    {"margin_pct", 1.0},
+                                    {"sl_roe_pct", 20},
+                                };
+                                for (auto it = m.begin(); it != m.end(); ++it)
+                                    bstd.controller[it.key()] = it.value();
+                                ui.api->post_live_knobs(bstd.id, bstd.controller);
+                                ui.say(ui.api->post_ctrl_map(bstd.id, m));
+                                ui.api->post_sl(bstd.id, 20);
+                                ui.preset_cur = "STD";
+                                ui.say("DMan V3 STD - stop 3% - TP 2% - ARM 1.5% - trail 0.5% - DCA 0.1 / 1.8 / 15 / 25 - BB 100 / 2 - SL 20");
+                                ui.refresh(false);
+                            } else if (h.i >= 0 && h.i < (int)ui.snap.bots.size()
                                 && ui.snap.bots[h.i].id == "hummingbot-bn-swing") {
                                 PmmDisp d;
                                 d.x = 0.3; d.tp = 2.40; d.arm = 1.40; d.trail = 22; d.next = 0.18;

@@ -62,9 +62,23 @@ struct Overlay {
     double sell_px = 0;       // parsed $ from next.sell (TP / trail / moon)
     double rebuy_px = 0;      // parsed $ from next.rebuy
     double close_px = 0;      // Only Up / Surfn moon, absolute price
+    double stop_frac = 0;     // official DMan V3 price stop, distinct from SL ROE
+    double dca[4] = {0, 0, 0, 0};
     int lev = 1;
     bool ghost = false;       // projected clip from knobs (no live size)
+    bool official_dman = false;
     bool is_short() const { return side == "SHORT"; }
+    double stop_price() const {
+        double s = frac(stop_frac);
+        if (entry <= 0 || s <= 0) return 0;
+        return is_short() ? entry * (1.0 + s) : entry * (1.0 - s);
+    }
+    double dca_px(int i) const {
+        if (i < 0 || i > 3) return 0;
+        double s = frac(dca[i]);
+        if (entry <= 0 || s <= 0) return 0;
+        return is_short() ? entry * (1.0 + s) : entry * (1.0 - s);
+    }
     double frac(double v) const {
         if (v > 1.0) return v / 100.0;
         return v;
@@ -89,6 +103,13 @@ struct Overlay {
     double trail_now_px() const {
         double d = trail_price_frac();
         double arm = arm_px();
+        if (official_dman) {
+            double td = frac(trail_delta);
+            if (td <= 0) return 0;
+            if (arm > 0) return is_short() ? arm * (1.0 + td) : arm * (1.0 - td);
+            if (entry <= 0) return 0;
+            return is_short() ? entry * (1.0 + td) : entry * (1.0 - td);
+        }
         if (entry <= 0 || d <= 0 || mark <= 0 || arm <= 0) return 0;
         bool armed = is_short() ? (mark <= arm) : (mark >= arm);
         if (!armed) return 0;
@@ -174,6 +195,15 @@ static bool apply_line_price(Overlay& o, int line, double px) {
         return true;
     }
     if (line == 1) {
+        if (o.official_dman) {
+            double tp = o.is_short() ? (1.0 - px / o.entry) : (px / o.entry - 1.0);
+            if (tp < 0.004) tp = 0.004;
+            if (tp > 0.20) tp = 0.20;
+            o.take_profit = tp;
+            o.tp_roe = 0;
+            o.sell_px = 0;
+            return true;
+        }
         o.sell_px = 0;
         if (o.tp_roe > 0 || o.take_profit <= 0) {
             if (o.entry <= 0 || o.lev < 1) return false;
@@ -194,12 +224,26 @@ static bool apply_line_price(Overlay& o, int line, double px) {
     }
     if (line == 2) {
         double a = o.is_short() ? (1.0 - px / o.entry) : (px / o.entry - 1.0);
-        if (a < 0.004) a = 0.004;
-        if (a > 0.04) a = 0.04;
+        if (o.official_dman) {
+            if (a < 0.002) a = 0.002;
+            if (a > 0.10) a = 0.10;
+        } else {
+            if (a < 0.004) a = 0.004;
+            if (a > 0.04) a = 0.04;
+        }
         o.trail_act = a;
         return true;
     }
     if (line == 3) {
+        if (o.official_dman) {
+            double ref = o.arm_px() > 0 ? o.arm_px() : o.entry;
+            if (ref <= 0) return false;
+            double td = o.is_short() ? (px / ref - 1.0) : (1.0 - px / ref);
+            if (td < 0.001) td = 0.001;
+            if (td > 0.05) td = 0.05;
+            o.trail_delta = td;
+            return true;
+        }
         if (o.mark <= 0) return false;
         double d = o.is_short() ? (px / o.mark - 1.0) : (1.0 - px / o.mark);
         double arm = o.frac(o.trail_act);
@@ -219,6 +263,21 @@ static bool apply_line_price(Overlay& o, int line, double px) {
         if (r > 0.008) r = 0.008;
         o.rebuy_pct = r;
         o.rebuy_px = px;
+        return true;
+    }
+    if (line == 5 && o.official_dman) {
+        double s = o.is_short() ? (px / o.entry - 1.0) : (1.0 - px / o.entry);
+        if (s < 0.005) s = 0.005;
+        if (s > 0.20) s = 0.20;
+        o.stop_frac = s;
+        return true;
+    }
+    if (line >= 7 && line <= 10 && o.official_dman) {
+        int i = line - 7;
+        double s = o.is_short() ? (px / o.entry - 1.0) : (1.0 - px / o.entry);
+        if (s < 0.0005) s = 0.0005;
+        if (s > 0.40) s = 0.40;
+        o.dca[i] = s;
         return true;
     }
     if (line == 6) {
@@ -252,6 +311,13 @@ static void push_live_overlay(const Overlay& o, bool force = false) {
         {"rebuy_px", o.rebuy_px},
     };
     if (o.close_px > 0) body["close_px"] = o.close_px;
+    if (o.official_dman) {
+        body["stop_loss"] = o.stop_frac;
+        body["dca_spread_1"] = o.dca[0];
+        body["dca_spread_2"] = o.dca[1];
+        body["dca_spread_3"] = o.dca[2];
+        body["dca_spread_4"] = o.dca[3];
+    }
     if (o.tp_roe > 0) {
         body["scale_roe_pct"] = o.tp_roe;
         body["tp_roe_pct"] = o.tp_roe;
@@ -470,12 +536,23 @@ static bool apply_pmm_live(std::vector<Overlay>& ov, const std::string& bot_id) 
             double nsl = jn(j, "sl_roe_pct", 0);
             if (nsl > 0) setd(o.sl_roe, nsl);
         }
-        if (o.bot_id == "hummingbot-bn-swing" || o.bot_id == "hummingbot-dman-maker")
+        if (o.bot_id == "hummingbot-bn-swing" || o.bot_id == "hummingbot-dman-maker"
+            || o.bot_id == "hummingbot-v2-dman-v3")
             o.tp_roe = 0;
         else {
             double nroe = jn(j, "scale_roe_pct", 0);
             if (nroe <= 0) nroe = jn(j, "tp_roe_pct", o.tp_roe);
             setd(o.tp_roe, nroe);
+        }
+        if (o.bot_id == "hummingbot-v2-dman-v3") {
+            o.official_dman = true;
+            double ns = jn(j, "stop_loss", 0);
+            if (ns > 0) setd(o.stop_frac, ns);
+            const char* dk[4] = {"dca_spread_1", "dca_spread_2", "dca_spread_3", "dca_spread_4"};
+            for (int i = 0; i < 4; ++i) {
+                double dv = jn(j, dk[i], 0);
+                if (dv > 0) setd(o.dca[i], dv);
+            }
         }
         double old_r = o.rebuy_pct;
         double new_r = jn(j, "rebuy_pct", o.rebuy_pct);
@@ -540,7 +617,8 @@ static void fill_ctrl(Overlay& o, const json& b) {
     o.trail_act = jn(ctrl, "trail_activation");
     o.trail_delta = jn(ctrl, "trail_delta");
     o.rebuy_pct = ctrl.contains("rebuy_pct") ? jn(ctrl, "rebuy_pct", 0) : 0;
-    if (o.bot_id == "hummingbot-bn-swing" || o.bot_id == "hummingbot-dman-maker")
+    if (o.bot_id == "hummingbot-bn-swing" || o.bot_id == "hummingbot-dman-maker"
+        || o.bot_id == "hummingbot-v2-dman-v3")
         o.tp_roe = 0;
     else {
         double scale = ctrl.contains("scale_roe_pct") ? jn(ctrl, "scale_roe_pct", 0) : 0;
@@ -548,6 +626,20 @@ static void fill_ctrl(Overlay& o, const json& b) {
         o.tp_roe = scale > 0 ? scale : tpr;
     }
     o.sl_roe = jn(ctrl, "sl_roe_pct", o.sl_roe);
+    if (o.bot_id == "hummingbot-v2-dman-v3") {
+        o.official_dman = true;
+        o.stop_frac = jn(ctrl, "stop_loss", 0);
+        if (o.stop_frac <= 0) o.stop_frac = 0.03;
+        if (o.take_profit <= 0) o.take_profit = 0.02;
+        if (o.trail_act <= 0) o.trail_act = 0.015;
+        if (o.trail_delta <= 0) o.trail_delta = 0.005;
+        const char* dk[4] = {"dca_spread_1", "dca_spread_2", "dca_spread_3", "dca_spread_4"};
+        const double dd[4] = {0.001, 0.018, 0.15, 0.25};
+        for (int i = 0; i < 4; ++i) {
+            o.dca[i] = jn(ctrl, dk[i], 0);
+            if (o.dca[i] <= 0) o.dca[i] = dd[i];
+        }
+    }
     o.close_px = ctrl.contains("close_px") ? jn(ctrl, "close_px", 0) : o.close_px;
     std::string sell, rebuy;
     if (b.contains("next") && b["next"].is_object()) {
@@ -717,9 +809,10 @@ int main(int argc, char** argv) {
         printf("\nopen-on %s  bot=%s  overlays %zu  binance n=%zu  err=%s\n",
                c.c_str(), bot_id.empty() ? "ALL" : bot_id.c_str(), ovd.size(), k.size(), err.c_str());
         for (auto& o : ovd)
-            printf("  IN %s %s %.4g  WIN %.4g  SL %.4g  ARM %.4g  TRAIL %.4g  rebuy %.4g  moon %.4g%s\n",
-                   o.bot.c_str(), o.side.c_str(), o.entry, o.win_px(), o.sl_px(),
-                   o.arm_px(), o.trail_now_px(), o.next_in_px(), o.close_px, o.ghost ? " ghost" : "");
+            printf("  IN %s %s %.4g  WIN %.4g  SL %.4g  STOP %.4g  ARM %.4g  TRAIL %.4g  DCA %.4g %.4g %.4g %.4g  rebuy %.4g  moon %.4g%s\n",
+                   o.bot.c_str(), o.side.c_str(), o.entry, o.win_px(), o.sl_px(), o.stop_price(),
+                   o.arm_px(), o.trail_now_px(), o.dca_px(0), o.dca_px(1), o.dca_px(2), o.dca_px(3),
+                   o.next_in_px(), o.close_px, o.ghost ? " ghost" : "");
         if (!k.empty()) printf("  last close %.4g  t=%lld\n", k.back().c, k.back().t);
         return err.empty() && !k.empty() ? 0 : 1;
     }
@@ -853,6 +946,10 @@ int main(int argc, char** argv) {
                     o.trail_act = k.trail_act;
                     o.trail_delta = k.trail_delta;
                     o.sl_roe = k.sl_roe;
+                    if (k.stop_frac > 0) o.stop_frac = k.stop_frac;
+                    for (int di = 0; di < 4; ++di)
+                        if (k.dca[di] > 0) o.dca[di] = k.dca[di];
+                    o.official_dman = o.official_dman || k.official_dman;
                     o.rebuy_pct = k.rebuy_pct;
                     if (k.side == o.side && o.entry > 0 && k.entry > 0
                         && std::fabs(k.entry - o.entry) < o.entry * 0.01)
@@ -958,6 +1055,13 @@ int main(int argc, char** argv) {
             };
             bump(o.entry); bump(o.win_px()); bump(o.sl_px());
             bump(o.arm_px()); bump(o.trail_now_px()); bump(o.next_in_px());
+            auto near = [&](double p) {
+                if (p <= 0 || o.entry <= 0) return;
+                if (std::fabs(p - o.entry) / o.entry > 0.08) return;
+                bump(p);
+            };
+            near(o.stop_price());
+            for (int di = 0; di < 4; ++di) near(o.dca_px(di));
             if (o.rebuy_px > 0) bump(o.rebuy_px);
             if (o.close_px > 0) bump(o.close_px);
         }
@@ -1044,7 +1148,7 @@ int main(int argc, char** argv) {
         auto add_line_hit = [&](int oi, int line, double px) {
             if (px <= 0 || bot_id.empty()) return;
             int y = y_for(px);
-            hits.push_back({5, oi * 10 + line, {plot.x, y - 6, plot.w, 13}});
+            hits.push_back({5, oi * 20 + line, {plot.x, y - 6, plot.w, 13}});
         };
         unsigned long col_sl = rgb(dpy, cm, 255, 77, 109);
         unsigned long col_tp = rgb(dpy, cm, 0, 255, 106);
@@ -1072,17 +1176,29 @@ int main(int argc, char** argv) {
             {
                 char tag[40];
                 if (o.tp_roe > 0) snprintf(tag, sizeof(tag), "WIN %.0f%%", o.tp_roe);
+                else if (o.official_dman && o.take_profit > 0)
+                    snprintf(tag, sizeof(tag), "WIN %.1f%%", o.frac(o.take_profit) * 100.0);
                 else snprintf(tag, sizeof(tag), "WIN");
                 add_mk(plot.x + plot.w - 12, o.win_px(), col_tp, tag);
             }
             add_line_hit(oi, 1, o.win_px());
             hline(o.arm_px(), col_arm, hot && (hover_line == 2 || drag_line == 2));
-            add_mk(plot.x + 10, o.arm_px(), col_arm, "ARM");
+            {
+                char tag[40];
+                if (o.official_dman && o.trail_act > 0)
+                    snprintf(tag, sizeof(tag), "ARM %.1f%%", o.frac(o.trail_act) * 100.0);
+                else snprintf(tag, sizeof(tag), "ARM");
+                add_mk(plot.x + 10, o.arm_px(), col_arm, tag);
+            }
             add_line_hit(oi, 2, o.arm_px());
             double tr = o.trail_now_px();
             if (tr > 0) {
                 hline(tr, col_tr, hot && (hover_line == 3 || drag_line == 3));
-                add_mk(plot.x + plot.w - 12, tr, col_tr, "TRAIL");
+                char tag[40];
+                if (o.official_dman && o.trail_delta > 0 && o.trail_delta < 1.0)
+                    snprintf(tag, sizeof(tag), "TRAIL %.2f%%", o.frac(o.trail_delta) * 100.0);
+                else snprintf(tag, sizeof(tag), "TRAIL");
+                add_mk(plot.x + plot.w - 12, tr, col_tr, tag);
                 add_line_hit(oi, 3, tr);
             }
             double ni = o.next_in_px();
@@ -1096,6 +1212,28 @@ int main(int argc, char** argv) {
                 hline(o.close_px, col_moon, hot && (hover_line == 6 || drag_line == 6));
                 add_mk(plot.x + plot.w - 12, o.close_px, col_moon, "MOON");
                 add_line_hit(oi, 6, o.close_px);
+            }
+            if (o.stop_price() > 0) {
+                unsigned long col_stop = rgb(dpy, cm, 255, 150, 40);
+                hline(o.stop_price(), col_stop, hot && (hover_line == 5 || drag_line == 5));
+                char tag[40];
+                snprintf(tag, sizeof(tag), "STOP %.1f%%", o.frac(o.stop_frac) * 100.0);
+                add_mk(plot.x + plot.w - 12, o.stop_price(), col_stop, tag);
+                add_line_hit(oi, 5, o.stop_price());
+            }
+            if (o.official_dman) {
+                unsigned long col_dca = rgb(dpy, cm, 90, 210, 220);
+                const char* dlab[4] = {"DCA1", "DCA2", "DCA3", "DCA4"};
+                for (int di = 0; di < 4; ++di) {
+                    double px = o.dca_px(di);
+                    if (px <= 0) continue;
+                    int ln = 7 + di;
+                    hline(px, col_dca, hot && (hover_line == ln || drag_line == ln));
+                    char tag[40];
+                    snprintf(tag, sizeof(tag), "%s %.2f%%", dlab[di], o.frac(o.dca[di]) * 100.0);
+                    add_mk(plot.x + 10, px, col_dca, tag);
+                    add_line_hit(oi, ln, px);
+                }
             }
             (void)rcol;
         }
@@ -1237,8 +1375,8 @@ int main(int argc, char** argv) {
                             XStoreName(dpy, win, t.c_str());
                         }
                     } else if (h.kind == 5) {
-                        drag_oi = h.i / 10;
-                        drag_line = h.i % 10;
+                        drag_oi = h.i / 20;
+                        drag_line = h.i % 20;
                         hover_oi = drag_oi;
                         hover_line = drag_line;
                         XDefineCursor(dpy, win, cur_ns);
@@ -1268,8 +1406,8 @@ int main(int argc, char** argv) {
                     int nho = -1, nhl = -1;
                     for (int hi = (int)hits.size() - 1; hi >= 0; --hi) {
                         if (hits[hi].kind != 5 || !inside(hits[hi].r, mx, my)) continue;
-                        nho = hits[hi].i / 10;
-                        nhl = hits[hi].i % 10;
+                        nho = hits[hi].i / 20;
+                        nhl = hits[hi].i % 20;
                         break;
                     }
                     if (nho != hover_oi || nhl != hover_line) {
@@ -1299,6 +1437,13 @@ int main(int argc, char** argv) {
                     }
                     if (drag_line == 6 && o.close_px > 0)
                         vals["close_px"] = o.close_px;
+                    if (o.official_dman) {
+                        vals["stop_loss"] = o.stop_frac;
+                        vals["dca_spread_1"] = o.dca[0];
+                        vals["dca_spread_2"] = o.dca[1];
+                        vals["dca_spread_3"] = o.dca[2];
+                        vals["dca_spread_4"] = o.dca[3];
+                    }
                     json body = {{"id", o.bot_id}, {"values", vals}};
                     http_request("127.0.0.1", 5004, "POST", "/api/wire/controller", body.dump(), 2000);
                     json slb = {{"id", o.bot_id}, {"sl_roe_pct", o.sl_roe}};
