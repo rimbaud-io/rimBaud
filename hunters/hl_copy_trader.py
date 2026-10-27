@@ -357,6 +357,9 @@ class HLCopyTrader(StrategyV2Base):
         self._deferred_opens: Dict[str, Dict[str, dict]] = {
             addr: {} for addr in config.trader_addresses
         }
+        # After a rejected open, stay quiet so a ghost clear cannot page Telegram
+        # again on the next poll. pair -> unix time.
+        self._open_quiet_until: Dict[str, float] = {}
         self._not_ready_since: Optional[float] = None
         self._last_defer_log: float = 0.0
 
@@ -4707,6 +4710,9 @@ class HLCopyTrader(StrategyV2Base):
         """
         pair = pos.get("pair") or COIN_TO_PAIR.get(coin) or f"{coin}-USD"
         pos = {**pos, "pair": pair}
+        quiet_until = float((getattr(self, "_open_quiet_until", {}) or {}).get(pair) or 0)
+        if time.time() < quiet_until:
+            return True
         side = str(pos.get("side") or "").upper()
         coin_u = str(coin or "").upper()
 
@@ -5233,10 +5239,42 @@ class HLCopyTrader(StrategyV2Base):
             self._close_in_flight.discard(pair)
             self._close_backoff_until[pair] = time.time() + 45
 
+    def _note_open_reject(self, order_id: str, order_failed_event) -> None:
+        """A rejected open is not a position. Stay quiet so the next poll does not log OPENED again."""
+        pair = None
+        mirror = None
+        for p, m in list(self._our_mirrors.items()):
+            if m.get("order_id") == order_id:
+                pair = p
+                mirror = m
+                break
+        if not pair:
+            return
+        err = str(
+            getattr(order_failed_event, "error_message", None)
+            or getattr(order_failed_event, "message", None)
+            or ""
+        )
+        self._our_mirrors.pop(pair, None)
+        self._close_in_flight.discard(pair)
+        if not hasattr(self, "_open_quiet_until"):
+            self._open_quiet_until = {}
+        self._open_quiet_until[pair] = time.time() + 180
+        side = str((mirror or {}).get("side") or "")
+        coin = str((mirror or {}).get("coin") or pair.replace("-USD", ""))
+        self.logger().warning(f"[open] {pair} rejected — quiet 180s ({err[:160]})")
+        trade_log(
+            f"{YELLOW}{BOLD}"
+            f"{_now():<22} {'WE COPY':<14} {'FAILED':<8} {side:<6} {coin:<7} "
+            f"rejected — quiet 180s"
+            f"{RESET}"
+        )
+
     def did_fail_order(self, order_failed_event):
         """Called by the framework when any order fails. Retry failed close orders with larger slippage."""
         order_id = order_failed_event.order_id
         if order_id not in self._pending_closes:
+            self._note_open_reject(order_id, order_failed_event)
             return
         ctx = self._pending_closes.pop(order_id)
         pair     = ctx["pair"]
