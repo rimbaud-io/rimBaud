@@ -1280,6 +1280,113 @@ static json sql_status_map(const Brain& br) {
     return g_sql_status;
 }
 
+// A controller with no status balance still spends the pool wallet wired into it.
+// wallet_in is the subaccount name. The address stays in wire_wallets.json.
+struct HlCash {
+    double equity = 0;
+    double free = 0;
+    bool ok = false;
+    std::time_t ts = 0;
+};
+static std::mutex g_hl_cash_mu;
+static std::map<std::string, HlCash> g_hl_cash;
+
+static bool hl_addr_ok(const std::string& a) {
+    if (a.size() != 42) return false;
+    if (a[0] != '0' || (a[1] != 'x' && a[1] != 'X')) return false;
+    for (size_t i = 2; i < a.size(); ++i) {
+        if (!std::isxdigit(static_cast<unsigned char>(a[i]))) return false;
+    }
+    return true;
+}
+
+static std::string fold_label(const std::string& s) {
+    std::string o;
+    bool gap = false;
+    for (char c : s) {
+        unsigned char u = static_cast<unsigned char>(c);
+        if (std::isspace(u)) {
+            gap = !o.empty();
+            continue;
+        }
+        if (gap) {
+            o.push_back(' ');
+            gap = false;
+        }
+        o.push_back(static_cast<char>(std::tolower(u)));
+    }
+    return o;
+}
+
+static void pool_by_name(const Brain& br, std::map<std::string, std::string>& out) {
+    out.clear();
+    auto wallets = read_json(join(br.conf, "wire_wallets.json"));
+    json rows = json::array();
+    if (wallets.is_array()) rows = wallets;
+    else if (wallets.contains("wallets") && wallets["wallets"].is_array())
+        rows = wallets["wallets"];
+    for (auto& w : rows) {
+        if (!w.is_object()) continue;
+        std::string name = fold_label(jstr(w, "name"));
+        std::string addr = jstr(w, "address");
+        if (name.empty() || !hl_addr_ok(addr)) continue;
+        out[name] = addr;
+    }
+}
+
+static void wired_names(const Brain& br, std::map<std::string, std::string>& out) {
+    out.clear();
+    auto rt = read_json(join(br.conf, "wire_runtime.json"));
+    if (!rt.is_object() || !rt.contains("bots") || !rt["bots"].is_object()) return;
+    for (auto it = rt["bots"].begin(); it != rt["bots"].end(); ++it) {
+        if (!it.value().is_object()) continue;
+        std::string name = jstr(it.value(), "wallet_in");
+        if (!name.empty()) out[it.key()] = name;
+    }
+}
+
+// clearinghouseState is weight 2. Cache 25s so the desk poll does not refill the bucket.
+static bool hl_cash_of(const std::string& addr, double& equity, double& free) {
+    if (!hl_addr_ok(addr)) return false;
+    std::string key = norm_addr(addr);
+    std::time_t now = std::time(nullptr);
+    {
+        std::lock_guard<std::mutex> lk(g_hl_cash_mu);
+        auto it = g_hl_cash.find(key);
+        if (it != g_hl_cash.end() && now - it->second.ts < (it->second.ok ? 25 : 15)) {
+            if (!it->second.ok) return false;
+            equity = it->second.equity;
+            free = it->second.free;
+            return true;
+        }
+    }
+    std::string cmd =
+        "curl -sm5 -sS -H 'Content-Type: application/json' "
+        "-d '{\"type\":\"clearinghouseState\",\"user\":\"" + addr + "\"}' "
+        "https://api.hyperliquid.xyz/info 2>/dev/null";
+    std::string body = slurp_cmd(cmd.c_str(), 262144);
+    json j = json::object();
+    try { j = json::parse(body.empty() ? "{}" : body); } catch (...) { j = json::object(); }
+    double eq = -1, fr = -1;
+    if (j.is_object()) {
+        if (j.contains("crossMarginSummary") && j["crossMarginSummary"].is_object())
+            eq = jnum(j["crossMarginSummary"], "accountValue", -1);
+        if (eq < 0 && j.contains("marginSummary") && j["marginSummary"].is_object())
+            eq = jnum(j["marginSummary"], "accountValue", -1);
+        fr = jnum(j, "withdrawable", -1);
+    }
+    bool ok = eq >= 0;
+    if (fr < 0) fr = ok ? eq : 0;
+    {
+        std::lock_guard<std::mutex> lk(g_hl_cash_mu);
+        g_hl_cash[key] = HlCash{ok ? eq : 0, ok ? fr : 0, ok, now};
+    }
+    if (!ok) return false;
+    equity = eq;
+    free = fr;
+    return true;
+}
+
 static json api_home(const Brain& br) {
     json bots = json::array();
     json positions = json::array();
@@ -1288,6 +1395,10 @@ static json api_home(const Brain& br) {
     int n_ok = 0, n_live = 0;
     auto sl = read_json(join(br.conf, "bot_sl.json"));
     auto accounts = read_json(join(br.conf, "bot_accounts.json"));
+    std::map<std::string, std::string> pool;
+    std::map<std::string, std::string> wired;
+    pool_by_name(br, pool);
+    wired_names(br, wired);
 
     for (auto& h : registry(br)) {
         if (!h.is_object()) continue;
@@ -1397,6 +1508,19 @@ static json api_home(const Brain& br) {
             free = 0;
             upnl = 0;
             npos = 0;
+        } else if (!jhas(st, "equity_usd") && !jhas(st, "equity")) {
+            auto nit = wired.find(id);
+            if (nit != wired.end()) {
+                auto pit = pool.find(fold_label(nit->second));
+                if (pit != pool.end()) {
+                    double eq = 0, fr = 0;
+                    if (hl_cash_of(pit->second, eq, fr)) {
+                        addr = pit->second;
+                        equity = eq;
+                        free = fr;
+                    }
+                }
+            }
         }
         if (ok) n_ok++;
         if (running && !deactivated) n_live++;
