@@ -429,6 +429,12 @@ static void fill_dman_v3_knobs(const Brain& br, json& out) {
     set_if_absent(out, "dynamic_order_spread", false);
     set_if_absent(out, "dynamic_target", false);
     set_if_absent(out, "margin_pct", 1.0);
+    auto pair = yml_scalar(yml, "trading_pair");
+    if (!pair.empty()) set_if_absent(out, "trading_pair", pair);
+    auto iv = yml_scalar(yml, "interval");
+    if (iv.empty()) iv = "3m";
+    set_if_absent(out, "interval", iv);
+    set_if_absent(out, "total_amount_quote", yml_double(yml, "total_amount_quote", 0));
 }
 
 static std::string yml_key_of(const std::string& line) {
