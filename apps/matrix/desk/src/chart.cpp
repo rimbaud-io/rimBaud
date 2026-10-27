@@ -57,10 +57,11 @@ struct Overlay {
     double take_profit = 0;   // price fraction, e.g. 0.02
     double trail_act = 0;     // price fraction where trail arms
     double trail_delta = 22;  // Trail % of ARM (8–40), or legacy price fraction
-    double rebuy_pct = 0.0018;  // NEXT IN price fraction (0.18% → 0.0018)
+    double rebuy_pct = 0;     // NEXT IN price fraction; 0 unless the controller has it
     double tp_roe = 0;        // win ROE %, e.g. 93
     double sell_px = 0;       // parsed $ from next.sell (TP / trail / moon)
     double rebuy_px = 0;      // parsed $ from next.rebuy
+    double close_px = 0;      // Only Up / Surfn moon, absolute price
     int lev = 1;
     bool ghost = false;       // projected clip from knobs (no live size)
     bool is_short() const { return side == "SHORT"; }
@@ -107,7 +108,7 @@ struct Overlay {
         if (sell_px > 0) {
             if (is_short() ? sell_px < entry : sell_px > entry) return sell_px;
         }
-        return is_short() ? entry * 0.98 : entry * 1.02;
+        return 0;
     }
     double next_in_from_pct() const {
         double r = frac(rebuy_pct);
@@ -220,6 +221,13 @@ static bool apply_line_price(Overlay& o, int line, double px) {
         o.rebuy_px = px;
         return true;
     }
+    if (line == 6) {
+        if (px < 0.0001) px = 0.0001;
+        if (px > 1e7) px = 1e7;
+        if (!o.is_short() && o.mark > 0 && px <= o.mark) px = o.mark * 1.001;
+        o.close_px = px;
+        return true;
+    }
     return false;
 }
 
@@ -243,6 +251,7 @@ static void push_live_overlay(const Overlay& o, bool force = false) {
         {"rebuy_pct", o.rebuy_pct},
         {"rebuy_px", o.rebuy_px},
     };
+    if (o.close_px > 0) body["close_px"] = o.close_px;
     if (o.tp_roe > 0) {
         body["scale_roe_pct"] = o.tp_roe;
         body["tp_roe_pct"] = o.tp_roe;
@@ -260,6 +269,7 @@ static const char* line_tag(int line) {
         case 2: return "ARM";
         case 3: return "TRAIL";
         case 4: return "NEXT IN";
+        case 6: return "MOON";
         default: return "?";
     }
 }
@@ -460,7 +470,9 @@ static bool apply_pmm_live(std::vector<Overlay>& ov, const std::string& bot_id) 
             double nsl = jn(j, "sl_roe_pct", 0);
             if (nsl > 0) setd(o.sl_roe, nsl);
         }
-        {
+        if (o.bot_id == "hummingbot-bn-swing" || o.bot_id == "hummingbot-dman-maker")
+            o.tp_roe = 0;
+        else {
             double nroe = jn(j, "scale_roe_pct", 0);
             if (nroe <= 0) nroe = jn(j, "tp_roe_pct", o.tp_roe);
             setd(o.tp_roe, nroe);
@@ -479,6 +491,14 @@ static bool apply_pmm_live(std::vector<Overlay>& ov, const std::string& bot_id) 
             }
         } else if (jpx > 0) {
             setd(o.rebuy_px, jpx);
+        }
+        if (j.contains("close_px")) {
+            double cpx = jn(j, "close_px", 0);
+            if (cpx < 0) cpx = 0;
+            if (std::fabs(o.close_px - cpx) > 1e-6) {
+                o.close_px = cpx;
+                ch = true;
+            }
         }
         o.sell_px = 0;
     }
@@ -519,9 +539,16 @@ static void fill_ctrl(Overlay& o, const json& b) {
     o.take_profit = jn(ctrl, "take_profit");
     o.trail_act = jn(ctrl, "trail_activation");
     o.trail_delta = jn(ctrl, "trail_delta");
-    o.rebuy_pct = jn(ctrl, "rebuy_pct", o.rebuy_pct);
-    o.tp_roe = jn(ctrl, "tp_roe_pct", jn(ctrl, "scale_roe_pct"));
+    o.rebuy_pct = ctrl.contains("rebuy_pct") ? jn(ctrl, "rebuy_pct", 0) : 0;
+    if (o.bot_id == "hummingbot-bn-swing" || o.bot_id == "hummingbot-dman-maker")
+        o.tp_roe = 0;
+    else {
+        double scale = ctrl.contains("scale_roe_pct") ? jn(ctrl, "scale_roe_pct", 0) : 0;
+        double tpr = ctrl.contains("tp_roe_pct") ? jn(ctrl, "tp_roe_pct", 0) : 0;
+        o.tp_roe = scale > 0 ? scale : tpr;
+    }
     o.sl_roe = jn(ctrl, "sl_roe_pct", o.sl_roe);
+    o.close_px = ctrl.contains("close_px") ? jn(ctrl, "close_px", 0) : o.close_px;
     std::string sell, rebuy;
     if (b.contains("next") && b["next"].is_object()) {
         sell = b["next"].value("sell", std::string());
@@ -567,8 +594,44 @@ static std::vector<Overlay> overlays_for(const json& home, const std::string& co
             if (o.entry > 0) out.push_back(o);
         }
     }
-    // No ghost overlays — only real open clips. Flat hunters show a clean chart.
-    (void)last_px;
+    // A selected hunter with no clip on this coin still shows its knobs,
+    // anchored to the last price, so the desk and the chart edit the same values.
+    if (!bot_id.empty() && last_px > 0 && home.contains("bots") && home["bots"].is_array()) {
+        bool have = false;
+        for (auto& o : out)
+            if (o.bot_id == bot_id || o.bot == bot_id) have = true;
+        if (!have) {
+            for (auto& b : home["bots"]) {
+                if (!b.is_object()) continue;
+                if (b.value("id", "") != bot_id && b.value("name", "") != bot_id) continue;
+                Overlay o;
+                o.ghost = true;
+                o.bot_id = b.value("id", bot_id);
+                o.bot = b.value("name", o.bot_id);
+                o.coin = coin;
+                o.entry = last_px;
+                o.mark = last_px;
+                o.lev = lev_for_coin(coin);
+                if (o.lev < 1) o.lev = 1;
+                o.side = "LONG";
+                if (b.contains("bias") && b["bias"].is_object()) {
+                    std::string v = b["bias"].value(coin, std::string());
+                    for (char& ch : v)
+                        if (ch >= 'a' && ch <= 'z') ch = static_cast<char>(ch - 32);
+                    if (v == "SHORT" || v == "LONG") o.side = v;
+                }
+                o.rebuy_pct = 0;
+                o.sl_roe = jn(b, "sl_roe_pct", 20);
+                color_from_id(o.bot_id, o.cr, o.cg, o.cb);
+                fill_ctrl(o, b);
+                o.entry = last_px;
+                o.mark = last_px;
+                if (o.sl_roe <= 0) o.sl_roe = 20;
+                out.push_back(o);
+                break;
+            }
+        }
+    }
     return out;
 }
 
@@ -654,9 +717,9 @@ int main(int argc, char** argv) {
         printf("\nopen-on %s  bot=%s  overlays %zu  binance n=%zu  err=%s\n",
                c.c_str(), bot_id.empty() ? "ALL" : bot_id.c_str(), ovd.size(), k.size(), err.c_str());
         for (auto& o : ovd)
-            printf("  IN %s %s %.4g  WIN %.4g  SL %.4g  ARM %.4g  TRAIL %.4g  rebuy %.4g%s\n",
+            printf("  IN %s %s %.4g  WIN %.4g  SL %.4g  ARM %.4g  TRAIL %.4g  rebuy %.4g  moon %.4g%s\n",
                    o.bot.c_str(), o.side.c_str(), o.entry, o.win_px(), o.sl_px(),
-                   o.arm_px(), o.trail_now_px(), o.rebuy_px, o.ghost ? " ghost" : "");
+                   o.arm_px(), o.trail_now_px(), o.next_in_px(), o.close_px, o.ghost ? " ghost" : "");
         if (!k.empty()) printf("  last close %.4g  t=%lld\n", k.back().c, k.back().t);
         return err.empty() && !k.empty() ? 0 : 1;
     }
@@ -896,6 +959,7 @@ int main(int argc, char** argv) {
             bump(o.entry); bump(o.win_px()); bump(o.sl_px());
             bump(o.arm_px()); bump(o.trail_now_px()); bump(o.next_in_px());
             if (o.rebuy_px > 0) bump(o.rebuy_px);
+            if (o.close_px > 0) bump(o.close_px);
         }
         if (hi <= lo) { lo = 0; hi = 1; }
         double pad = (hi - lo) * 0.04;
@@ -1027,6 +1091,12 @@ int main(int argc, char** argv) {
                 add_mk(plot.x + 10, ni, col_re, "NEXT IN");
                 add_line_hit(oi, 4, ni);
             }
+            if (o.close_px > 0) {
+                unsigned long col_moon = rgb(dpy, cm, 255, 236, 160);
+                hline(o.close_px, col_moon, hot && (hover_line == 6 || drag_line == 6));
+                add_mk(plot.x + plot.w - 12, o.close_px, col_moon, "MOON");
+                add_line_hit(oi, 6, o.close_px);
+            }
             (void)rcol;
         }
         const int gap = FH + 4;
@@ -1068,16 +1138,21 @@ int main(int argc, char** argv) {
             if (drag_line >= 0)
                 txt(gold, 12, H - 10, "dragging line — drop to set hunter knobs via Spring · no HL close/open");
             else if (hover_line >= 0)
-                txt(gold, 12, H - 10, "drag this line to move SL / WIN / ARM / TRAIL / NEXT IN");
-            else
-                    {
+                txt(gold, 12, H - 10, "drag this line to move SL / WIN / ARM / TRAIL / NEXT IN / MOON");
+            else {
+                bool ghost = false;
+                for (auto& o : ov) if (o.ghost) ghost = true;
+                if (ghost)
+                    txt(gold, 12, H - 10, "flat - lines are this hunter's knobs. Drag writes the desk. Positions stay.");
+                else {
                     char hud[128];
                     double sls = ov.empty() ? 0 : ov[0].sl_roe;
                     snprintf(hud, sizeof(hud),
-                             "SL %.0f%% ROE  ·  drag lines  ·  Spring live  ·  clips untouched",
+                             "SL %.0f%% ROE  -  drag lines  -  Spring live  -  clips stay",
                              sls);
                     txt(gold, 12, H - 10, hud);
                 }
+            }
         } else
             txt(white, 12, H - 10, "CLOSE or window X  ·  pick a hunter in the dropdown to edit knobs");
         if (hunter_menu && !hunters.empty()) {
@@ -1222,6 +1297,8 @@ int main(int argc, char** argv) {
                     } else {
                         vals["take_profit"] = o.take_profit;
                     }
+                    if (drag_line == 6 && o.close_px > 0)
+                        vals["close_px"] = o.close_px;
                     json body = {{"id", o.bot_id}, {"values", vals}};
                     http_request("127.0.0.1", 5004, "POST", "/api/wire/controller", body.dump(), 2000);
                     json slb = {{"id", o.bot_id}, {"sl_roe_pct", o.sl_roe}};
