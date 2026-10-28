@@ -3382,10 +3382,17 @@ std::vector<std::string> src_ports(const WireNode& n) {
     return {"out"};
 }
 
+static bool dman_v3_coin_only(const std::string& id) {
+    return id == "hummingbot-v2-dman-v3";
+}
+
 std::vector<std::string> tgt_ports(const WireNode& n) {
     if (n.type == "frame" || n.type == "circle") return {};
-    if (n.type == "bot" || n.type == "homebot")
+    if (n.type == "bot" || n.type == "homebot") {
+        if (dman_v3_coin_only(n.id))
+            return {"wallet", "coin", "sl", "moon", "ctrl", "eclose"};
         return {"wallet", "coin", "sl", "bias", "moon", "ctrl", "eclose", "trader-1", "trader-2", "trader-3"};
+    }
     if (n.type == "wallet") return {"income"};
     if (n.type == "risk_wallet") return {"risk"};
     if (n.type == "logs" || n.type == "output" || n.type == "funds") return {"in"};
@@ -3421,10 +3428,14 @@ std::vector<PortVis> layout_ports(const WireNode& n, const Rect& box) {
         put("income", true, box.x + box.w, box.y + box.h * 22 / 100);
         put("risk", true, box.x + box.w, box.y + box.h * 50 / 100);
         put("logs", true, box.x + box.w, box.y + box.h * 78 / 100);
-        const char* bot[] = {"sl", "bias", "moon", "ctrl", "eclose"};
-        int nbot = 5;
-        for (int i = 0; i < nbot; ++i)
-            put(bot[i], false, box.x + box.w * (12 + i * 18) / 100, box.y + box.h);
+        const char* bot_all[] = {"sl", "bias", "moon", "ctrl", "eclose"};
+        const char* bot_coin[] = {"sl", "moon", "ctrl", "eclose"};
+        const char** bot = dman_v3_coin_only(n.id) ? bot_coin : bot_all;
+        int nbot = dman_v3_coin_only(n.id) ? 4 : 5;
+        for (int i = 0; i < nbot; ++i) {
+            int slot = dman_v3_coin_only(n.id) ? (i < 1 ? 0 : i + 1) : i;
+            put(bot[i], false, box.x + box.w * (12 + slot * 18) / 100, box.y + box.h);
+        }
         if (n.id == "hummingbot-hl" || n.kind == "copy") {
             put("trader-1", false, box.x + box.w * 20 / 100, box.y);
             put("trader-2", false, box.x + box.w * 50 / 100, box.y);
@@ -3778,8 +3789,8 @@ const V2Blurb* v2_blurb(const std::string& id) {
         {"hummingbot-v2-dman-v3",
          "Official DMan. Band side, many maker levels",
          "Official mean-reversion controller, not the Dman hunter on this desk. "
-         "Bollinger percent picks the side, then several maker levels step away from the price. "
-         "The band width can stretch those steps, and each level has its own stop and trail."},
+         "The wired coin is the only market. There is no BIAS port. "
+         "Bollinger percent picks the side, then several maker levels step away from the price."},
         {"hummingbot-v2-supertrend",
          "Trend up and near the line, else short",
          "Official trend controller, not the Surfn hunter. "
@@ -5126,7 +5137,13 @@ int run_desk(FlaskApi& api) {
                             if (!bs.empty()) bs += "  ";
                             bs += kv.first + "=" + kv.second;
                         }
-                        if (!bs.empty()) put(C.ab_text, bs);
+                        if (lb->id == "hummingbot-v2-dman-v3") {
+                            std::string pair = "coin from the wire";
+                            if (lb->controller.contains("trading_pair")
+                                && lb->controller["trading_pair"].is_string())
+                                pair = lb->controller["trading_pair"].get<std::string>();
+                            put(C.ab_text, "coin " + pair + "  no BIAS");
+                        } else if (!bs.empty()) put(C.ab_text, bs);
                         int shown = 0;
                         int cap = (lb->id == "hummingbot-hl") ? 8 : 3;
                         for (auto& p : ui.snap.positions) {
@@ -5657,6 +5674,26 @@ int run_desk(FlaskApi& api) {
             set_clip(dpy, gc, main);
             yy += slband.h + 12;
 
+            if (b->id == "hummingbot-v2-dman-v3") {
+                std::string pair = "LTC-USD";
+                if (b->controller.contains("trading_pair") && b->controller["trading_pair"].is_string())
+                    pair = b->controller["trading_pair"].get<std::string>();
+                std::string coin = pair;
+                auto dash = coin.find('-');
+                if (dash != std::string::npos) coin = coin.substr(0, dash);
+                text(dpy, buf, gc, C.gold, x, yy, "COIN");
+                yy += 18;
+                text(dpy, buf, gc, C.text, x, yy + 14, fit_px(coin, 48));
+                text(dpy, buf, gc, C.muted, x + 56, yy + 14,
+                     fit_px(pair + "  from the wire. No BIAS.", inner - 120));
+                Rect chb{right - 60, yy, 52, 20};
+                if (chb.x > x + 200) {
+                    stroke(dpy, buf, gc, C.gold, chb);
+                    text(dpy, buf, gc, C.gold, chb.x + 6, chb.y + 14, "Chart");
+                    ui.hits.push_back({Hit::Chart, ui.sel, chb, coin});
+                }
+                yy += 28;
+            } else {
             text(dpy, buf, gc, C.gold, x, yy, "BIAS");
             yy += 18;
             std::vector<std::string> coins = b->coins;
@@ -5717,6 +5754,7 @@ int run_desk(FlaskApi& api) {
                     }
                     yy += 26;
                 }
+            }
             }
 
             yy += 6;
