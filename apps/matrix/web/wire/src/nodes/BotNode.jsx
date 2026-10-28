@@ -22,6 +22,7 @@ export default function BotNode({ id, data, selected }) {
   const ok = !!data.ok;
   const run = !!data.running;
   const isCopy = id === "hummingbot-hl" || data.id === "hummingbot-hl" || data.kind === "copy";
+  const coinOnly = id === "hummingbot-v2-dman-v3" || data.hasBias === false;
   const color = data.color || "#7ecbff";
   const positions = (data.positions || []).slice(0, 2);
   const extra = (data.positions || []).length - positions.length;
@@ -69,7 +70,9 @@ export default function BotNode({ id, data, selected }) {
       <span className="port right logs" style={{ top: "74%" }} data-tip={PORT_TIP.botLogs}>LOG</span>
 
       <PortHandle type="target" position={Position.Bottom} id="sl" className="h-sl" style={{ left: "10%" }} tip={PORT_TIP.botSl} />
-      <PortHandle type="target" position={Position.Bottom} id="bias" className="h-bias" style={{ left: "28%" }} tip={PORT_TIP.botBias} />
+      {coinOnly ? null : (
+        <PortHandle type="target" position={Position.Bottom} id="bias" className="h-bias" style={{ left: "28%" }} tip={PORT_TIP.botBias} />
+      )}
       <PortHandle type="target" position={Position.Bottom} id="moon" className="h-moon" style={{ left: "46%" }} tip={PORT_TIP.botMoon} />
       <PortHandle type="target" position={Position.Bottom} id="ctrl" className="h-ctrl" style={{ left: "64%" }} tip={PORT_TIP.botCtrl} />
       <PortHandle type="target" position={Position.Bottom} id="eclose" className="h-eclose" style={{ left: "88%" }} tip={PORT_TIP.botEclose} />
@@ -116,14 +119,14 @@ export default function BotNode({ id, data, selected }) {
         <span>coin {w.coin || "—"}</span>
         <span>sl {w.sl != null ? `−${w.sl}%` : "—"}</span>
         <span>moon {w.moon != null ? `+${w.moon}%` : "—"}</span>
-        <span>bias {w.bias || "—"}</span>
+        {coinOnly ? null : <span>bias {w.bias || "—"}</span>}
         {isCopy ? <span>lead {w.traders || "—"}</span> : null}
         <span>risk {w.risk || "—"}</span>
         <span className={w.eclose ? "kill-armed" : ""}>kill {w.eclose || "—"}</span>
       </div>
       <div className="bot-set">
         <span data-tip={PORT_TIP.botSl}>SL</span>
-        <span data-tip={PORT_TIP.botBias}>BIAS</span>
+        {coinOnly ? null : <span data-tip={PORT_TIP.botBias}>BIAS</span>}
         <span data-tip={PORT_TIP.botMoon}>MOON</span>
         <span
           className="nodrag nopan"
