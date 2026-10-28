@@ -179,7 +179,7 @@ enum Page { PgHome, PgWire, PgCondor, PgHunters, PgFunds, PgStrategy, PgSystem, 
 const char* PAGE_NAME[] = {"HOME", "WIRE", "CONDOR", "HUNTERS", "FUNDS", "STRATEGY", "SYSTEM"};
 
 struct Hit {
-    enum Kind { Idle, Nav, Hunter, NotWired, WireNode, WireEdge, WirePort, ToolCat, ToolItem, WireBoard, WireAct, Ctx, Backend, Chart, Sl, Lev, Restart, HunterGate, DeskBias, CoinBias, CoinClose, CoinOpen100, DmanCoin, CtrlBool, CtrlKnob, CtrlSel, CtrlStd, CopyMute, CopySlots, CopyAudit, AuditClose, AuditRun, Quit, PackSave, PackRestore, WireSnap, AnnotColor, AnnotSize, InspectBack, CompileClose, CompileWork, CompileGo, PresetDrop, PresetPick, PresetSave, ApiKey, ReplYes, ReplNo, FundsDel, FundsAdd, FundsField, FundsRename, Seq } kind = Idle;
+    enum Kind { Idle, Nav, Hunter, NotWired, WireNode, WireEdge, WirePort, ToolCat, ToolItem, WireBoard, WireAct, Ctx, Backend, Chart, Sl, Lev, Restart, HunterGate, DeskBias, CoinBias, CoinClose, CoinOpen100, DmanCoin, DmanSize, CtrlBool, CtrlKnob, CtrlSel, CtrlStd, CopyMute, CopySlots, CopyAudit, AuditClose, AuditRun, Quit, PackSave, PackRestore, WireSnap, AnnotColor, AnnotSize, InspectBack, CompileClose, CompileWork, CompileGo, PresetDrop, PresetPick, PresetSave, ApiKey, ReplYes, ReplNo, FundsDel, FundsAdd, FundsField, FundsRename, Seq } kind = Idle;
     int i = -1;
     Rect r{};
     std::string key;
@@ -3064,6 +3064,8 @@ std::string action_tip(const DeskUi& ui, const Hit& h) {
         }
         case Hit::DmanCoin:
             return "DMan V3 market " + h.key + "-USD. Bollinger picks the side. No order from this click.";
+        case Hit::DmanSize:
+            return "DMan V3 size " + h.key + "% of leftover. Writes the quote. No order from this click.";
         case Hit::CoinOpen100: {
             std::string n = (h.i >= 0 && h.i < (int)ui.snap.bots.size()) ? ui.snap.bots[h.i].name : "hunter";
             std::string side;
@@ -3792,6 +3794,7 @@ const V2Blurb* v2_blurb(const std::string& id) {
          "Official DMan. Band side, many maker levels",
          "Official mean-reversion controller, not the Dman hunter on this desk. "
          "Choose BTC, ETH, LTC, or TAO. That coin is the only market. There is no BIAS port. "
+         "25%, 50%, or 100% of leftover is the quote. A click does not send an order. "
          "Bollinger percent picks the side, then several maker levels step away from the price."},
         {"hummingbot-v2-supertrend",
          "Trend up and near the line, else short",
@@ -5709,6 +5712,38 @@ int run_desk(FlaskApi& api) {
                 yy += 24;
                 text(dpy, buf, gc, C.muted, x, yy,
                      fit_px(pair + "  one market. Bollinger picks the side. No BIAS.", inner));
+                yy += 18;
+                double quote = 0;
+                if (b->controller.contains("total_amount_quote")
+                    && b->controller["total_amount_quote"].is_number())
+                    quote = b->controller["total_amount_quote"].get<double>();
+                double mp = 0;
+                if (b->controller.contains("margin_pct") && b->controller["margin_pct"].is_number())
+                    mp = b->controller["margin_pct"].get<double>();
+                if (mp > 1.0 && mp <= 100.0) mp /= 100.0;
+                text(dpy, buf, gc, C.gold, x, yy, "SIZE");
+                yy += 18;
+                const char* slabs[] = {"25%", "50%", "100%"};
+                const char* skeys[] = {"25", "50", "100"};
+                const double spct[] = {0.25, 0.50, 1.0};
+                bool armed = quote > 0.5;
+                for (int si = 0; si < 3; ++si) {
+                    Rect br{bx0 + si * (btn_w + btn_gap), yy, btn_w, 20};
+                    if (br.x + br.w > right - 64) break;
+                    bool on = armed && std::fabs(mp - spct[si]) < 0.02;
+                    fill(dpy, buf, gc, on ? C.gold : C.bg, br);
+                    stroke(dpy, buf, gc, C.gold, br);
+                    int tx = br.x + (br.w - static_cast<int>(std::strlen(slabs[si])) * CHAR_W) / 2;
+                    text(dpy, buf, gc, on ? C.bg : C.gold, tx, br.y + 14, slabs[si]);
+                    ui.hits.push_back({Hit::DmanSize, ui.sel, br, skeys[si]});
+                }
+                yy += 24;
+                char qline[96];
+                if (armed)
+                    snprintf(qline, sizeof(qline), "$%.2f quote. No order from this click.", quote);
+                else
+                    snprintf(qline, sizeof(qline), "quote $0. Pick a share of leftover. No order.");
+                text(dpy, buf, gc, C.muted, x, yy, fit_px(qline, inner));
                 yy += 18;
             } else {
             text(dpy, buf, gc, C.gold, x, yy, "BIAS");
@@ -8387,6 +8422,26 @@ int run_desk(FlaskApi& api) {
                                 ui.refresh(false);
                             }
                             redraw();
+                        } else if (h.kind == Hit::DmanSize) {
+                            if (h.i >= 0 && h.i < (int)ui.snap.bots.size()) {
+                                auto& b = ui.snap.bots[h.i];
+                                double pct = 0.25;
+                                if (h.key == "50") pct = 0.5;
+                                else if (h.key == "100") pct = 1.0;
+                                std::string msg = ui.api->post_ctrl(b.id, "margin_pct", nlohmann::json(pct));
+                                if (msg.find("quote") != std::string::npos) {
+                                    b.controller["margin_pct"] = pct;
+                                    auto dollar = msg.find('$');
+                                    if (dollar != std::string::npos) {
+                                        try {
+                                            b.controller["total_amount_quote"] = std::stod(msg.substr(dollar + 1));
+                                        } catch (...) {}
+                                    }
+                                }
+                                ui.say(msg);
+                                ui.refresh(false);
+                            }
+                            redraw();
                         } else if (h.kind == Hit::CoinClose) {
                             if (h.i >= 0 && h.i < (int)ui.snap.bots.size()) {
                                 auto& b = ui.snap.bots[h.i];
@@ -8518,7 +8573,6 @@ int run_desk(FlaskApi& api) {
                                     {"bb_short_threshold", 1.0},
                                     {"dynamic_order_spread", false},
                                     {"dynamic_target", false},
-                                    {"margin_pct", 1.0},
                                     {"sl_roe_pct", 20},
                                 };
                                 for (auto it = m.begin(); it != m.end(); ++it)
