@@ -1631,10 +1631,6 @@ def preset_save(bot_id, name, values, locked=False):
             con.commit()
         finally:
             con.close()
-    try:
-        export_controller_presets()
-    except Exception:
-        pass
     return name
 
 
@@ -1651,10 +1647,6 @@ def seed_controller_presets():
                 vals[spec["key"]] = spec["default"]
         if vals:
             preset_save(bot_id, "STD", vals, locked=True)
-    try:
-        export_controller_presets()
-    except Exception:
-        pass
     return True
 
 

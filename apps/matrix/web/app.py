@@ -7427,12 +7427,30 @@ def _ctrl_write(bot_id, incoming):
 
     row["updated"] = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
     row["source"] = "wire"
-    try:
-        _write_json_file(_ctrl_file(bot_id), row)
-    except OSError as exc:
-        return {"ok": False, "error": str(exc)}
+    # Controller edits stay in SQLite. The json file is not written.
+    if not _MATRIX_OK:
+        return {
+            "ok": False,
+            "error": "controller sqlite was not written",
+            "closes": False,
+            "positions_untouched": True,
+        }
     for key in changed:
-        _sql_kv_set(bot_id, key, row.get(key), "wire")
+        try:
+            if not matrix_store.kv_set(bot_id, key, row.get(key), "wire"):
+                return {
+                    "ok": False,
+                    "error": "controller sqlite was not written",
+                    "closes": False,
+                    "positions_untouched": True,
+                }
+        except Exception as exc:
+            return {
+                "ok": False,
+                "error": str(exc),
+                "closes": False,
+                "positions_untouched": True,
+            }
     name = (BOTS.get(bot_id) or {}).get("name") or bot_id
     msg = f"{name} controller · " + (", ".join(msgs) if msgs else ", ".join(changed))
     after_ctrl = _ctrl_live_values(bot_id)
