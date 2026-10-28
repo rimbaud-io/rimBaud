@@ -304,15 +304,17 @@ static std::string norm_addr(std::string a) {
     return a;
 }
 
-// A stopped or paused hunter's last file is not money. One Hyperliquid
-// address is one balance, so hunters that share it are counted once.
+// A stopped or paused hunter's last file is not money. A down controller
+// with pool_cash is a fresh clearinghouse read of the wired wallet, so that
+// balance stays. One Hyperliquid address is counted once.
 static void fold_live_funds(const json& bots, json& positions, double& eq_sum, double& upnl_sum) {
     std::map<std::string, int> winner;
     std::vector<char> count(bots.size(), 0);
     for (size_t i = 0; i < bots.size(); ++i) {
         const json& b = bots[i];
         if (!b.is_object()) continue;
-        if (!jbool(b, "running") || jbool(b, "deactivated")) continue;
+        if (jbool(b, "deactivated")) continue;
+        if (!jbool(b, "running") && !jbool(b, "pool_cash")) continue;
         std::string addr = norm_addr(jstr(b, "address"));
         if (addr.size() < 8) {
             count[i] = 1;
@@ -1661,12 +1663,16 @@ static json api_home(const Brain& br) {
 
         double upnl = (npos > 0) ? summed_upnl : stated_upnl;
         if (have_stated_upnl && npos == 0) upnl = stated_upnl;
+        // A down hunter's status file is not cash. A controller with no status
+        // file still holds the wired pool, including after a reboot stops it.
+        bool pool_cash = false;
         if (!live) {
             equity = 0;
             free = 0;
             upnl = 0;
             npos = 0;
-        } else if (!jhas(st, "equity_usd") && !jhas(st, "equity")) {
+        }
+        if (!deactivated && !jhas(st, "equity_usd") && !jhas(st, "equity")) {
             auto nit = wired.find(id);
             if (nit != wired.end()) {
                 auto pit = pool.find(fold_label(nit->second));
@@ -1676,6 +1682,7 @@ static json api_home(const Brain& br) {
                         addr = pit->second;
                         equity = eq;
                         free = fr;
+                        pool_cash = true;
                     }
                 }
             }
@@ -1737,6 +1744,7 @@ static json api_home(const Brain& br) {
             {"deactivated", deactivated},
             {"hl_ip", (deactivated || !running) ? "none" : "spending"},
             {"address", addr},
+            {"pool_cash", pool_cash},
             {"equity_usd", equity},
             {"free_usd", free},
             {"n_pos", npos},
