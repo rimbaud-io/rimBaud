@@ -2399,6 +2399,31 @@ static bool apply_dman_every_2_win(const Brain& br, bool on) {
     return ok;
 }
 
+// Leftover on the wallet wired into official DMan V3. Cached with the other cash reads.
+static bool dman_v3_leftover(const Brain& br, double& free, double& equity) {
+    free = 0;
+    equity = 0;
+    auto rt = read_json(join(br.conf, "wire_runtime.json"));
+    if (!rt.is_object() || !rt.contains("bots") || !rt["bots"].is_object()) return false;
+    auto bot = rt["bots"].value("hummingbot-v2-dman-v3", json::object());
+    if (!bot.is_object()) return false;
+    std::string want = fold_label(jstr(bot, "wallet_in"));
+    if (want.empty()) return false;
+    auto wallets = read_json(join(br.conf, "wire_wallets.json"));
+    json rows = json::array();
+    if (wallets.is_array()) rows = wallets;
+    else if (wallets.contains("wallets") && wallets["wallets"].is_array()) rows = wallets["wallets"];
+    std::string addr;
+    for (auto& w : rows) {
+        if (!w.is_object()) continue;
+        if (fold_label(jstr(w, "name")) != want) continue;
+        addr = jstr(w, "address");
+        break;
+    }
+    if (addr.size() < 42) return false;
+    return hl_cash_of(addr, equity, free);
+}
+
 static json api_ctrl_post(const Brain& br, const json& data) {
     std::string id = jstr(data, "id", jstr(data, "bot_id"));
     if (!valid_id(id)) return {{"ok", false}, {"error", "unknown hunter"}};
@@ -2418,6 +2443,9 @@ static json api_ctrl_post(const Brain& br, const json& data) {
     if (!row.is_object()) row = json::object();
     json changed = json::array();
     std::string msgs;
+    bool size_set = false;
+    double size_pct = 0;
+    double size_quote = 0;
     for (auto it = values.begin(); it != values.end(); ++it) {
         std::string key = it.key();
         if (key.empty() || key == "updated" || key == "source") continue;
@@ -2433,6 +2461,28 @@ static json api_ctrl_post(const Brain& br, const json& data) {
             if (!apply_dman_every_2_win(br, val.get<bool>()))
                 return {{"ok", false}, {"error", "risk skim not saved"},
                         {"closes", false}, {"positions_untouched", true}};
+        }
+        if (id == "hummingbot-v2-dman-v3" && key == "margin_pct") {
+            double pct = val.is_number() ? val.get<double>() : -1;
+            if (pct > 1.0 && pct <= 100.0) pct /= 100.0;
+            if (pct < 0.10 || pct > 1.0)
+                return {{"ok", false},
+                        {"error", "DMan V3 size is 10% to 100% of leftover"},
+                        {"closes", false}, {"positions_untouched", true}};
+            double free = 0, equity = 0;
+            if (!dman_v3_leftover(br, free, equity))
+                return {{"ok", false},
+                        {"error", "DMan V3 leftover was not read"},
+                        {"closes", false}, {"positions_untouched", true}};
+            double base = free > 0.5 ? free : equity;
+            if (base < 1.0)
+                return {{"ok", false},
+                        {"error", "DMan V3 leftover is empty"},
+                        {"closes", false}, {"positions_untouched", true}};
+            size_set = true;
+            size_pct = pct;
+            size_quote = std::round(base * pct * 100.0) / 100.0;
+            val = pct;
         }
         if (id == "hummingbot-v2-dman-v3" && key == "trading_pair") {
             std::string coin, pair;
@@ -2464,6 +2514,14 @@ static json api_ctrl_post(const Brain& br, const json& data) {
             if (!msgs.empty()) msgs += " · ";
             msgs += jstr(armed, "message");
         }
+    }
+    if (size_set) {
+        row["margin_pct"] = size_pct;
+        row["total_amount_quote"] = size_quote;
+        bool listed = false;
+        for (auto& k : changed)
+            if (k.is_string() && k.get<std::string>() == "total_amount_quote") listed = true;
+        if (!listed) changed.push_back("total_amount_quote");
     }
     row["updated"] = utc_now();
     row["source"] = "spring";
@@ -2500,6 +2558,9 @@ static json api_ctrl_post(const Brain& br, const json& data) {
                 retarget_dman_v3_coin(br, coin);
             }
         }
+        if (size_set)
+            yml_set_scalar(join(br.conf, "controllers/conf_v2_dman-v3.yml"),
+                           "total_amount_quote", fmt_frac(size_quote));
     }
     {
         std::lock_guard<std::mutex> lk(g_live_mu);
@@ -2513,7 +2574,13 @@ static json api_ctrl_post(const Brain& br, const json& data) {
         g_live_knobs[id] = live;
     }
     std::string message = "controller saved — no HL close/open";
-    if (id == "hummingbot-v2-dman-v3" && row.contains("trading_pair") && row["trading_pair"].is_string()) {
+    if (size_set) {
+        char buf[160];
+        snprintf(buf, sizeof(buf),
+                 "DMan V3 size %.0f%% of leftover, $%.2f quote. No order. The running process stays quiet until that container is restarted.",
+                 size_pct * 100.0, size_quote);
+        message = buf;
+    } else if (id == "hummingbot-v2-dman-v3" && row.contains("trading_pair") && row["trading_pair"].is_string()) {
         for (auto& k : changed) {
             if (!k.is_string() || k.get<std::string>() != "trading_pair") continue;
             message = "DMan V3 market " + row["trading_pair"].get<std::string>()
