@@ -179,7 +179,7 @@ enum Page { PgHome, PgWire, PgCondor, PgHunters, PgFunds, PgStrategy, PgSystem, 
 const char* PAGE_NAME[] = {"HOME", "WIRE", "CONDOR", "HUNTERS", "FUNDS", "STRATEGY", "SYSTEM"};
 
 struct Hit {
-    enum Kind { Idle, Nav, Hunter, NotWired, WireNode, WireEdge, WirePort, ToolCat, ToolItem, WireBoard, WireAct, Ctx, Backend, Chart, Sl, Lev, Restart, HunterGate, DeskBias, CoinBias, CoinClose, CoinOpen100, CtrlBool, CtrlKnob, CtrlSel, CtrlStd, CopyMute, CopySlots, CopyAudit, AuditClose, AuditRun, Quit, PackSave, PackRestore, WireSnap, AnnotColor, AnnotSize, InspectBack, CompileClose, CompileWork, CompileGo, PresetDrop, PresetPick, PresetSave, ApiKey, ReplYes, ReplNo, FundsDel, FundsAdd, FundsField, FundsRename, Seq } kind = Idle;
+    enum Kind { Idle, Nav, Hunter, NotWired, WireNode, WireEdge, WirePort, ToolCat, ToolItem, WireBoard, WireAct, Ctx, Backend, Chart, Sl, Lev, Restart, HunterGate, DeskBias, CoinBias, CoinClose, CoinOpen100, DmanCoin, CtrlBool, CtrlKnob, CtrlSel, CtrlStd, CopyMute, CopySlots, CopyAudit, AuditClose, AuditRun, Quit, PackSave, PackRestore, WireSnap, AnnotColor, AnnotSize, InspectBack, CompileClose, CompileWork, CompileGo, PresetDrop, PresetPick, PresetSave, ApiKey, ReplYes, ReplNo, FundsDel, FundsAdd, FundsField, FundsRename, Seq } kind = Idle;
     int i = -1;
     Rect r{};
     std::string key;
@@ -3062,6 +3062,8 @@ std::string action_tip(const DeskUi& ui, const Hit& h) {
             std::string n = (h.i >= 0 && h.i < (int)ui.snap.bots.size()) ? ui.snap.bots[h.i].name : "hunter";
             return "queue flatten " + h.key + " on " + n + " (LONG or SHORT)";
         }
+        case Hit::DmanCoin:
+            return "DMan V3 market " + h.key + "-USD. Bollinger picks the side. No order from this click.";
         case Hit::CoinOpen100: {
             std::string n = (h.i >= 0 && h.i < (int)ui.snap.bots.size()) ? ui.snap.bots[h.i].name : "hunter";
             std::string side;
@@ -3789,7 +3791,7 @@ const V2Blurb* v2_blurb(const std::string& id) {
         {"hummingbot-v2-dman-v3",
          "Official DMan. Band side, many maker levels",
          "Official mean-reversion controller, not the Dman hunter on this desk. "
-         "The wired coin is the only market. There is no BIAS port. "
+         "Choose BTC, ETH, LTC, or TAO. That coin is the only market. There is no BIAS port. "
          "Bollinger percent picks the side, then several maker levels step away from the price."},
         {"hummingbot-v2-supertrend",
          "Trend up and near the line, else short",
@@ -5678,21 +5680,36 @@ int run_desk(FlaskApi& api) {
                 std::string pair = "LTC-USD";
                 if (b->controller.contains("trading_pair") && b->controller["trading_pair"].is_string())
                     pair = b->controller["trading_pair"].get<std::string>();
-                std::string coin = pair;
-                auto dash = coin.find('-');
-                if (dash != std::string::npos) coin = coin.substr(0, dash);
+                std::string cur = pair;
+                auto dash = cur.find('-');
+                if (dash != std::string::npos) cur = cur.substr(0, dash);
+                for (char& c : cur) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
                 text(dpy, buf, gc, C.gold, x, yy, "COIN");
                 yy += 18;
-                text(dpy, buf, gc, C.text, x, yy + 14, fit_px(coin, 48));
-                text(dpy, buf, gc, C.muted, x + 56, yy + 14,
-                     fit_px(pair + "  from the wire. No BIAS.", inner - 120));
-                Rect chb{right - 60, yy, 52, 20};
-                if (chb.x > x + 200) {
+                const char* choices[] = {"BTC", "ETH", "LTC", "TAO"};
+                int btn_w = 64;
+                int btn_gap = 8;
+                int bx0 = x;
+                for (int ci = 0; ci < 4; ++ci) {
+                    Rect br{bx0 + ci * (btn_w + btn_gap), yy, btn_w, 20};
+                    if (br.x + br.w > right - 64) break;
+                    bool on = cur == choices[ci];
+                    fill(dpy, buf, gc, on ? C.gold : C.bg, br);
+                    stroke(dpy, buf, gc, C.gold, br);
+                    int tx = br.x + (br.w - static_cast<int>(std::strlen(choices[ci])) * CHAR_W) / 2;
+                    text(dpy, buf, gc, on ? C.bg : C.gold, tx, br.y + 14, choices[ci]);
+                    ui.hits.push_back({Hit::DmanCoin, ui.sel, br, choices[ci]});
+                }
+                Rect chb{bx0 + 4 * (btn_w + btn_gap) + 8, yy, 52, 20};
+                if (chb.x + chb.w <= right) {
                     stroke(dpy, buf, gc, C.gold, chb);
                     text(dpy, buf, gc, C.gold, chb.x + 6, chb.y + 14, "Chart");
-                    ui.hits.push_back({Hit::Chart, ui.sel, chb, coin});
+                    ui.hits.push_back({Hit::Chart, ui.sel, chb, cur});
                 }
-                yy += 28;
+                yy += 24;
+                text(dpy, buf, gc, C.muted, x, yy,
+                     fit_px(pair + "  one market. Bollinger picks the side. No BIAS.", inner));
+                yy += 18;
             } else {
             text(dpy, buf, gc, C.gold, x, yy, "BIAS");
             yy += 18;
@@ -8350,6 +8367,25 @@ int run_desk(FlaskApi& api) {
                             if (h.i >= 0 && h.i < (int)ui.snap.bots.size())
                                 ui.say(ui.api->post_bias(ui.snap.bots[h.i].id, coin, mode));
                             ui.refresh(false);
+                            redraw();
+                        } else if (h.kind == Hit::DmanCoin) {
+                            if (h.i >= 0 && h.i < (int)ui.snap.bots.size()) {
+                                auto& b = ui.snap.bots[h.i];
+                                std::string pair = h.key + "-USD";
+                                std::string msg = ui.api->post_ctrl(b.id, "trading_pair", nlohmann::json(pair));
+                                if (msg.find("market") != std::string::npos || msg.find("saved") != std::string::npos) {
+                                    b.controller["trading_pair"] = pair;
+                                    for (auto& e : ui.snap.wire_edges) {
+                                        if (e.target == b.id && e.target_handle == "coin") {
+                                            e.source = "coin-" + h.key;
+                                            e.source_handle = "coin";
+                                            e.id = "e-coin-" + h.key + "-coin-" + b.id;
+                                        }
+                                    }
+                                }
+                                ui.say(msg);
+                                ui.refresh(false);
+                            }
                             redraw();
                         } else if (h.kind == Hit::CoinClose) {
                             if (h.i >= 0 && h.i < (int)ui.snap.bots.size()) {
