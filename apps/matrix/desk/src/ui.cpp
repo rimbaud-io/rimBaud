@@ -106,25 +106,31 @@ void hide_paused_funds(DeskSnap& snap) {
         if (paused.count(b.id)) {
             b.deactivated = true;
             b.ok = false;
+            b.pool_cash = false;
             b.equity = 0;
             b.free_usd = 0;
             b.upnl = 0;
             b.n_pos = 0;
             b.health = "deactivated";
             b.health_reason = "deactivated - 0 Hyperliquid IP tokens, positions stay on the exchange";
-        } else if (!b.running) {
+        } else if (!b.running && !b.pool_cash) {
             b.equity = 0;
             b.free_usd = 0;
             b.upnl = 0;
             b.n_pos = 0;
+        } else if (!b.running) {
+            b.upnl = 0;
+            b.n_pos = 0;
         }
     }
-    // One address is one balance. A down hunter is not counted.
+    // One address is one balance. A down hunter's stale file is not counted.
+    // A down controller with pool_cash is the wired wallet and stays.
     std::map<std::string, int> winner;
     std::vector<char> count(snap.bots.size(), 0);
     for (size_t i = 0; i < snap.bots.size(); ++i) {
         auto& b = snap.bots[i];
-        if (!b.running || b.deactivated) continue;
+        if (b.deactivated) continue;
+        if (!b.running && !b.pool_cash) continue;
         std::string addr = fold_addr(b.address);
         if (addr.size() < 8) {
             count[i] = 1;

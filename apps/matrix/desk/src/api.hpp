@@ -69,6 +69,7 @@ struct Bot {
     std::string next_rebuy;
     bool running = false;
     bool deactivated = false; // docker pause: process frozen, 0 Hyperliquid IP, positions stay
+    bool pool_cash = false;   // down controller, balance is a live read of the wired wallet
     bool ok = false;
     double equity = 0;
     double free_usd = 0;

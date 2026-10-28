@@ -114,6 +114,7 @@ static Bot parse_bot(const json& j) {
     b.health_reason = str(j, "health_reason");
     b.running = flag(j, "running");
     b.deactivated = flag(j, "deactivated");
+    b.pool_cash = flag(j, "pool_cash");
     b.ok = flag(j, "ok");
     b.equity = num(j, "equity_usd");
     b.free_usd = num(j, "free_usd");
