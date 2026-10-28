@@ -2571,6 +2571,10 @@ static json api_bias_post(const Brain& br, const json& data) {
     for (char& c : bias) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
     if (!valid_id(id) || (bias != "LONG" && bias != "SHORT" && bias != "FLAT"))
         return {{"ok", false}, {"error", "bias must be LONG, SHORT, or FLAT"}};
+    if (id == "hummingbot-v2-dman-v3")
+        return {{"ok", false},
+                {"error", "DMan V3 takes the wired coin, not a BIAS"},
+                {"closes", false}, {"positions_untouched", true}};
     json h;
     for (auto& x : registry(br)) if (jstr(x, "id") == id) h = x;
     if (!h.is_object()) return {{"ok", false}, {"error", "unknown hunter"}};
