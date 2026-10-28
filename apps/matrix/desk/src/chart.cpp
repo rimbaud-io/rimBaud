@@ -1116,17 +1116,20 @@ static NextEntry make_entry(const Overlay& o, const std::vector<BarSet>& sets,
         e.ok = e.px > 0;
         if (o.bias == "FLAT" || o.bias.empty()) e.note = "bias flat";
     } else if (o.entry_kind == 6) {
-        e.px = last_px > 0 ? last_px : (cs.empty() ? 0 : cs.back().c);
-        e.ok = e.px > 0;
-        if (!o.ghost) {
-            e.what = "market";
-            e.note = "in a clip - next entry is market after flat";
-        } else if (o.bias == "LONG" || o.bias == "SHORT") {
-            e.what = o.bias == "SHORT" ? "market short" : "market long";
-            e.now = true;
+        // Market entry has no gate of its own. The rainbow marks the next buy
+        // (NEXT IN), the same job the Bollinger line does on DMan V3.
+        // The live mark stays off this line and is drawn on the price axis.
+        double buy = o.next_in_px();
+        double mkt = last_px > 0 ? last_px : (cs.empty() ? 0 : cs.back().c);
+        bool distinct = buy > 0 && (mkt <= 0 || std::fabs(buy - mkt) > mkt * 0.0008);
+        if (distinct) {
+            e.px = buy;
+            e.ok = true;
+            e.what = (o.bias == "SHORT" || (!o.ghost && o.side == "SHORT")) ? "short in" : "buy in";
+            if (!o.ghost) e.note = "in a clip";
+            else if (o.bias != "LONG" && o.bias != "SHORT") e.note = "set LONG or SHORT";
         } else {
-            e.what = "market";
-            e.note = "set LONG or SHORT";
+            e.note = "no next buy level";
         }
     }
     if (o.entry_kind == 1 && !o.pair.empty()) {
@@ -1788,9 +1791,13 @@ int main(int argc, char** argv) {
                 add_line_hit(oi, 3, tr);
             }
             double ni = o.next_in_px();
-            if (ni > 0) {
+            bool rainbow_on_buy = oi < (int)nexts.size() && nexts[oi].ok && ni > 0
+                && std::fabs(nexts[oi].px - ni) <= std::max(1e-8, ni * 1e-6);
+            if (ni > 0 && !rainbow_on_buy) {
                 hline(ni, col_re, hot && (hover_line == 4 || drag_line == 4));
                 add_mk(plot.x + 10, ni, col_re, "NEXT IN");
+                add_line_hit(oi, 4, ni);
+            } else if (rainbow_on_buy) {
                 add_line_hit(oi, 4, ni);
             }
             if (o.close_px > 0) {
@@ -1865,6 +1872,25 @@ int main(int argc, char** argv) {
             }
             fill(rgb(dpy, cm, 6, 18, 10), {tx - 3, ly - FH + 4, tw + 6, FH});
             txt2(m.col, tx, ly, m.lab);
+        }
+        if (last_px > 0 && hi > lo) {
+            int y = ypx(last_px);
+            if (y >= plot.y + 1 && y <= plot.y + plot.h - 2) {
+                unsigned long neon = rgb(dpy, cm, 0, 255, 255);
+                XSetForeground(dpy, gc, neon);
+                XSetLineAttributes(dpy, gc, 2, LineSolid, CapButt, JoinMiter);
+                XDrawLine(dpy, buf, gc, plot.x + plot.w - 1, y, plot.x + plot.w + 10, y);
+                XDrawLine(dpy, buf, gc, plot.x + plot.w + 2, y - 5, plot.x + plot.w + 9, y);
+                XDrawLine(dpy, buf, gc, plot.x + plot.w + 2, y + 5, plot.x + plot.w + 9, y);
+                std::string lab = fmt_px(last_px);
+                int tw = (int)lab.size() * FW;
+                int tx = plot.x + plot.w + 12;
+                int base = y + (fs2 ? fs2->ascent / 2 - fs2->descent / 2 : 6);
+                if (base < plot.y + FH - 2) base = plot.y + FH - 2;
+                if (base > plot.y + plot.h - 2) base = plot.y + plot.h - 2;
+                fill(rgb(dpy, cm, 0, 36, 44), {tx - 3, base - FH + 3, tw + 6, FH});
+                txt2(neon, tx, base, lab);
+            }
         }
         std::string foot;
         for (int i = 0; i < (int)ov.size() && i < (int)nexts.size(); ++i) {
