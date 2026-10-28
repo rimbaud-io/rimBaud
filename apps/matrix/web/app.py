@@ -4775,6 +4775,50 @@ def _apply_condor_gauge(nodes, edges):
     return applied
 
 
+_DMAN_V3_COINS = ("BTC", "ETH", "LTC", "TAO")
+
+
+def _dman_v3_set_pair(coin):
+    """The wired coin is the only market for official DMan V3. BIAS is not a pair."""
+    coin = str(coin or "").upper().replace("-USD", "").replace("-USDT", "")
+    if coin not in _DMAN_V3_COINS:
+        return None
+    pair = coin + "-USD"
+    path = os.path.join(CONF_DIR, "controllers", "conf_v2_dman-v3.yml")
+    try:
+        with open(path) as f:
+            lines = f.read().splitlines()
+    except OSError:
+        return None
+    found = False
+    out = []
+    for ln in lines:
+        key = ln.split(":", 1)[0].strip() if ":" in ln else ""
+        if key == "trading_pair":
+            out.append("trading_pair: " + pair)
+            found = True
+        else:
+            out.append(ln)
+    if not found:
+        out.append("trading_pair: " + pair)
+    text = "\n".join(out) + "\n"
+    try:
+        with open(path) as f:
+            cur = f.read()
+    except OSError:
+        cur = ""
+    if cur == text:
+        return None
+    try:
+        tmp = path + ".tmp"
+        with open(tmp, "w") as f:
+            f.write(text)
+        os.replace(tmp, path)
+    except OSError:
+        return None
+    return "DMan V3 pair " + pair
+
+
 def _apply_wire_graph(nodes, edges):
     """Map abstract wires onto live hunter files. Income is recorded only (no HL send)."""
     by_id = {}
@@ -4896,6 +4940,10 @@ def _apply_wire_graph(nodes, edges):
                 _sql_kv_set(bid, "sl_roe_pct", round(sl, 2), "wire")
         if moon is not None and bid in _MOON_BOTS and 1.0 <= moon <= 500.0:
             note = _arm_hunter_moon(bid, moon, coin, runtime["updated"])
+            if note:
+                applied.append(note)
+        if bid == "hummingbot-v2-dman-v3":
+            note = _dman_v3_set_pair(coin)
             if note:
                 applied.append(note)
     for bid in _MOON_BOTS:
