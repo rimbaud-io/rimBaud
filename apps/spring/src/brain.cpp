@@ -510,6 +510,87 @@ static void patch_dman_v3_yml(const Brain& br, const json& row) {
     if (std::rename(tmp.c_str(), path.c_str()) != 0) std::remove(tmp.c_str());
 }
 
+// Official DMan V3 trades one pair. The hunter page chooses BTC, ETH, LTC, or TAO.
+static bool dman_v3_coin_pair(const json& val, std::string& coin, std::string& pair) {
+    if (!val.is_string()) return false;
+    std::string s = val.get<std::string>();
+    for (char& c : s) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+    auto cut = s.find('-');
+    if (cut != std::string::npos) s = s.substr(0, cut);
+    if (s != "BTC" && s != "ETH" && s != "LTC" && s != "TAO") return false;
+    coin = s;
+    pair = s + "-USD";
+    return true;
+}
+
+static bool yml_set_scalar(const std::string& path, const std::string& key, const std::string& value) {
+    std::ifstream in(path);
+    if (!in) return false;
+    std::vector<std::string> lines;
+    std::string line;
+    while (std::getline(in, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        lines.push_back(line);
+    }
+    in.close();
+    bool found = false;
+    std::string next = key + ": " + value;
+    for (auto& ln : lines) {
+        if (yml_key_of(ln) == key) {
+            ln = next;
+            found = true;
+            break;
+        }
+    }
+    if (!found) lines.push_back(next);
+    std::string tmp = path + ".tmp";
+    std::ofstream out(tmp, std::ios::trunc);
+    if (!out) return false;
+    for (auto& ln : lines) out << ln << "\n";
+    out.close();
+    if (!out) {
+        std::remove(tmp.c_str());
+        return false;
+    }
+    if (std::rename(tmp.c_str(), path.c_str()) != 0) {
+        std::remove(tmp.c_str());
+        return false;
+    }
+    return true;
+}
+
+static void retarget_dman_v3_coin(const Brain& br, const std::string& coin) {
+    const std::string bot = "hummingbot-v2-dman-v3";
+    const std::string src = "coin-" + coin;
+    auto g = read_json(join(br.conf, "wire_graph.json"));
+    if (g.is_object() && g.contains("edges") && g["edges"].is_array()) {
+        bool have = false;
+        if (g.contains("nodes") && g["nodes"].is_array()) {
+            for (auto& n : g["nodes"])
+                if (n.is_object() && jstr(n, "id") == src) have = true;
+        }
+        if (have) {
+            bool wrote = false;
+            for (auto& e : g["edges"]) {
+                if (!e.is_object()) continue;
+                if (jstr(e, "target") != bot || jstr(e, "targetHandle") != "coin") continue;
+                e["source"] = src;
+                e["sourceHandle"] = "coin";
+                e["id"] = "e-" + src + "-coin-" + bot;
+                wrote = true;
+            }
+            if (wrote) write_json(join(br.conf, "wire_graph.json"), g);
+        }
+    }
+    auto rt = read_json(join(br.conf, "wire_runtime.json"));
+    if (rt.is_object() && rt.contains("bots") && rt["bots"].is_object()
+        && rt["bots"].contains(bot) && rt["bots"][bot].is_object()) {
+        rt["bots"][bot]["coin"] = coin;
+        rt["bots"][bot]["coins"] = json::array({coin});
+        write_json(join(br.conf, "wire_runtime.json"), rt);
+    }
+}
+
 static json merge_controller(const Brain& br, const std::string& id, const json& status, const json& sl) {
     json out = json::object();
     if (status.is_object()) {
@@ -2353,6 +2434,14 @@ static json api_ctrl_post(const Brain& br, const json& data) {
                 return {{"ok", false}, {"error", "risk skim not saved"},
                         {"closes", false}, {"positions_untouched", true}};
         }
+        if (id == "hummingbot-v2-dman-v3" && key == "trading_pair") {
+            std::string coin, pair;
+            if (!dman_v3_coin_pair(val, coin, pair))
+                return {{"ok", false},
+                        {"error", "DMan V3 coin is BTC, ETH, LTC, or TAO"},
+                        {"closes", false}, {"positions_untouched", true}};
+            val = pair;
+        }
         if (key == "sl_roe_pct") {
             double sl = val.is_number() ? val.get<double>() : 20;
             if (sl < 1 || sl > 90) return {{"ok", false}, {"error", "sl_roe_pct must be 1–90"}};
@@ -2400,6 +2489,17 @@ static json api_ctrl_post(const Brain& br, const json& data) {
                 touch = true;
         }
         if (touch) patch_dman_v3_yml(br, row);
+        bool pair_set = false;
+        for (auto& k : changed) {
+            if (k.is_string() && k.get<std::string>() == "trading_pair") pair_set = true;
+        }
+        if (pair_set && row.contains("trading_pair")) {
+            std::string coin, pair;
+            if (dman_v3_coin_pair(row["trading_pair"], coin, pair)) {
+                yml_set_scalar(join(br.conf, "controllers/conf_v2_dman-v3.yml"), "trading_pair", pair);
+                retarget_dman_v3_coin(br, coin);
+            }
+        }
     }
     {
         std::lock_guard<std::mutex> lk(g_live_mu);
@@ -2412,10 +2512,19 @@ static json api_ctrl_post(const Brain& br, const json& data) {
         live["updated"] = row["updated"];
         g_live_knobs[id] = live;
     }
+    std::string message = "controller saved — no HL close/open";
+    if (id == "hummingbot-v2-dman-v3" && row.contains("trading_pair") && row["trading_pair"].is_string()) {
+        for (auto& k : changed) {
+            if (!k.is_string() || k.get<std::string>() != "trading_pair") continue;
+            message = "DMan V3 market " + row["trading_pair"].get<std::string>()
+                + ". The running process stays quiet until that container is restarted. No order.";
+            break;
+        }
+    }
     return {
         {"ok", true}, {"id", id}, {"changed", changed},
         {"closes", false}, {"positions_untouched", true},
-        {"message", "controller saved — no HL close/open"},
+        {"message", message},
     };
 }
 
