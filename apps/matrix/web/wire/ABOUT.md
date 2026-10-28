@@ -19,4 +19,4 @@ limitations under the License.
 Browser wire. Place a controller, a wallet, and a coin.
 
 The canvas in the browser. The same wire idea as the native desk.
-<!-- archy-folder 0.2g25 -->
+<!-- archy-folder 0.2g26 -->
