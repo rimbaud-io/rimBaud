@@ -22,3 +22,10 @@
 
 bool matrix_sql_apply(const std::string& conf, const nlohmann::json& job);
 bool matrix_sql_snapshot(const std::string& conf, nlohmann::json& status, nlohmann::json& bias);
+// Controller knobs and presets. The caller does not write a JSON mirror.
+bool matrix_sql_kv_map(const std::string& conf, const std::string& bot, nlohmann::json& out);
+bool matrix_sql_preset_list(const std::string& conf, const std::string& bot, nlohmann::json& list);
+bool matrix_sql_preset_get(const std::string& conf, const std::string& bot, const std::string& name,
+                           nlohmann::json& values, bool& found);
+bool matrix_sql_preset_save(const std::string& conf, const std::string& bot, const std::string& name,
+                            const nlohmann::json& values, bool locked, std::string& err);

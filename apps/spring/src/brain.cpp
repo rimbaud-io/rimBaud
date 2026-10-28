@@ -348,9 +348,22 @@ static double sl_of(const json& sl, const std::string& id, double fallback) {
     return fallback;
 }
 
-static json ctrl_file(const Brain& br, const std::string& id) {
-    if (!valid_id(id)) return json::object();
-    return read_json(join(br.conf, id + "_ctrl.json"));
+// Controller knobs are stored in matrix.db. The old json file fills a key
+// only when SQLite does not have it. A save does not write that file.
+static json ctrl_saved(const Brain& br, const std::string& id) {
+    json out = json::object();
+    if (!valid_id(id)) return out;
+    json sql;
+    if (matrix_sql_kv_map(br.conf, id, sql) && sql.is_object())
+        out = std::move(sql);
+    json file = read_json(join(br.conf, id + "_ctrl.json"));
+    if (!file.is_object()) return out;
+    for (auto it = file.begin(); it != file.end(); ++it) {
+        if (it.key() == "updated" || it.key() == "source") continue;
+        if (!out.contains(it.key()) || out[it.key()].is_null())
+            out[it.key()] = it.value();
+    }
+    return out;
 }
 
 static std::string yml_scalar(const std::string& text, const std::string& key) {
@@ -601,7 +614,7 @@ static json merge_controller(const Brain& br, const std::string& id, const json&
             if (status.contains(k)) out[k] = status[k];
         }
     }
-    auto file = ctrl_file(br, id);
+    auto file = ctrl_saved(br, id);
     if (file.is_object()) {
         for (auto it = file.begin(); it != file.end(); ++it) {
             if (it.key() == "updated" || it.key() == "source") continue;
@@ -2439,7 +2452,7 @@ static json api_ctrl_post(const Brain& br, const json& data) {
         }
     }
     std::lock_guard<std::mutex> lk(g_write_mu);
-    json row = ctrl_file(br, id);
+    json row = ctrl_saved(br, id);
     if (!row.is_object()) row = json::object();
     json changed = json::array();
     std::string msgs;
@@ -2530,11 +2543,13 @@ static json api_ctrl_post(const Brain& br, const json& data) {
         if (k.is_string() && row.contains(k.get<std::string>()))
             kv[k.get<std::string>()] = row[k.get<std::string>()];
     }
-    sql_apply(br, {{"op", "kv"}, {"bot_id", id}, {"values", kv}});
     if (changed.empty())
         return {{"ok", false}, {"error", "no controller keys"}, {"closes", false}};
-    if (!write_json(join(br.conf, id + "_ctrl.json"), row))
-        return {{"ok", false}, {"error", "write ctrl failed"}};
+    if (!sql_apply(br, {{"op", "kv"}, {"bot_id", id}, {"values", kv}}))
+        return {{"ok", false}, {"error", "controller sqlite was not written"},
+                {"closes", false}, {"positions_untouched", true}};
+    // Stock DMan V3 loads its yml. The desk store is SQLite. This copies the
+    // saved row into the file that process reads. It is not a second store.
     if (id == "hummingbot-v2-dman-v3") {
         bool touch = false;
         for (auto& k : changed) {
@@ -2610,18 +2625,9 @@ static json api_presets_get(const Brain& br, const std::string& query) {
     if (id.empty())
         return {{"ok", false}, {"error", "id required — presets are per hunter"}, {"closes", false}};
     if (!valid_id(id)) return {{"ok", false}, {"error", "unknown bot"}, {"closes", false}};
-    json all = read_json(join(br.conf, "controller_presets.json"));
     json list = json::array();
-    if (all.is_object() && all.contains("presets") && all["presets"].is_object()
-        && all["presets"].contains(id) && all["presets"][id].is_array())
-        list = all["presets"][id];
-    if (!list.is_array() || list.empty()) {
-        sql_apply(br, {{"op", "preset_seed"}});
-        all = read_json(join(br.conf, "controller_presets.json"));
-        if (all.is_object() && all.contains("presets") && all["presets"].is_object()
-            && all["presets"].contains(id) && all["presets"][id].is_array())
-            list = all["presets"][id];
-    }
+    if (!matrix_sql_preset_list(br.conf, id, list) || !list.is_array())
+        list = json::array();
     return {
         {"ok", true}, {"id", id}, {"presets", list.is_array() ? list : json::array()},
         {"closes", false}, {"positions_untouched", true},
@@ -2638,17 +2644,12 @@ static json api_presets_post(Brain& br, const json& data) {
     if (op == "save") {
         json values = data.contains("values") && data["values"].is_object()
             ? data["values"] : json::object();
-        if (values.empty()) {
-            auto row = read_json(join(br.conf, id + "_ctrl.json"));
-            if (row.is_object()) values = row;
-        }
-        if (!sql_apply(br, {
-                {"op", "preset_save"}, {"bot_id", id}, {"name", name},
-                {"values", values}, {"locked", false},
-            })) {
+        if (values.empty()) values = ctrl_saved(br, id);
+        std::string err;
+        if (!matrix_sql_preset_save(br.conf, id, name, values, false, err)) {
             return {
                 {"ok", false}, {"closes", false},
-                {"error", "save failed — STD is locked, pick another name"},
+                {"error", err.empty() ? "save failed — STD is locked, pick another name" : err},
             };
         }
         return {
@@ -2658,17 +2659,10 @@ static json api_presets_post(Brain& br, const json& data) {
         };
     }
     if (op == "apply") {
-        json all = read_json(join(br.conf, "controller_presets.json"));
         json vals = json::object();
-        if (all.is_object() && all.contains("presets") && all["presets"].is_object()
-            && all["presets"].contains(id) && all["presets"][id].is_array()) {
-            for (auto& p : all["presets"][id]) {
-                if (p.is_object() && jstr(p, "name") == name) {
-                    if (p.contains("values") && p["values"].is_object()) vals = p["values"];
-                    break;
-                }
-            }
-        }
+        bool found = false;
+        if (!matrix_sql_preset_get(br.conf, id, name, vals, found) || !found)
+            vals = json::object();
         if (vals.empty())
             return {{"ok", false}, {"error", "unknown preset"}, {"closes", false}};
         json body = {{"id", id}, {"values", vals}};
@@ -2703,11 +2697,12 @@ static json api_live_knobs_get(const Brain& br, const std::string& query) {
             row = g_live_knobs[id];
     }
     if (!row.is_object() || row.empty()) {
-        row = read_json(join(br.conf, id + "_ctrl.json"));
-        if (!row.is_object()) row = json::object();
-        auto slp = read_json(join(br.conf, "bot_sl.json"));
-        if (slp.is_object() && slp.contains(id) && slp[id].is_object())
-            row["sl_roe_pct"] = jnum(slp[id], "sl_roe_pct", jnum(row, "sl_roe_pct", 20));
+        row = ctrl_saved(br, id);
+        if (!row.contains("sl_roe_pct")) {
+            auto slp = read_json(join(br.conf, "bot_sl.json"));
+            if (slp.is_object() && slp.contains(id) && slp[id].is_object())
+                row["sl_roe_pct"] = jnum(slp[id], "sl_roe_pct", 20);
+        }
         std::lock_guard<std::mutex> lk(g_live_mu);
         g_live_knobs[id] = row;
     }

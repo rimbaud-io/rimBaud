@@ -270,3 +270,177 @@ bool matrix_sql_snapshot(const std::string& conf, json& status, json& bias) {
     sqlite3_finalize(st);
     return true;
 }
+
+bool matrix_sql_kv_map(const std::string& conf, const std::string& bot, json& out) {
+    out = json::object();
+    if (bot.empty()) return false;
+    Db db(db_path(conf));
+    if (!db) return false;
+    sqlite3_stmt* st = nullptr;
+    const char* q = "SELECT key, value_json FROM kv WHERE bot_id=?";
+    if (sqlite3_prepare_v2(db.db, q, -1, &st, nullptr) != SQLITE_OK) return false;
+    if (!bind_text(st, 1, bot)) {
+        sqlite3_finalize(st);
+        return false;
+    }
+    while (sqlite3_step(st) == SQLITE_ROW) {
+        const char* key = reinterpret_cast<const char*>(sqlite3_column_text(st, 0));
+        const char* body = reinterpret_cast<const char*>(sqlite3_column_text(st, 1));
+        if (!key || !body) continue;
+        std::string k = key;
+        if (k == "updated" || k == "source") continue;
+        try {
+            out[k] = json::parse(body);
+        } catch (...) {
+        }
+    }
+    sqlite3_finalize(st);
+    return true;
+}
+
+static std::string squeeze_name(std::string s) {
+    std::string o;
+    bool gap = false;
+    for (char c : s) {
+        if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+            if (!o.empty()) gap = true;
+            continue;
+        }
+        if (gap) {
+            o.push_back(' ');
+            gap = false;
+        }
+        o.push_back(c);
+    }
+    if (o.size() > 32) o.resize(32);
+    return o;
+}
+
+bool matrix_sql_preset_list(const std::string& conf, const std::string& bot, json& list) {
+    list = json::array();
+    if (bot.empty()) return false;
+    Db db(db_path(conf));
+    if (!db) return false;
+    sqlite3_stmt* st = nullptr;
+    const char* q =
+        "SELECT name, values_json, locked, updated_at FROM controller_preset "
+        "WHERE bot_id=? ORDER BY locked DESC, name COLLATE NOCASE";
+    if (sqlite3_prepare_v2(db.db, q, -1, &st, nullptr) != SQLITE_OK) return false;
+    if (!bind_text(st, 1, bot)) {
+        sqlite3_finalize(st);
+        return false;
+    }
+    while (sqlite3_step(st) == SQLITE_ROW) {
+        const char* name = reinterpret_cast<const char*>(sqlite3_column_text(st, 0));
+        const char* body = reinterpret_cast<const char*>(sqlite3_column_text(st, 1));
+        int locked = sqlite3_column_int(st, 2);
+        const char* updated = reinterpret_cast<const char*>(sqlite3_column_text(st, 3));
+        json values = json::object();
+        if (body) {
+            try {
+                json parsed = json::parse(body);
+                if (parsed.is_object()) values = parsed;
+            } catch (...) {
+            }
+        }
+        list.push_back({
+            {"name", name ? name : ""},
+            {"locked", locked != 0},
+            {"updated", updated ? updated : ""},
+            {"values", values},
+        });
+    }
+    sqlite3_finalize(st);
+    return true;
+}
+
+bool matrix_sql_preset_get(const std::string& conf, const std::string& bot, const std::string& name,
+                           json& values, bool& found) {
+    values = json::object();
+    found = false;
+    std::string want = squeeze_name(name);
+    if (bot.empty() || want.empty()) return false;
+    Db db(db_path(conf));
+    if (!db) return false;
+    sqlite3_stmt* st = nullptr;
+    const char* q = "SELECT values_json FROM controller_preset WHERE bot_id=? AND name=?";
+    if (sqlite3_prepare_v2(db.db, q, -1, &st, nullptr) != SQLITE_OK) return false;
+    if (!bind_text(st, 1, bot) || !bind_text(st, 2, want)) {
+        sqlite3_finalize(st);
+        return false;
+    }
+    if (sqlite3_step(st) == SQLITE_ROW) {
+        const char* body = reinterpret_cast<const char*>(sqlite3_column_text(st, 0));
+        found = true;
+        if (body) {
+            try {
+                json parsed = json::parse(body);
+                if (parsed.is_object()) values = parsed;
+            } catch (...) {
+            }
+        }
+    }
+    sqlite3_finalize(st);
+    return true;
+}
+
+bool matrix_sql_preset_save(const std::string& conf, const std::string& bot, const std::string& name,
+                            const json& values, bool locked, std::string& err) {
+    err.clear();
+    std::string id = bot;
+    std::string label = squeeze_name(name);
+    if (id.empty() || label.empty()) {
+        err = "bot_id and name required";
+        return false;
+    }
+    std::string low = lower_copy(label);
+    if (low == "std" || low == "standard") {
+        if (!locked) {
+            err = "STD is locked — pick another name";
+            return false;
+        }
+        label = "STD";
+        locked = true;
+    }
+    Db db(db_path(conf));
+    if (!db) {
+        err = "sqlite did not open";
+        return false;
+    }
+    sqlite3_stmt* st = nullptr;
+    const char* look = "SELECT locked FROM controller_preset WHERE bot_id=? AND name=?";
+    if (sqlite3_prepare_v2(db.db, look, -1, &st, nullptr) != SQLITE_OK) {
+        err = "preset read failed";
+        return false;
+    }
+    if (!bind_text(st, 1, id) || !bind_text(st, 2, label)) {
+        sqlite3_finalize(st);
+        err = "preset read failed";
+        return false;
+    }
+    if (sqlite3_step(st) == SQLITE_ROW && sqlite3_column_int(st, 0) != 0 && !locked) {
+        sqlite3_finalize(st);
+        err = "cannot overwrite locked preset " + label;
+        return false;
+    }
+    sqlite3_finalize(st);
+    st = nullptr;
+    const char* sql =
+        "INSERT INTO controller_preset(bot_id, name, values_json, locked, updated_at) "
+        "VALUES(?, ?, ?, ?, ?) "
+        "ON CONFLICT(bot_id, name) DO UPDATE SET "
+        "values_json=excluded.values_json, locked=excluded.locked, updated_at=excluded.updated_at";
+    if (sqlite3_prepare_v2(db.db, sql, -1, &st, nullptr) != SQLITE_OK) {
+        err = "preset save failed";
+        return false;
+    }
+    json body = values.is_object() ? values : json::object();
+    std::string dumped = body.dump();
+    std::string ts = utc_now();
+    bool ok = bind_text(st, 1, id) && bind_text(st, 2, label) && bind_text(st, 3, dumped)
+        && sqlite3_bind_int(st, 4, locked ? 1 : 0) == SQLITE_OK
+        && bind_text(st, 5, ts) && step_done(st);
+    sqlite3_finalize(st);
+    if (!ok) err = "preset save failed";
+    return ok;
+}

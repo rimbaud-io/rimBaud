@@ -36,9 +36,11 @@ void sqlite3_free(void*);
 int sqlite3_busy_timeout(sqlite3*, int ms);
 int sqlite3_prepare_v2(sqlite3*, const char* sql, int nByte, sqlite3_stmt** ppStmt, const char** pzTail);
 int sqlite3_bind_text(sqlite3_stmt*, int, const char*, int, sqlite3_destructor_type);
+int sqlite3_bind_int(sqlite3_stmt*, int, int);
 int sqlite3_step(sqlite3_stmt*);
 int sqlite3_finalize(sqlite3_stmt*);
 const unsigned char* sqlite3_column_text(sqlite3_stmt*, int iCol);
+int sqlite3_column_int(sqlite3_stmt*, int iCol);
 
 #ifdef __cplusplus
 }
