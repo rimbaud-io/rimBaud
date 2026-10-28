@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Live controller knobs: SQLite first, conf/{bot_id}_ctrl.json fallback."""
+"""Controller knobs are saved in SQLite. The json file is only a legacy read."""
 from __future__ import annotations
 
 import json
