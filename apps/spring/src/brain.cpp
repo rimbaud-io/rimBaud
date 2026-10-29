@@ -496,6 +496,21 @@ static void patch_dman_v3_yml(const Brain& br, const json& row) {
         + fmt_frac(num_of("dca_spread_2", 0.018)) + ","
         + fmt_frac(num_of("dca_spread_3", 0.15)) + ","
         + fmt_frac(num_of("dca_spread_4", 0.25)) + "\"";
+    if (row.contains("dca_amount_1") && row.contains("dca_amount_2")
+        && row.contains("dca_amount_3") && row.contains("dca_amount_4")) {
+        set["dca_amounts_pct"] = "\"" + fmt_frac(num_of("dca_amount_1", 0.25)) + ","
+            + fmt_frac(num_of("dca_amount_2", 0.25)) + ","
+            + fmt_frac(num_of("dca_amount_3", 0.25)) + ","
+            + fmt_frac(num_of("dca_amount_4", 0.25)) + "\"";
+    }
+    if (row.contains("interval") && row["interval"].is_string())
+        set["interval"] = row["interval"].get<std::string>();
+    if (row.contains("time_limit") && row["time_limit"].is_number())
+        set["time_limit"] = std::to_string((int)std::lround(num_of("time_limit", 2700)));
+    if (row.contains("cooldown_time") && row["cooldown_time"].is_number())
+        set["cooldown_time"] = std::to_string((int)std::lround(num_of("cooldown_time", 15)));
+    if (row.contains("max_executors_per_side") && row["max_executors_per_side"].is_number())
+        set["max_executors_per_side"] = std::to_string((int)std::lround(num_of("max_executors_per_side", 2)));
     auto dyn = flag_of("dynamic_order_spread");
     if (!dyn.empty()) set["dynamic_order_spread"] = dyn;
     auto tgt = flag_of("dynamic_target");
@@ -2459,6 +2474,8 @@ static json api_ctrl_post(const Brain& br, const json& data) {
     bool size_set = false;
     double size_pct = 0;
     double size_quote = 0;
+    bool mode_set = false;
+    std::string mode_name;
     for (auto it = values.begin(); it != values.end(); ++it) {
         std::string key = it.key();
         if (key.empty() || key == "updated" || key == "source") continue;
@@ -2496,6 +2513,38 @@ static json api_ctrl_post(const Brain& br, const json& data) {
             size_pct = pct;
             size_quote = std::round(base * pct * 100.0) / 100.0;
             val = pct;
+        }
+        if (id == "hummingbot-v2-dman-v3" && key == "dman_mode") {
+            std::string s = val.is_string() ? val.get<std::string>() : "";
+            for (char& c : s) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+            if (s != "STANDARD" && s != "AGGRESSIVE" && s != "GOD")
+                return {{"ok", false},
+                        {"error", "DMan V3 mode is STANDARD, AGGRESSIVE, or GOD"},
+                        {"closes", false}, {"positions_untouched", true}};
+            mode_set = true;
+            mode_name = s;
+            val = s;
+        }
+        if (id == "hummingbot-v2-dman-v3" && key == "interval") {
+            std::string s = val.is_string() ? val.get<std::string>() : "";
+            if (s != "1m" && s != "3m" && s != "5m" && s != "15m" && s != "1h")
+                return {{"ok", false},
+                        {"error", "DMan V3 interval is 1m, 3m, 5m, 15m, or 1h"},
+                        {"closes", false}, {"positions_untouched", true}};
+            val = s;
+        }
+        if (id == "hummingbot-v2-dman-v3" && (key == "time_limit" || key == "cooldown_time"
+                                              || key == "max_executors_per_side")) {
+            double n = val.is_number() ? val.get<double>() : -1;
+            bool ok = false;
+            if (key == "time_limit") ok = n >= 60 && n <= 86400;
+            else if (key == "cooldown_time") ok = n >= 1 && n <= 3600;
+            else ok = n >= 1 && n <= 5;
+            if (!ok)
+                return {{"ok", false},
+                        {"error", "DMan V3 " + key + " is out of range"},
+                        {"closes", false}, {"positions_untouched", true}};
+            val = (int)std::lround(n);
         }
         if (id == "hummingbot-v2-dman-v3" && key == "trading_pair") {
             std::string coin, pair;
@@ -2557,8 +2606,11 @@ static json api_ctrl_post(const Brain& br, const json& data) {
             std::string s = k.get<std::string>();
             if (s == "stop_loss" || s == "take_profit" || s == "trail_activation" || s == "trail_delta"
                 || s == "dca_spread_1" || s == "dca_spread_2" || s == "dca_spread_3" || s == "dca_spread_4"
+                || s == "dca_amount_1" || s == "dca_amount_2" || s == "dca_amount_3" || s == "dca_amount_4"
                 || s == "bb_length" || s == "bb_std" || s == "bb_long_threshold" || s == "bb_short_threshold"
-                || s == "dynamic_order_spread" || s == "dynamic_target")
+                || s == "dynamic_order_spread" || s == "dynamic_target"
+                || s == "interval" || s == "time_limit" || s == "cooldown_time"
+                || s == "max_executors_per_side" || s == "dman_mode")
                 touch = true;
         }
         if (touch) patch_dman_v3_yml(br, row);
@@ -2595,6 +2647,9 @@ static json api_ctrl_post(const Brain& br, const json& data) {
                  "DMan V3 size %.0f%% of leftover, $%.2f quote. No order. The running process stays quiet until that container is restarted.",
                  size_pct * 100.0, size_quote);
         message = buf;
+    } else if (mode_set) {
+        message = "DMan V3 " + mode_name
+            + ". Coin and quote stay. No order. The running process stays quiet until that container is restarted.";
     } else if (id == "hummingbot-v2-dman-v3" && row.contains("trading_pair") && row["trading_pair"].is_string()) {
         for (auto& k : changed) {
             if (!k.is_string() || k.get<std::string>() != "trading_pair") continue;
