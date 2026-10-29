@@ -423,6 +423,8 @@ public:
     std::string post_bias(const std::string& id, const std::string& coin, const std::string& bias);
     std::string post_close_coin(const std::string& id, const std::string& coin);
     std::string post_open100(const std::string& id, const std::string& coin, const std::string& side = {});
+    // DMan V3 hunter page. Queues one maker ladder. Does not use the 100% path.
+    std::string post_dman_enter(const std::string& id, const std::string& side, const std::string& coin);
     std::string post_ctrl(const std::string& id, const std::string& key, const nlohmann::json& value);
     std::string post_ctrl_map(const std::string& id, const nlohmann::json& values);
     std::string post_copy_mute(int trader, bool mute);

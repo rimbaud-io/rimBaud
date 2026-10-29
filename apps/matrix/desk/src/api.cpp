@@ -906,6 +906,16 @@ std::string FlaskApi::post_close_coin(const std::string& id, const std::string& 
     return str(j, "message", "close queued for " + coin);
 }
 
+std::string FlaskApi::post_dman_enter(const std::string& id, const std::string& side, const std::string& coin) {
+    if (!can_post()) return writes_off_msg();
+    json body = {{"id", id}, {"side", side}, {"coin", coin}};
+    auto r = http_request(host, port, "POST", "/api/home/enter", body.dump());
+    json j = parse_or(r.body);
+    if (flag(j, "closes")) return "refusing close — positions untouched";
+    if (r.status != 200 || flag(j, "ok") == false) return str(j, "error", "enter failed");
+    return str(j, "message", "enter queued");
+}
+
 std::string FlaskApi::post_open100(const std::string& id, const std::string& coin, const std::string& side) {
     if (!can_post()) return writes_off_msg();
     json body = {{"id", id}, {"coin", coin}, {"pct", 1}};

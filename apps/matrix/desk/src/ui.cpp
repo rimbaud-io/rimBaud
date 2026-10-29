@@ -179,7 +179,7 @@ enum Page { PgHome, PgWire, PgCondor, PgHunters, PgFunds, PgStrategy, PgSystem, 
 const char* PAGE_NAME[] = {"HOME", "WIRE", "CONDOR", "HUNTERS", "FUNDS", "STRATEGY", "SYSTEM"};
 
 struct Hit {
-    enum Kind { Idle, Nav, Hunter, NotWired, WireNode, WireEdge, WirePort, ToolCat, ToolItem, WireBoard, WireAct, Ctx, Backend, Chart, Sl, Lev, Restart, HunterGate, DeskBias, CoinBias, CoinClose, CoinOpen100, DmanCoin, DmanSize, DmanMode, CtrlBool, CtrlKnob, CtrlSel, CtrlStd, CopyMute, CopySlots, CopyAudit, AuditClose, AuditRun, Quit, PackSave, PackRestore, WireSnap, AnnotColor, AnnotSize, InspectBack, CompileClose, CompileWork, CompileGo, PresetDrop, PresetPick, PresetSave, ApiKey, ReplYes, ReplNo, FundsDel, FundsAdd, FundsField, FundsRename, Seq } kind = Idle;
+    enum Kind { Idle, Nav, Hunter, NotWired, WireNode, WireEdge, WirePort, ToolCat, ToolItem, WireBoard, WireAct, Ctx, Backend, Chart, Sl, Lev, Restart, HunterGate, DeskBias, CoinBias, CoinClose, CoinOpen100, DmanCoin, DmanSize, DmanMode, DmanEnter, CtrlBool, CtrlKnob, CtrlSel, CtrlStd, CopyMute, CopySlots, CopyAudit, AuditClose, AuditRun, Quit, PackSave, PackRestore, WireSnap, AnnotColor, AnnotSize, InspectBack, CompileClose, CompileWork, CompileGo, PresetDrop, PresetPick, PresetSave, ApiKey, ReplYes, ReplNo, FundsDel, FundsAdd, FundsField, FundsRename, Seq } kind = Idle;
     int i = -1;
     Rect r{};
     std::string key;
@@ -3167,6 +3167,9 @@ std::string action_tip(const DeskUi& ui, const Hit& h) {
             if (h.key.empty() || h.key == "open")
                 return "DMan V3 mode. Standard, aggressive, or god. No order from this click.";
             return "DMan V3 " + h.key + ". Writes that setup. Coin and quote stay. No order from this click.";
+        case Hit::DmanEnter:
+            return "DMan V3 ENTER " + h.key
+                + ". One maker ladder on the wired subaccount when the connector is ready. Not the 100% queue.";
         case Hit::CoinOpen100: {
             std::string n = (h.i >= 0 && h.i < (int)ui.snap.bots.size()) ? ui.snap.bots[h.i].name : "hunter";
             std::string side;
@@ -5872,6 +5875,24 @@ int run_desk(FlaskApi& api) {
                     }
                 }
                 text(dpy, buf, gc, C.muted, x, yy, fit_px(dman_v3_mode_line(mode), inner));
+                yy += 18;
+                text(dpy, buf, gc, C.gold, x, yy, "ENTER");
+                yy += 18;
+                const char* enters[] = {"ENTER LONG", "ENTER SHORT"};
+                const char* ekeys[] = {"LONG", "SHORT"};
+                unsigned long ecol[] = {C.green, C.rose};
+                int ew = 120;
+                for (int ei = 0; ei < 2; ++ei) {
+                    Rect br{bx0 + ei * (ew + btn_gap), yy, ew, 20};
+                    if (br.x + br.w > right - 8) break;
+                    stroke(dpy, buf, gc, ecol[ei], br);
+                    int tx = br.x + (br.w - static_cast<int>(std::strlen(enters[ei])) * CHAR_W) / 2;
+                    text(dpy, buf, gc, ecol[ei], tx, br.y + 14, enters[ei]);
+                    ui.hits.push_back({Hit::DmanEnter, ui.sel, br, ekeys[ei]});
+                }
+                yy += 24;
+                text(dpy, buf, gc, C.muted, x, yy,
+                     fit_px("one maker ladder on the wired subaccount. Not the 100% queue.", inner));
                 yy += 18;
             } else {
             text(dpy, buf, gc, C.gold, x, yy, "BIAS");
@@ -8592,6 +8613,22 @@ int run_desk(FlaskApi& api) {
                                 ui.say(msg);
                                 ui.say(std::string("DMan V3 ") + h.key + " — " + dman_v3_mode_line(h.key)
                                        + " No order.");
+                                ui.refresh(false);
+                            }
+                            redraw();
+                        } else if (h.kind == Hit::DmanEnter) {
+                            if (h.i >= 0 && h.i < (int)ui.snap.bots.size()) {
+                                auto& b = ui.snap.bots[h.i];
+                                std::string pair = "TAO-USD";
+                                if (b.controller.contains("trading_pair")
+                                    && b.controller["trading_pair"].is_string())
+                                    pair = b.controller["trading_pair"].get<std::string>();
+                                std::string coin = pair;
+                                auto dash = coin.find('-');
+                                if (dash != std::string::npos) coin = coin.substr(0, dash);
+                                for (char& c : coin)
+                                    c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+                                ui.say(ui.api->post_dman_enter(b.id, h.key, coin));
                                 ui.refresh(false);
                             }
                             redraw();
