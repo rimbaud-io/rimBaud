@@ -19,4 +19,4 @@ limitations under the License.
 Spring is the hunter brain on port 5004. It writes hunter files.
 
 The matrix, Meta, and Archy talk to Spring. A bias change does not close a clip. Spring does not sign a Hyperliquid order.
-<!-- archy-folder 0.2g31 -->
+<!-- archy-folder 0.2g32 -->
