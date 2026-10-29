@@ -3010,6 +3010,63 @@ static json api_home_close_post(const Brain& br, const json& data) {
     };
 }
 
+// Hunter-page ENTER for official DMan V3. One maker ladder, kind "enter".
+// The 100% leftover queue stays a refusal for this bot.
+static json api_home_enter_post(const Brain& br, const json& data) {
+    std::string id = jstr(data, "id", jstr(data, "bot_id", jstr(data, "bot")));
+    if (id != "hummingbot-v2-dman-v3")
+        return {{"ok", false}, {"queued", false}, {"closes", false}, {"positions_untouched", true},
+                {"error", "ENTER is only on the DMan V3 hunter page."}};
+    auto norm = [](std::string s) {
+        for (char& c : s) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+        return s;
+    };
+    std::string side = norm(jstr(data, "side"));
+    if (side != "LONG" && side != "SHORT")
+        return {{"ok", false}, {"queued", false}, {"closes", false}, {"positions_untouched", true},
+                {"error", "DMan V3 enter is LONG or SHORT."}};
+    std::string coin, pair;
+    if (!dman_v3_coin_pair(data.contains("coin") ? data["coin"] : json(), coin, pair))
+        return {{"ok", false}, {"queued", false}, {"closes", false}, {"positions_untouched", true},
+                {"error", "DMan V3 enter coin is BTC, ETH, LTC, or TAO."}};
+    json row = ctrl_saved(br, id);
+    std::string live_coin, live_pair;
+    json pair_val = row.contains("trading_pair") ? row["trading_pair"] : json();
+    if (!dman_v3_coin_pair(pair_val, live_coin, live_pair)) {
+        std::ifstream in(join(br.conf, "controllers/conf_v2_dman-v3.yml"));
+        std::stringstream buf;
+        buf << in.rdbuf();
+        pair_val = yml_scalar(buf.str(), "trading_pair");
+        if (!dman_v3_coin_pair(pair_val, live_coin, live_pair))
+            return {{"ok", false}, {"queued", false}, {"closes", false}, {"positions_untouched", true},
+                    {"error", "DMan V3 market was not read. Nothing queued."}};
+    }
+    if (coin != live_coin)
+        return {{"ok", false}, {"queued", false}, {"closes", false}, {"positions_untouched", true},
+                {"error", "DMan V3 market is " + live_pair + ". This enter was not queued."}};
+    double quote = 0;
+    if (row.contains("total_amount_quote") && row["total_amount_quote"].is_number())
+        quote = row["total_amount_quote"].get<double>();
+    if (quote < 10.0) {
+        std::ifstream in(join(br.conf, "controllers/conf_v2_dman-v3.yml"));
+        std::stringstream buf;
+        buf << in.rdbuf();
+        quote = yml_double(buf.str(), "total_amount_quote", quote);
+    }
+    if (quote < 10.0)
+        return {{"ok", false}, {"queued", false}, {"closes", false}, {"positions_untouched", true},
+                {"error", "DMan V3 quote is under $10. Pick a size. Nothing queued."}};
+    json payload = {{"side", side}, {"coin", coin}, {"pair", live_pair}, {"source", "spring-desk"}};
+    if (!sql_apply(br, {{"op", "command"}, {"bot_id", id}, {"kind", "enter"}, {"payload", payload}}))
+        return {{"ok", false}, {"queued", false}, {"closes", false}, {"positions_untouched", true},
+                {"error", "DMan V3 enter was not saved."}};
+    return {
+        {"ok", true}, {"queued", true}, {"id", id}, {"coin", coin}, {"side", side}, {"closes", false},
+        {"message", "DMan V3 ENTER " + side + " " + coin
+            + " queued. One maker ladder on the wired subaccount when the connector is ready. Waits 30 minutes. The 100% queue was not used."},
+    };
+}
+
 static json api_home_open_post(const Brain& br, const json& data) {
     std::string id = jstr(data, "id", jstr(data, "bot_id", jstr(data, "bot")));
     std::string coin = jstr(data, "coin");
@@ -3087,12 +3144,15 @@ std::string Brain::handle(const std::string& method, const std::string& path,
             out = api_hunter_gate_post(*this, parse_body(body));
             if (!out.value("ok", false)) status = 400;
         } else if (method != "GET") {
-            if (path == "/api/home/close" || path == "/api/home/open") {
+            if (path == "/api/home/close" || path == "/api/home/open" || path == "/api/home/enter") {
                 if (!writes_on()) {
                     status = 403;
                     out = deny_write(method + " " + path);
                 } else if (path == "/api/home/close") {
                     out = api_home_close_post(*this, parse_body(body));
+                } else if (path == "/api/home/enter") {
+                    out = api_home_enter_post(*this, parse_body(body));
+                    if (!out.value("ok", false)) status = 400;
                 } else {
                     out = api_home_open_post(*this, parse_body(body));
                 }
