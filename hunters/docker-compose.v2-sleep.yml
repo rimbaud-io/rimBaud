@@ -14,7 +14,9 @@
 
 # V2 standard controllers — STOPPED until WIRE place. Profile v2-sleep.
 # docker compose -f docker-compose.yml -f docker-compose.v2-sleep.yml --profile v2-sleep create
-# Never started by plain `docker compose up`. Empty connectors = no HL keys.
+# Never started by plain `docker compose up`.
+# Each sleeper mounts its own connectors directory. The wire copies the wired
+# wallet's connector there. Live hunter connector files are not modified.
 x-v2: &v2sleeper
   image: hummingbot/hummingbot:latest
   restart: "no"
@@ -38,9 +40,36 @@ x-v2: &v2sleeper
     - ./certs:/home/hummingbot/certs
     - ./scripts:/home/hummingbot/scripts
     - ./controllers:/home/hummingbot/controllers
+    - ./hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_derivative.py:/home/hummingbot/hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_derivative.py
+    - ./hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_api_order_book_data_source.py:/home/hummingbot/hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_api_order_book_data_source.py
+    - ./hummingbot/data_feed/candles_feed/candles_base.py:/home/hummingbot/hummingbot/data_feed/candles_feed/candles_base.py
+    - ./hummingbot/core/data_type/order_book_tracker.py:/home/hummingbot/hummingbot/core/data_type/order_book_tracker.py
+    - ./hummingbot/core/data_type/order_book_tracker_data_source.py:/home/hummingbot/hummingbot/core/data_type/order_book_tracker_data_source.py
+    - ./hummingbot/core/data_type/user_stream_tracker_data_source.py:/home/hummingbot/hummingbot/core/data_type/user_stream_tracker_data_source.py
+    - ./hummingbot/strategy/strategy_v2_base.py:/home/hummingbot/hummingbot/strategy/strategy_v2_base.py
+    - ./hummingbot/strategy_v2/executors/dca_executor/dca_executor.py:/home/hummingbot/hummingbot/strategy_v2/executors/dca_executor/dca_executor.py
 services:
   hummingbot-v2-bollinger-v1:
     <<: *v2sleeper
+    volumes:
+      - ./conf:/home/hummingbot/conf
+      - ./conf-v2-sleep/hummingbot-v2-bollinger-v1/connectors:/home/hummingbot/conf/connectors
+      - ./conf/strategies:/home/hummingbot/conf/strategies
+      - ./conf/controllers:/home/hummingbot/conf/controllers
+      - ./conf/scripts:/home/hummingbot/conf/scripts
+      - ./logs:/home/hummingbot/logs
+      - ./data:/home/hummingbot/data
+      - ./certs:/home/hummingbot/certs
+      - ./scripts:/home/hummingbot/scripts
+      - ./controllers:/home/hummingbot/controllers
+      - ./hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_derivative.py:/home/hummingbot/hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_derivative.py
+      - ./hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_api_order_book_data_source.py:/home/hummingbot/hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_api_order_book_data_source.py
+      - ./hummingbot/data_feed/candles_feed/candles_base.py:/home/hummingbot/hummingbot/data_feed/candles_feed/candles_base.py
+      - ./hummingbot/core/data_type/order_book_tracker.py:/home/hummingbot/hummingbot/core/data_type/order_book_tracker.py
+      - ./hummingbot/core/data_type/order_book_tracker_data_source.py:/home/hummingbot/hummingbot/core/data_type/order_book_tracker_data_source.py
+      - ./hummingbot/core/data_type/user_stream_tracker_data_source.py:/home/hummingbot/hummingbot/core/data_type/user_stream_tracker_data_source.py
+      - ./hummingbot/strategy/strategy_v2_base.py:/home/hummingbot/hummingbot/strategy/strategy_v2_base.py
+      - ./hummingbot/strategy_v2/executors/dca_executor/dca_executor.py:/home/hummingbot/hummingbot/strategy_v2/executors/dca_executor/dca_executor.py
     container_name: hummingbot-v2-bollinger-v1
     environment:
       - CONFIG_PASSWORD=${CONFIG_PASSWORD:-Dan2Delion}
@@ -48,6 +77,25 @@ services:
 
   hummingbot-v2-bollinger-v2:
     <<: *v2sleeper
+    volumes:
+      - ./conf:/home/hummingbot/conf
+      - ./conf-v2-sleep/hummingbot-v2-bollinger-v2/connectors:/home/hummingbot/conf/connectors
+      - ./conf/strategies:/home/hummingbot/conf/strategies
+      - ./conf/controllers:/home/hummingbot/conf/controllers
+      - ./conf/scripts:/home/hummingbot/conf/scripts
+      - ./logs:/home/hummingbot/logs
+      - ./data:/home/hummingbot/data
+      - ./certs:/home/hummingbot/certs
+      - ./scripts:/home/hummingbot/scripts
+      - ./controllers:/home/hummingbot/controllers
+      - ./hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_derivative.py:/home/hummingbot/hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_derivative.py
+      - ./hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_api_order_book_data_source.py:/home/hummingbot/hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_api_order_book_data_source.py
+      - ./hummingbot/data_feed/candles_feed/candles_base.py:/home/hummingbot/hummingbot/data_feed/candles_feed/candles_base.py
+      - ./hummingbot/core/data_type/order_book_tracker.py:/home/hummingbot/hummingbot/core/data_type/order_book_tracker.py
+      - ./hummingbot/core/data_type/order_book_tracker_data_source.py:/home/hummingbot/hummingbot/core/data_type/order_book_tracker_data_source.py
+      - ./hummingbot/core/data_type/user_stream_tracker_data_source.py:/home/hummingbot/hummingbot/core/data_type/user_stream_tracker_data_source.py
+      - ./hummingbot/strategy/strategy_v2_base.py:/home/hummingbot/hummingbot/strategy/strategy_v2_base.py
+      - ./hummingbot/strategy_v2/executors/dca_executor/dca_executor.py:/home/hummingbot/hummingbot/strategy_v2/executors/dca_executor/dca_executor.py
     container_name: hummingbot-v2-bollinger-v2
     environment:
       - CONFIG_PASSWORD=${CONFIG_PASSWORD:-Dan2Delion}
@@ -55,6 +103,25 @@ services:
 
   hummingbot-v2-bollingrid:
     <<: *v2sleeper
+    volumes:
+      - ./conf:/home/hummingbot/conf
+      - ./conf-v2-sleep/hummingbot-v2-bollingrid/connectors:/home/hummingbot/conf/connectors
+      - ./conf/strategies:/home/hummingbot/conf/strategies
+      - ./conf/controllers:/home/hummingbot/conf/controllers
+      - ./conf/scripts:/home/hummingbot/conf/scripts
+      - ./logs:/home/hummingbot/logs
+      - ./data:/home/hummingbot/data
+      - ./certs:/home/hummingbot/certs
+      - ./scripts:/home/hummingbot/scripts
+      - ./controllers:/home/hummingbot/controllers
+      - ./hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_derivative.py:/home/hummingbot/hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_derivative.py
+      - ./hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_api_order_book_data_source.py:/home/hummingbot/hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_api_order_book_data_source.py
+      - ./hummingbot/data_feed/candles_feed/candles_base.py:/home/hummingbot/hummingbot/data_feed/candles_feed/candles_base.py
+      - ./hummingbot/core/data_type/order_book_tracker.py:/home/hummingbot/hummingbot/core/data_type/order_book_tracker.py
+      - ./hummingbot/core/data_type/order_book_tracker_data_source.py:/home/hummingbot/hummingbot/core/data_type/order_book_tracker_data_source.py
+      - ./hummingbot/core/data_type/user_stream_tracker_data_source.py:/home/hummingbot/hummingbot/core/data_type/user_stream_tracker_data_source.py
+      - ./hummingbot/strategy/strategy_v2_base.py:/home/hummingbot/hummingbot/strategy/strategy_v2_base.py
+      - ./hummingbot/strategy_v2/executors/dca_executor/dca_executor.py:/home/hummingbot/hummingbot/strategy_v2/executors/dca_executor/dca_executor.py
     container_name: hummingbot-v2-bollingrid
     environment:
       - CONFIG_PASSWORD=${CONFIG_PASSWORD:-Dan2Delion}
@@ -62,6 +129,25 @@ services:
 
   hummingbot-v2-macd-bb:
     <<: *v2sleeper
+    volumes:
+      - ./conf:/home/hummingbot/conf
+      - ./conf-v2-sleep/hummingbot-v2-macd-bb/connectors:/home/hummingbot/conf/connectors
+      - ./conf/strategies:/home/hummingbot/conf/strategies
+      - ./conf/controllers:/home/hummingbot/conf/controllers
+      - ./conf/scripts:/home/hummingbot/conf/scripts
+      - ./logs:/home/hummingbot/logs
+      - ./data:/home/hummingbot/data
+      - ./certs:/home/hummingbot/certs
+      - ./scripts:/home/hummingbot/scripts
+      - ./controllers:/home/hummingbot/controllers
+      - ./hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_derivative.py:/home/hummingbot/hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_derivative.py
+      - ./hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_api_order_book_data_source.py:/home/hummingbot/hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_api_order_book_data_source.py
+      - ./hummingbot/data_feed/candles_feed/candles_base.py:/home/hummingbot/hummingbot/data_feed/candles_feed/candles_base.py
+      - ./hummingbot/core/data_type/order_book_tracker.py:/home/hummingbot/hummingbot/core/data_type/order_book_tracker.py
+      - ./hummingbot/core/data_type/order_book_tracker_data_source.py:/home/hummingbot/hummingbot/core/data_type/order_book_tracker_data_source.py
+      - ./hummingbot/core/data_type/user_stream_tracker_data_source.py:/home/hummingbot/hummingbot/core/data_type/user_stream_tracker_data_source.py
+      - ./hummingbot/strategy/strategy_v2_base.py:/home/hummingbot/hummingbot/strategy/strategy_v2_base.py
+      - ./hummingbot/strategy_v2/executors/dca_executor/dca_executor.py:/home/hummingbot/hummingbot/strategy_v2/executors/dca_executor/dca_executor.py
     container_name: hummingbot-v2-macd-bb
     environment:
       - CONFIG_PASSWORD=${CONFIG_PASSWORD:-Dan2Delion}
@@ -69,6 +155,25 @@ services:
 
   hummingbot-v2-dman-v3:
     <<: *v2sleeper
+    volumes:
+      - ./conf:/home/hummingbot/conf
+      - ./conf-v2-sleep/hummingbot-v2-dman-v3/connectors:/home/hummingbot/conf/connectors
+      - ./conf/strategies:/home/hummingbot/conf/strategies
+      - ./conf/controllers:/home/hummingbot/conf/controllers
+      - ./conf/scripts:/home/hummingbot/conf/scripts
+      - ./logs:/home/hummingbot/logs
+      - ./data:/home/hummingbot/data
+      - ./certs:/home/hummingbot/certs
+      - ./scripts:/home/hummingbot/scripts
+      - ./controllers:/home/hummingbot/controllers
+      - ./hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_derivative.py:/home/hummingbot/hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_derivative.py
+      - ./hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_api_order_book_data_source.py:/home/hummingbot/hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_api_order_book_data_source.py
+      - ./hummingbot/data_feed/candles_feed/candles_base.py:/home/hummingbot/hummingbot/data_feed/candles_feed/candles_base.py
+      - ./hummingbot/core/data_type/order_book_tracker.py:/home/hummingbot/hummingbot/core/data_type/order_book_tracker.py
+      - ./hummingbot/core/data_type/order_book_tracker_data_source.py:/home/hummingbot/hummingbot/core/data_type/order_book_tracker_data_source.py
+      - ./hummingbot/core/data_type/user_stream_tracker_data_source.py:/home/hummingbot/hummingbot/core/data_type/user_stream_tracker_data_source.py
+      - ./hummingbot/strategy/strategy_v2_base.py:/home/hummingbot/hummingbot/strategy/strategy_v2_base.py
+      - ./hummingbot/strategy_v2/executors/dca_executor/dca_executor.py:/home/hummingbot/hummingbot/strategy_v2/executors/dca_executor/dca_executor.py
     container_name: hummingbot-v2-dman-v3
     environment:
       - CONFIG_PASSWORD=${CONFIG_PASSWORD:-Dan2Delion}
@@ -76,6 +181,25 @@ services:
 
   hummingbot-v2-supertrend:
     <<: *v2sleeper
+    volumes:
+      - ./conf:/home/hummingbot/conf
+      - ./conf-v2-sleep/hummingbot-v2-supertrend/connectors:/home/hummingbot/conf/connectors
+      - ./conf/strategies:/home/hummingbot/conf/strategies
+      - ./conf/controllers:/home/hummingbot/conf/controllers
+      - ./conf/scripts:/home/hummingbot/conf/scripts
+      - ./logs:/home/hummingbot/logs
+      - ./data:/home/hummingbot/data
+      - ./certs:/home/hummingbot/certs
+      - ./scripts:/home/hummingbot/scripts
+      - ./controllers:/home/hummingbot/controllers
+      - ./hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_derivative.py:/home/hummingbot/hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_derivative.py
+      - ./hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_api_order_book_data_source.py:/home/hummingbot/hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_api_order_book_data_source.py
+      - ./hummingbot/data_feed/candles_feed/candles_base.py:/home/hummingbot/hummingbot/data_feed/candles_feed/candles_base.py
+      - ./hummingbot/core/data_type/order_book_tracker.py:/home/hummingbot/hummingbot/core/data_type/order_book_tracker.py
+      - ./hummingbot/core/data_type/order_book_tracker_data_source.py:/home/hummingbot/hummingbot/core/data_type/order_book_tracker_data_source.py
+      - ./hummingbot/core/data_type/user_stream_tracker_data_source.py:/home/hummingbot/hummingbot/core/data_type/user_stream_tracker_data_source.py
+      - ./hummingbot/strategy/strategy_v2_base.py:/home/hummingbot/hummingbot/strategy/strategy_v2_base.py
+      - ./hummingbot/strategy_v2/executors/dca_executor/dca_executor.py:/home/hummingbot/hummingbot/strategy_v2/executors/dca_executor/dca_executor.py
     container_name: hummingbot-v2-supertrend
     environment:
       - CONFIG_PASSWORD=${CONFIG_PASSWORD:-Dan2Delion}
@@ -83,6 +207,25 @@ services:
 
   hummingbot-v2-ai-livestream:
     <<: *v2sleeper
+    volumes:
+      - ./conf:/home/hummingbot/conf
+      - ./conf-v2-sleep/hummingbot-v2-ai-livestream/connectors:/home/hummingbot/conf/connectors
+      - ./conf/strategies:/home/hummingbot/conf/strategies
+      - ./conf/controllers:/home/hummingbot/conf/controllers
+      - ./conf/scripts:/home/hummingbot/conf/scripts
+      - ./logs:/home/hummingbot/logs
+      - ./data:/home/hummingbot/data
+      - ./certs:/home/hummingbot/certs
+      - ./scripts:/home/hummingbot/scripts
+      - ./controllers:/home/hummingbot/controllers
+      - ./hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_derivative.py:/home/hummingbot/hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_derivative.py
+      - ./hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_api_order_book_data_source.py:/home/hummingbot/hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_api_order_book_data_source.py
+      - ./hummingbot/data_feed/candles_feed/candles_base.py:/home/hummingbot/hummingbot/data_feed/candles_feed/candles_base.py
+      - ./hummingbot/core/data_type/order_book_tracker.py:/home/hummingbot/hummingbot/core/data_type/order_book_tracker.py
+      - ./hummingbot/core/data_type/order_book_tracker_data_source.py:/home/hummingbot/hummingbot/core/data_type/order_book_tracker_data_source.py
+      - ./hummingbot/core/data_type/user_stream_tracker_data_source.py:/home/hummingbot/hummingbot/core/data_type/user_stream_tracker_data_source.py
+      - ./hummingbot/strategy/strategy_v2_base.py:/home/hummingbot/hummingbot/strategy/strategy_v2_base.py
+      - ./hummingbot/strategy_v2/executors/dca_executor/dca_executor.py:/home/hummingbot/hummingbot/strategy_v2/executors/dca_executor/dca_executor.py
     container_name: hummingbot-v2-ai-livestream
     environment:
       - CONFIG_PASSWORD=${CONFIG_PASSWORD:-Dan2Delion}
@@ -90,6 +233,25 @@ services:
 
   hummingbot-v2-pmm-dynamic:
     <<: *v2sleeper
+    volumes:
+      - ./conf:/home/hummingbot/conf
+      - ./conf-v2-sleep/hummingbot-v2-pmm-dynamic/connectors:/home/hummingbot/conf/connectors
+      - ./conf/strategies:/home/hummingbot/conf/strategies
+      - ./conf/controllers:/home/hummingbot/conf/controllers
+      - ./conf/scripts:/home/hummingbot/conf/scripts
+      - ./logs:/home/hummingbot/logs
+      - ./data:/home/hummingbot/data
+      - ./certs:/home/hummingbot/certs
+      - ./scripts:/home/hummingbot/scripts
+      - ./controllers:/home/hummingbot/controllers
+      - ./hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_derivative.py:/home/hummingbot/hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_derivative.py
+      - ./hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_api_order_book_data_source.py:/home/hummingbot/hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_api_order_book_data_source.py
+      - ./hummingbot/data_feed/candles_feed/candles_base.py:/home/hummingbot/hummingbot/data_feed/candles_feed/candles_base.py
+      - ./hummingbot/core/data_type/order_book_tracker.py:/home/hummingbot/hummingbot/core/data_type/order_book_tracker.py
+      - ./hummingbot/core/data_type/order_book_tracker_data_source.py:/home/hummingbot/hummingbot/core/data_type/order_book_tracker_data_source.py
+      - ./hummingbot/core/data_type/user_stream_tracker_data_source.py:/home/hummingbot/hummingbot/core/data_type/user_stream_tracker_data_source.py
+      - ./hummingbot/strategy/strategy_v2_base.py:/home/hummingbot/hummingbot/strategy/strategy_v2_base.py
+      - ./hummingbot/strategy_v2/executors/dca_executor/dca_executor.py:/home/hummingbot/hummingbot/strategy_v2/executors/dca_executor/dca_executor.py
     container_name: hummingbot-v2-pmm-dynamic
     environment:
       - CONFIG_PASSWORD=${CONFIG_PASSWORD:-Dan2Delion}
@@ -97,6 +259,25 @@ services:
 
   hummingbot-v2-grid-strike:
     <<: *v2sleeper
+    volumes:
+      - ./conf:/home/hummingbot/conf
+      - ./conf-v2-sleep/hummingbot-v2-grid-strike/connectors:/home/hummingbot/conf/connectors
+      - ./conf/strategies:/home/hummingbot/conf/strategies
+      - ./conf/controllers:/home/hummingbot/conf/controllers
+      - ./conf/scripts:/home/hummingbot/conf/scripts
+      - ./logs:/home/hummingbot/logs
+      - ./data:/home/hummingbot/data
+      - ./certs:/home/hummingbot/certs
+      - ./scripts:/home/hummingbot/scripts
+      - ./controllers:/home/hummingbot/controllers
+      - ./hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_derivative.py:/home/hummingbot/hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_derivative.py
+      - ./hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_api_order_book_data_source.py:/home/hummingbot/hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_api_order_book_data_source.py
+      - ./hummingbot/data_feed/candles_feed/candles_base.py:/home/hummingbot/hummingbot/data_feed/candles_feed/candles_base.py
+      - ./hummingbot/core/data_type/order_book_tracker.py:/home/hummingbot/hummingbot/core/data_type/order_book_tracker.py
+      - ./hummingbot/core/data_type/order_book_tracker_data_source.py:/home/hummingbot/hummingbot/core/data_type/order_book_tracker_data_source.py
+      - ./hummingbot/core/data_type/user_stream_tracker_data_source.py:/home/hummingbot/hummingbot/core/data_type/user_stream_tracker_data_source.py
+      - ./hummingbot/strategy/strategy_v2_base.py:/home/hummingbot/hummingbot/strategy/strategy_v2_base.py
+      - ./hummingbot/strategy_v2/executors/dca_executor/dca_executor.py:/home/hummingbot/hummingbot/strategy_v2/executors/dca_executor/dca_executor.py
     container_name: hummingbot-v2-grid-strike
     environment:
       - CONFIG_PASSWORD=${CONFIG_PASSWORD:-Dan2Delion}
@@ -104,6 +285,25 @@ services:
 
   hummingbot-v2-multi-grid:
     <<: *v2sleeper
+    volumes:
+      - ./conf:/home/hummingbot/conf
+      - ./conf-v2-sleep/hummingbot-v2-multi-grid/connectors:/home/hummingbot/conf/connectors
+      - ./conf/strategies:/home/hummingbot/conf/strategies
+      - ./conf/controllers:/home/hummingbot/conf/controllers
+      - ./conf/scripts:/home/hummingbot/conf/scripts
+      - ./logs:/home/hummingbot/logs
+      - ./data:/home/hummingbot/data
+      - ./certs:/home/hummingbot/certs
+      - ./scripts:/home/hummingbot/scripts
+      - ./controllers:/home/hummingbot/controllers
+      - ./hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_derivative.py:/home/hummingbot/hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_derivative.py
+      - ./hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_api_order_book_data_source.py:/home/hummingbot/hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_api_order_book_data_source.py
+      - ./hummingbot/data_feed/candles_feed/candles_base.py:/home/hummingbot/hummingbot/data_feed/candles_feed/candles_base.py
+      - ./hummingbot/core/data_type/order_book_tracker.py:/home/hummingbot/hummingbot/core/data_type/order_book_tracker.py
+      - ./hummingbot/core/data_type/order_book_tracker_data_source.py:/home/hummingbot/hummingbot/core/data_type/order_book_tracker_data_source.py
+      - ./hummingbot/core/data_type/user_stream_tracker_data_source.py:/home/hummingbot/hummingbot/core/data_type/user_stream_tracker_data_source.py
+      - ./hummingbot/strategy/strategy_v2_base.py:/home/hummingbot/hummingbot/strategy/strategy_v2_base.py
+      - ./hummingbot/strategy_v2/executors/dca_executor/dca_executor.py:/home/hummingbot/hummingbot/strategy_v2/executors/dca_executor/dca_executor.py
     container_name: hummingbot-v2-multi-grid
     environment:
       - CONFIG_PASSWORD=${CONFIG_PASSWORD:-Dan2Delion}
@@ -111,6 +311,25 @@ services:
 
   hummingbot-v2-stat-arb:
     <<: *v2sleeper
+    volumes:
+      - ./conf:/home/hummingbot/conf
+      - ./conf-v2-sleep/hummingbot-v2-stat-arb/connectors:/home/hummingbot/conf/connectors
+      - ./conf/strategies:/home/hummingbot/conf/strategies
+      - ./conf/controllers:/home/hummingbot/conf/controllers
+      - ./conf/scripts:/home/hummingbot/conf/scripts
+      - ./logs:/home/hummingbot/logs
+      - ./data:/home/hummingbot/data
+      - ./certs:/home/hummingbot/certs
+      - ./scripts:/home/hummingbot/scripts
+      - ./controllers:/home/hummingbot/controllers
+      - ./hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_derivative.py:/home/hummingbot/hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_derivative.py
+      - ./hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_api_order_book_data_source.py:/home/hummingbot/hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_api_order_book_data_source.py
+      - ./hummingbot/data_feed/candles_feed/candles_base.py:/home/hummingbot/hummingbot/data_feed/candles_feed/candles_base.py
+      - ./hummingbot/core/data_type/order_book_tracker.py:/home/hummingbot/hummingbot/core/data_type/order_book_tracker.py
+      - ./hummingbot/core/data_type/order_book_tracker_data_source.py:/home/hummingbot/hummingbot/core/data_type/order_book_tracker_data_source.py
+      - ./hummingbot/core/data_type/user_stream_tracker_data_source.py:/home/hummingbot/hummingbot/core/data_type/user_stream_tracker_data_source.py
+      - ./hummingbot/strategy/strategy_v2_base.py:/home/hummingbot/hummingbot/strategy/strategy_v2_base.py
+      - ./hummingbot/strategy_v2/executors/dca_executor/dca_executor.py:/home/hummingbot/hummingbot/strategy_v2/executors/dca_executor/dca_executor.py
     container_name: hummingbot-v2-stat-arb
     environment:
       - CONFIG_PASSWORD=${CONFIG_PASSWORD:-Dan2Delion}
@@ -118,6 +337,25 @@ services:
 
   hummingbot-v2-hedge:
     <<: *v2sleeper
+    volumes:
+      - ./conf:/home/hummingbot/conf
+      - ./conf-v2-sleep/hummingbot-v2-hedge/connectors:/home/hummingbot/conf/connectors
+      - ./conf/strategies:/home/hummingbot/conf/strategies
+      - ./conf/controllers:/home/hummingbot/conf/controllers
+      - ./conf/scripts:/home/hummingbot/conf/scripts
+      - ./logs:/home/hummingbot/logs
+      - ./data:/home/hummingbot/data
+      - ./certs:/home/hummingbot/certs
+      - ./scripts:/home/hummingbot/scripts
+      - ./controllers:/home/hummingbot/controllers
+      - ./hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_derivative.py:/home/hummingbot/hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_derivative.py
+      - ./hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_api_order_book_data_source.py:/home/hummingbot/hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_api_order_book_data_source.py
+      - ./hummingbot/data_feed/candles_feed/candles_base.py:/home/hummingbot/hummingbot/data_feed/candles_feed/candles_base.py
+      - ./hummingbot/core/data_type/order_book_tracker.py:/home/hummingbot/hummingbot/core/data_type/order_book_tracker.py
+      - ./hummingbot/core/data_type/order_book_tracker_data_source.py:/home/hummingbot/hummingbot/core/data_type/order_book_tracker_data_source.py
+      - ./hummingbot/core/data_type/user_stream_tracker_data_source.py:/home/hummingbot/hummingbot/core/data_type/user_stream_tracker_data_source.py
+      - ./hummingbot/strategy/strategy_v2_base.py:/home/hummingbot/hummingbot/strategy/strategy_v2_base.py
+      - ./hummingbot/strategy_v2/executors/dca_executor/dca_executor.py:/home/hummingbot/hummingbot/strategy_v2/executors/dca_executor/dca_executor.py
     container_name: hummingbot-v2-hedge
     environment:
       - CONFIG_PASSWORD=${CONFIG_PASSWORD:-Dan2Delion}
@@ -125,6 +363,25 @@ services:
 
   hummingbot-v2-pmm-v1:
     <<: *v2sleeper
+    volumes:
+      - ./conf:/home/hummingbot/conf
+      - ./conf-v2-sleep/hummingbot-v2-pmm-v1/connectors:/home/hummingbot/conf/connectors
+      - ./conf/strategies:/home/hummingbot/conf/strategies
+      - ./conf/controllers:/home/hummingbot/conf/controllers
+      - ./conf/scripts:/home/hummingbot/conf/scripts
+      - ./logs:/home/hummingbot/logs
+      - ./data:/home/hummingbot/data
+      - ./certs:/home/hummingbot/certs
+      - ./scripts:/home/hummingbot/scripts
+      - ./controllers:/home/hummingbot/controllers
+      - ./hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_derivative.py:/home/hummingbot/hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_derivative.py
+      - ./hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_api_order_book_data_source.py:/home/hummingbot/hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_api_order_book_data_source.py
+      - ./hummingbot/data_feed/candles_feed/candles_base.py:/home/hummingbot/hummingbot/data_feed/candles_feed/candles_base.py
+      - ./hummingbot/core/data_type/order_book_tracker.py:/home/hummingbot/hummingbot/core/data_type/order_book_tracker.py
+      - ./hummingbot/core/data_type/order_book_tracker_data_source.py:/home/hummingbot/hummingbot/core/data_type/order_book_tracker_data_source.py
+      - ./hummingbot/core/data_type/user_stream_tracker_data_source.py:/home/hummingbot/hummingbot/core/data_type/user_stream_tracker_data_source.py
+      - ./hummingbot/strategy/strategy_v2_base.py:/home/hummingbot/hummingbot/strategy/strategy_v2_base.py
+      - ./hummingbot/strategy_v2/executors/dca_executor/dca_executor.py:/home/hummingbot/hummingbot/strategy_v2/executors/dca_executor/dca_executor.py
     container_name: hummingbot-v2-pmm-v1
     environment:
       - CONFIG_PASSWORD=${CONFIG_PASSWORD:-Dan2Delion}
@@ -132,6 +389,25 @@ services:
 
   hummingbot-v2-pmm-mister:
     <<: *v2sleeper
+    volumes:
+      - ./conf:/home/hummingbot/conf
+      - ./conf-v2-sleep/hummingbot-v2-pmm-mister/connectors:/home/hummingbot/conf/connectors
+      - ./conf/strategies:/home/hummingbot/conf/strategies
+      - ./conf/controllers:/home/hummingbot/conf/controllers
+      - ./conf/scripts:/home/hummingbot/conf/scripts
+      - ./logs:/home/hummingbot/logs
+      - ./data:/home/hummingbot/data
+      - ./certs:/home/hummingbot/certs
+      - ./scripts:/home/hummingbot/scripts
+      - ./controllers:/home/hummingbot/controllers
+      - ./hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_derivative.py:/home/hummingbot/hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_derivative.py
+      - ./hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_api_order_book_data_source.py:/home/hummingbot/hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_api_order_book_data_source.py
+      - ./hummingbot/data_feed/candles_feed/candles_base.py:/home/hummingbot/hummingbot/data_feed/candles_feed/candles_base.py
+      - ./hummingbot/core/data_type/order_book_tracker.py:/home/hummingbot/hummingbot/core/data_type/order_book_tracker.py
+      - ./hummingbot/core/data_type/order_book_tracker_data_source.py:/home/hummingbot/hummingbot/core/data_type/order_book_tracker_data_source.py
+      - ./hummingbot/core/data_type/user_stream_tracker_data_source.py:/home/hummingbot/hummingbot/core/data_type/user_stream_tracker_data_source.py
+      - ./hummingbot/strategy/strategy_v2_base.py:/home/hummingbot/hummingbot/strategy/strategy_v2_base.py
+      - ./hummingbot/strategy_v2/executors/dca_executor/dca_executor.py:/home/hummingbot/hummingbot/strategy_v2/executors/dca_executor/dca_executor.py
     container_name: hummingbot-v2-pmm-mister
     environment:
       - CONFIG_PASSWORD=${CONFIG_PASSWORD:-Dan2Delion}
@@ -139,6 +415,25 @@ services:
 
   hummingbot-v2-qgrid:
     <<: *v2sleeper
+    volumes:
+      - ./conf:/home/hummingbot/conf
+      - ./conf-v2-sleep/hummingbot-v2-qgrid/connectors:/home/hummingbot/conf/connectors
+      - ./conf/strategies:/home/hummingbot/conf/strategies
+      - ./conf/controllers:/home/hummingbot/conf/controllers
+      - ./conf/scripts:/home/hummingbot/conf/scripts
+      - ./logs:/home/hummingbot/logs
+      - ./data:/home/hummingbot/data
+      - ./certs:/home/hummingbot/certs
+      - ./scripts:/home/hummingbot/scripts
+      - ./controllers:/home/hummingbot/controllers
+      - ./hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_derivative.py:/home/hummingbot/hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_derivative.py
+      - ./hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_api_order_book_data_source.py:/home/hummingbot/hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_api_order_book_data_source.py
+      - ./hummingbot/data_feed/candles_feed/candles_base.py:/home/hummingbot/hummingbot/data_feed/candles_feed/candles_base.py
+      - ./hummingbot/core/data_type/order_book_tracker.py:/home/hummingbot/hummingbot/core/data_type/order_book_tracker.py
+      - ./hummingbot/core/data_type/order_book_tracker_data_source.py:/home/hummingbot/hummingbot/core/data_type/order_book_tracker_data_source.py
+      - ./hummingbot/core/data_type/user_stream_tracker_data_source.py:/home/hummingbot/hummingbot/core/data_type/user_stream_tracker_data_source.py
+      - ./hummingbot/strategy/strategy_v2_base.py:/home/hummingbot/hummingbot/strategy/strategy_v2_base.py
+      - ./hummingbot/strategy_v2/executors/dca_executor/dca_executor.py:/home/hummingbot/hummingbot/strategy_v2/executors/dca_executor/dca_executor.py
     container_name: hummingbot-v2-qgrid
     environment:
       - CONFIG_PASSWORD=${CONFIG_PASSWORD:-Dan2Delion}
@@ -146,6 +441,25 @@ services:
 
   hummingbot-v2-arb:
     <<: *v2sleeper
+    volumes:
+      - ./conf:/home/hummingbot/conf
+      - ./conf-v2-sleep/hummingbot-v2-arb/connectors:/home/hummingbot/conf/connectors
+      - ./conf/strategies:/home/hummingbot/conf/strategies
+      - ./conf/controllers:/home/hummingbot/conf/controllers
+      - ./conf/scripts:/home/hummingbot/conf/scripts
+      - ./logs:/home/hummingbot/logs
+      - ./data:/home/hummingbot/data
+      - ./certs:/home/hummingbot/certs
+      - ./scripts:/home/hummingbot/scripts
+      - ./controllers:/home/hummingbot/controllers
+      - ./hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_derivative.py:/home/hummingbot/hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_derivative.py
+      - ./hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_api_order_book_data_source.py:/home/hummingbot/hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_api_order_book_data_source.py
+      - ./hummingbot/data_feed/candles_feed/candles_base.py:/home/hummingbot/hummingbot/data_feed/candles_feed/candles_base.py
+      - ./hummingbot/core/data_type/order_book_tracker.py:/home/hummingbot/hummingbot/core/data_type/order_book_tracker.py
+      - ./hummingbot/core/data_type/order_book_tracker_data_source.py:/home/hummingbot/hummingbot/core/data_type/order_book_tracker_data_source.py
+      - ./hummingbot/core/data_type/user_stream_tracker_data_source.py:/home/hummingbot/hummingbot/core/data_type/user_stream_tracker_data_source.py
+      - ./hummingbot/strategy/strategy_v2_base.py:/home/hummingbot/hummingbot/strategy/strategy_v2_base.py
+      - ./hummingbot/strategy_v2/executors/dca_executor/dca_executor.py:/home/hummingbot/hummingbot/strategy_v2/executors/dca_executor/dca_executor.py
     container_name: hummingbot-v2-arb
     environment:
       - CONFIG_PASSWORD=${CONFIG_PASSWORD:-Dan2Delion}
@@ -153,6 +467,25 @@ services:
 
   hummingbot-v2-xemm:
     <<: *v2sleeper
+    volumes:
+      - ./conf:/home/hummingbot/conf
+      - ./conf-v2-sleep/hummingbot-v2-xemm/connectors:/home/hummingbot/conf/connectors
+      - ./conf/strategies:/home/hummingbot/conf/strategies
+      - ./conf/controllers:/home/hummingbot/conf/controllers
+      - ./conf/scripts:/home/hummingbot/conf/scripts
+      - ./logs:/home/hummingbot/logs
+      - ./data:/home/hummingbot/data
+      - ./certs:/home/hummingbot/certs
+      - ./scripts:/home/hummingbot/scripts
+      - ./controllers:/home/hummingbot/controllers
+      - ./hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_derivative.py:/home/hummingbot/hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_derivative.py
+      - ./hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_api_order_book_data_source.py:/home/hummingbot/hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_api_order_book_data_source.py
+      - ./hummingbot/data_feed/candles_feed/candles_base.py:/home/hummingbot/hummingbot/data_feed/candles_feed/candles_base.py
+      - ./hummingbot/core/data_type/order_book_tracker.py:/home/hummingbot/hummingbot/core/data_type/order_book_tracker.py
+      - ./hummingbot/core/data_type/order_book_tracker_data_source.py:/home/hummingbot/hummingbot/core/data_type/order_book_tracker_data_source.py
+      - ./hummingbot/core/data_type/user_stream_tracker_data_source.py:/home/hummingbot/hummingbot/core/data_type/user_stream_tracker_data_source.py
+      - ./hummingbot/strategy/strategy_v2_base.py:/home/hummingbot/hummingbot/strategy/strategy_v2_base.py
+      - ./hummingbot/strategy_v2/executors/dca_executor/dca_executor.py:/home/hummingbot/hummingbot/strategy_v2/executors/dca_executor/dca_executor.py
     container_name: hummingbot-v2-xemm
     environment:
       - CONFIG_PASSWORD=${CONFIG_PASSWORD:-Dan2Delion}
@@ -160,6 +493,25 @@ services:
 
   hummingbot-v2-lp:
     <<: *v2sleeper
+    volumes:
+      - ./conf:/home/hummingbot/conf
+      - ./conf-v2-sleep/hummingbot-v2-lp/connectors:/home/hummingbot/conf/connectors
+      - ./conf/strategies:/home/hummingbot/conf/strategies
+      - ./conf/controllers:/home/hummingbot/conf/controllers
+      - ./conf/scripts:/home/hummingbot/conf/scripts
+      - ./logs:/home/hummingbot/logs
+      - ./data:/home/hummingbot/data
+      - ./certs:/home/hummingbot/certs
+      - ./scripts:/home/hummingbot/scripts
+      - ./controllers:/home/hummingbot/controllers
+      - ./hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_derivative.py:/home/hummingbot/hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_derivative.py
+      - ./hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_api_order_book_data_source.py:/home/hummingbot/hummingbot/connector/derivative/hyperliquid_perpetual/hyperliquid_perpetual_api_order_book_data_source.py
+      - ./hummingbot/data_feed/candles_feed/candles_base.py:/home/hummingbot/hummingbot/data_feed/candles_feed/candles_base.py
+      - ./hummingbot/core/data_type/order_book_tracker.py:/home/hummingbot/hummingbot/core/data_type/order_book_tracker.py
+      - ./hummingbot/core/data_type/order_book_tracker_data_source.py:/home/hummingbot/hummingbot/core/data_type/order_book_tracker_data_source.py
+      - ./hummingbot/core/data_type/user_stream_tracker_data_source.py:/home/hummingbot/hummingbot/core/data_type/user_stream_tracker_data_source.py
+      - ./hummingbot/strategy/strategy_v2_base.py:/home/hummingbot/hummingbot/strategy/strategy_v2_base.py
+      - ./hummingbot/strategy_v2/executors/dca_executor/dca_executor.py:/home/hummingbot/hummingbot/strategy_v2/executors/dca_executor/dca_executor.py
     container_name: hummingbot-v2-lp
     environment:
       - CONFIG_PASSWORD=${CONFIG_PASSWORD:-Dan2Delion}
