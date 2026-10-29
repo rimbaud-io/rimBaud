@@ -4819,8 +4819,37 @@ def _dman_v3_set_pair(coin):
     return "DMan V3 pair " + pair
 
 
+def _v2_arm(bot_id, restart=True):
+    """Copy the wired wallet connector into one V2 sleeper. Live hunters stay."""
+    bot_id = str(bot_id or "").strip()
+    if not bot_id.startswith("hummingbot-v2-"):
+        return {"ok": False, "error": "not a V2 sleeper"}
+    candidates = [
+        os.environ.get("V2_WALLET_ARM") or "",
+        "/scripts/v2_wallet_arm.py",
+        os.path.join(os.path.dirname(CONF_DIR), "scripts", "v2_wallet_arm.py"),
+    ]
+    path = next((p for p in candidates if p and os.path.isfile(p)), "")
+    if not path:
+        return {"ok": False, "error": "wallet arm script is not mounted"}
+    cmd = [sys.executable, path, "--bot", bot_id, "--restart" if restart else "--install"]
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=90)
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)[:200]}
+    lines = [ln for ln in (proc.stdout or "").splitlines() if ln.strip()]
+    try:
+        obj = json.loads(lines[-1]) if lines else {}
+    except json.JSONDecodeError:
+        err = (proc.stderr or proc.stdout or "wallet arm failed")[-240:]
+        return {"ok": False, "error": err}
+    if not isinstance(obj, dict):
+        return {"ok": False, "error": "wallet arm returned nothing"}
+    return obj
+
+
 def _apply_wire_graph(nodes, edges):
-    """Map abstract wires onto live hunter files. Income is recorded only (no HL send)."""
+    """Map abstract wires onto live hunter files. A V2 wallet wire installs that connector."""
     by_id = {}
     for n in nodes or []:
         if isinstance(n, dict) and n.get("id"):
@@ -4896,6 +4925,12 @@ def _apply_wire_graph(nodes, edges):
         if income_n:
             idata = income_n.get("data") if isinstance(income_n.get("data"), dict) else {}
             wout = str(idata.get("name") or "subaccount")
+        if str(bid).startswith("hummingbot-v2-") and win and (not wout or wout == win):
+            income_note = "opens and closes settle on this subaccount. The realized win stays here."
+        elif str(bid).startswith("hummingbot-v2-") and win:
+            income_note = "opens and closes settle on " + win + ". Income " + str(wout) + " is a label. No send."
+        else:
+            income_note = "mapped on the canvas — no automatic Hyperliquid send yet"
         runtime["bots"][bid] = {
             "coin": coin,
             "coins": coins_wired,
@@ -4904,7 +4939,7 @@ def _apply_wire_graph(nodes, edges):
             "wallet_in": win,
             "income_wallet": wout,
             "income_transfer": False,
-            "income_note": "mapped on the canvas — no automatic Hyperliquid send yet",
+            "income_note": income_note,
             "risk_skim": None,
         }
         if risk_n:
@@ -4977,6 +5012,16 @@ def _apply_wire_graph(nodes, edges):
         _write_json_file(WIRE_RUNTIME_FILE, runtime)
     except OSError:
         pass
+    for bid, row in (runtime.get("bots") or {}).items():
+        if not str(bid).startswith("hummingbot-v2-"):
+            continue
+        if not isinstance(row, dict) or not row.get("wallet_in"):
+            continue
+        arm = _v2_arm(bid, restart=True)
+        if arm.get("message"):
+            applied.append(arm["message"])
+        elif arm.get("error"):
+            applied.append(str(bid) + " wallet: " + str(arm["error"]))
     applied.extend(_apply_condor_gauge(nodes, edges))
     applied.extend(_apply_condor_setup(nodes, edges))
     applied.extend(_apply_copy_trader_wires(nodes, edges))
@@ -5407,6 +5452,26 @@ def api_wire_sleeper():
                 "cap": cap,
                 "positions_untouched": True,
             }), 400
+        arm = _v2_arm(bot_id, restart=True)
+        if arm.get("error") and not arm.get("ok"):
+            return jsonify({
+                "ok": False,
+                "id": bot_id,
+                "op": "start",
+                "closes": False,
+                "positions_untouched": True,
+                "error": arm.get("error"),
+                "message": arm.get("error"),
+            }), 400
+        if arm.get("restarted") or get_container_state(bot_id)["running"]:
+            return jsonify({
+                "ok": True,
+                "id": bot_id,
+                "op": "start",
+                "closes": False,
+                "positions_untouched": True,
+                "message": arm.get("message") or "V2 sleeper started on the wired wallet",
+            })
         try:
             proc = subprocess.run(
                 ["docker", "start", bot_id],
@@ -5421,7 +5486,7 @@ def api_wire_sleeper():
             "op": "start",
             "closes": False,
             "positions_untouched": True,
-            "message": "V2 sleeper started (no keys until wallet wired)" if ok else "docker start failed — is the container created?",
+            "message": (arm.get("message") or "V2 sleeper started on the wired wallet") if ok else "docker start failed — is the container created?",
             "error": None if ok else "docker start failed — is the container created?",
         }), (200 if ok else 400)
     if op == "stop":
