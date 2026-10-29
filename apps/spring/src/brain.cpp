@@ -1556,6 +1556,7 @@ struct HlCash {
     double free = 0;
     bool ok = false;
     std::time_t ts = 0;
+    json positions = json::array();
 };
 static std::mutex g_hl_cash_mu;
 static std::map<std::string, HlCash> g_hl_cash;
@@ -1614,8 +1615,49 @@ static void wired_names(const Brain& br, std::map<std::string, std::string>& out
     }
 }
 
+// Open clips on a clearinghouse payload. szi is a string. A flat coin is omitted.
+static json hl_book_rows(const json& j) {
+    json out = json::array();
+    if (!j.is_object() || !j.contains("assetPositions") || !j["assetPositions"].is_array())
+        return out;
+    for (auto& wrap : j["assetPositions"]) {
+        if (!wrap.is_object()) continue;
+        json pos = wrap.contains("position") && wrap["position"].is_object()
+            ? wrap["position"] : json::object();
+        double sz = jnum(pos, "szi");
+        if (std::fabs(sz) < 1e-12) continue;
+        std::string side = sz < 0 ? "SHORT" : "LONG";
+        double entry = jnum(pos, "entryPx");
+        double pnl = jnum(pos, "unrealizedPnl");
+        int lev = 1;
+        if (pos.contains("leverage") && pos["leverage"].is_object())
+            lev = static_cast<int>(jnum(pos["leverage"], "value", 1));
+        if (lev < 1) lev = 1;
+        double abs_sz = std::fabs(sz);
+        double mark = entry;
+        if (abs_sz > 0) {
+            if (side == "SHORT") mark = entry - pnl / abs_sz;
+            else mark = entry + pnl / abs_sz;
+        }
+        double roe = 0;
+        if (entry > 0 && mark > 0)
+            roe = (side == "SHORT" ? (entry - mark) : (mark - entry)) / entry * lev * 100.0;
+        out.push_back({
+            {"coin", jstr(pos, "coin")},
+            {"side", side},
+            {"size", abs_sz},
+            {"entry_px", entry},
+            {"mark_px", mark},
+            {"leverage", lev},
+            {"pnl_usd", pnl},
+            {"roe_pct", roe},
+        });
+    }
+    return out;
+}
+
 // clearinghouseState is weight 2. Cache 25s so the desk poll does not refill the bucket.
-static bool hl_cash_of(const std::string& addr, double& equity, double& free) {
+static bool hl_cash_of(const std::string& addr, double& equity, double& free, json* book = nullptr) {
     if (!hl_addr_ok(addr)) return false;
     std::string key = norm_addr(addr);
     std::time_t now = std::time(nullptr);
@@ -1626,6 +1668,7 @@ static bool hl_cash_of(const std::string& addr, double& equity, double& free) {
             if (!it->second.ok) return false;
             equity = it->second.equity;
             free = it->second.free;
+            if (book) *book = it->second.positions;
             return true;
         }
     }
@@ -1637,22 +1680,31 @@ static bool hl_cash_of(const std::string& addr, double& equity, double& free) {
     json j = json::object();
     try { j = json::parse(body.empty() ? "{}" : body); } catch (...) { j = json::object(); }
     double eq = -1, fr = -1;
+    json rows = json::array();
     if (j.is_object()) {
         if (j.contains("crossMarginSummary") && j["crossMarginSummary"].is_object())
             eq = jnum(j["crossMarginSummary"], "accountValue", -1);
         if (eq < 0 && j.contains("marginSummary") && j["marginSummary"].is_object())
             eq = jnum(j["marginSummary"], "accountValue", -1);
         fr = jnum(j, "withdrawable", -1);
+        rows = hl_book_rows(j);
     }
     bool ok = eq >= 0;
     if (fr < 0) fr = ok ? eq : 0;
     {
         std::lock_guard<std::mutex> lk(g_hl_cash_mu);
-        g_hl_cash[key] = HlCash{ok ? eq : 0, ok ? fr : 0, ok, now};
+        HlCash row;
+        row.equity = ok ? eq : 0;
+        row.free = ok ? fr : 0;
+        row.ok = ok;
+        row.ts = now;
+        row.positions = ok ? rows : json::array();
+        g_hl_cash[key] = std::move(row);
     }
     if (!ok) return false;
     equity = eq;
     free = fr;
+    if (book) *book = std::move(rows);
     return true;
 }
 
@@ -1787,11 +1839,39 @@ static json api_home(const Brain& br) {
                 auto pit = pool.find(fold_label(nit->second));
                 if (pit != pool.end()) {
                     double eq = 0, fr = 0;
-                    if (hl_cash_of(pit->second, eq, fr)) {
+                    json book = json::array();
+                    if (hl_cash_of(pit->second, eq, fr, &book)) {
                         addr = pit->second;
                         equity = eq;
                         free = fr;
                         pool_cash = true;
+                        // No status file, so the card was flat while the wallet held the clip.
+                        // Leftover stays withdrawable. The clip explains the rest of equity.
+                        if (npos == 0 && book.is_array() && !book.empty()) {
+                            double summed = 0;
+                            for (auto& row : book) {
+                                if (!row.is_object()) continue;
+                                double sz = jnum(row, "size");
+                                if (sz < 1e-12) continue;
+                                npos++;
+                                summed += jnum(row, "pnl_usd");
+                                positions.push_back({
+                                    {"bot_id", id},
+                                    {"bot", jstr(h, "name", id)},
+                                    {"href", jstr(h, "href")},
+                                    {"coin", jstr(row, "coin")},
+                                    {"side", jstr(row, "side")},
+                                    {"size", sz},
+                                    {"entry_px", jnum(row, "entry_px")},
+                                    {"mark_px", jnum(row, "mark_px")},
+                                    {"leverage", static_cast<int>(jnum(row, "leverage", 1))},
+                                    {"pnl_usd", jnum(row, "pnl_usd")},
+                                    {"roe_pct", jnum(row, "roe_pct")},
+                                    {"source", "hl-wallet"},
+                                });
+                            }
+                            if (npos > 0) upnl = summed;
+                        }
                     }
                 }
             }
