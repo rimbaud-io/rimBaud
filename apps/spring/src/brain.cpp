@@ -2041,12 +2041,30 @@ static json api_sleeper(const Brain& br, const json& data) {
         if (!docker_running(id) && n >= cap)
             return {{"ok", false}, {"error", "V2 cap " + std::to_string(cap) + " running — stop one first"},
                     {"closes", false}, {"running", n}, {"cap", cap}};
+        std::string script = join(dirname_of(br.conf), "scripts/v2_wallet_arm.py");
+        std::string arm_cmd = "python3 \"" + script + "\" --bot " + id + " --restart 2>/dev/null";
+        std::string arm_out = slurp_cmd(arm_cmd.c_str(), 8000);
+        json arm = json::object();
+        try { arm = json::parse(arm_out.empty() ? "{}" : arm_out); } catch (...) { arm = json::object(); }
+        if (!arm.value("ok", false)) {
+            std::string err = jstr(arm, "error", "wired wallet was not installed");
+            return {{"ok", false}, {"id", id}, {"op", "start"}, {"closes", false},
+                    {"positions_untouched", true}, {"error", err}, {"message", err}};
+        }
+        g_docker_ts = 0;
+        if (arm.value("restarted", false) || docker_running(id)) {
+            return {{"ok", true}, {"id", id}, {"op", "start"}, {"closes", false},
+                    {"positions_untouched", true},
+                    {"wallet", jstr(arm, "wallet")},
+                    {"message", jstr(arm, "message", "V2 sleeper started on the wired wallet")}};
+        }
         std::string cmd = "docker start " + id + " >/dev/null 2>&1";
         int rc = std::system(cmd.c_str());
         g_docker_ts = 0;
         return {{"ok", rc == 0}, {"id", id}, {"op", "start"}, {"closes", false},
                 {"positions_untouched", true},
-                {"message", rc == 0 ? "V2 sleeper started (no keys until wallet wired)" : "docker start failed — is the container created?"}};
+                {"message", rc == 0 ? jstr(arm, "message", "V2 sleeper started on the wired wallet")
+                                     : "docker start failed — is the container created?"}};
     }
     if (op == "stop") {
         std::string cmd = "docker stop -t 2 " + id + " >/dev/null 2>&1";
@@ -3021,12 +3039,11 @@ static json api_home_open_post(const Brain& br, const json& data) {
     }
     if (side != "LONG" && side != "SHORT")
         return {{"ok", false}, {"queued", false}, {"error", "set " + coin + " BIAS to LONG or SHORT before 100%"}};
-    // Official V2 sleeper does not read this queue, and its connector dir is empty.
+    // Official V2 opens from its controller on the wired subaccount, not this queue.
     if (id == "hummingbot-v2-dman-v3")
         return {
             {"ok", false}, {"queued", false}, {"closes", false}, {"positions_untouched", true},
-            {"error", "DMan V3 cannot sign a 100% " + side + " " + coin
-                + ". No Hyperliquid key in the sleeper. Load the wired wallet on /confiig and restart that container. Nothing was sent."},
+            {"error", "DMan V3 opens and closes from its controller on the wired subaccount. This 100% queue was not sent."},
         };
     json payload = {{"coin", coin}, {"side", side}, {"pct", 1.0}, {"source", "spring"}};
     if (!sql_apply(br, {{"op", "command"}, {"bot_id", id}, {"kind", "open"}, {"payload", payload}}))
