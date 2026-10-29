@@ -179,7 +179,7 @@ enum Page { PgHome, PgWire, PgCondor, PgHunters, PgFunds, PgStrategy, PgSystem, 
 const char* PAGE_NAME[] = {"HOME", "WIRE", "CONDOR", "HUNTERS", "FUNDS", "STRATEGY", "SYSTEM"};
 
 struct Hit {
-    enum Kind { Idle, Nav, Hunter, NotWired, WireNode, WireEdge, WirePort, ToolCat, ToolItem, WireBoard, WireAct, Ctx, Backend, Chart, Sl, Lev, Restart, HunterGate, DeskBias, CoinBias, CoinClose, CoinOpen100, DmanCoin, DmanSize, CtrlBool, CtrlKnob, CtrlSel, CtrlStd, CopyMute, CopySlots, CopyAudit, AuditClose, AuditRun, Quit, PackSave, PackRestore, WireSnap, AnnotColor, AnnotSize, InspectBack, CompileClose, CompileWork, CompileGo, PresetDrop, PresetPick, PresetSave, ApiKey, ReplYes, ReplNo, FundsDel, FundsAdd, FundsField, FundsRename, Seq } kind = Idle;
+    enum Kind { Idle, Nav, Hunter, NotWired, WireNode, WireEdge, WirePort, ToolCat, ToolItem, WireBoard, WireAct, Ctx, Backend, Chart, Sl, Lev, Restart, HunterGate, DeskBias, CoinBias, CoinClose, CoinOpen100, DmanCoin, DmanSize, DmanMode, CtrlBool, CtrlKnob, CtrlSel, CtrlStd, CopyMute, CopySlots, CopyAudit, AuditClose, AuditRun, Quit, PackSave, PackRestore, WireSnap, AnnotColor, AnnotSize, InspectBack, CompileClose, CompileWork, CompileGo, PresetDrop, PresetPick, PresetSave, ApiKey, ReplYes, ReplNo, FundsDel, FundsAdd, FundsField, FundsRename, Seq } kind = Idle;
     int i = -1;
     Rect r{};
     std::string key;
@@ -509,9 +509,9 @@ std::vector<CtrlField> standard_fields(const std::string& id) {
         fs.push_back(mkf("trail_delta", "Trail %", "price_pct", 0.05, 0.1, 5));
         fs.push_back(mkf("dca_spread_1", "DCA 1 %", "price_pct", 0.01, 0.05, 40));
         fs.push_back(mkf("dca_spread_2", "DCA 2 %", "price_pct", 0.01, 0.05, 40));
-        fs.push_back(mkf("dca_spread_3", "DCA 3 %", "price_pct", 0.1, 0.5, 40));
-        fs.push_back(mkf("dca_spread_4", "DCA 4 %", "price_pct", 0.1, 0.5, 40));
-        fs.push_back(mkf("bb_length", "BB length", "num", 1, 10, 300));
+        fs.push_back(mkf("dca_spread_3", "DCA 3 %", "price_pct", 0.01, 0.01, 40));
+        fs.push_back(mkf("dca_spread_4", "DCA 4 %", "price_pct", 0.01, 0.01, 40));
+        fs.push_back(mkf("bb_length", "BB length", "num", 1, 5, 300));
         fs.push_back(mkf("bb_std", "BB std", "num", 0.1, 0.5, 4));
         fs.push_back(mkf("bb_long_threshold", "Long BBP <=", "num", 0.01, 0, 1.2));
         fs.push_back(mkf("bb_short_threshold", "Short BBP >=", "num", 0.01, 0, 1.2));
@@ -546,6 +546,102 @@ nlohmann::json store_ctrl(const CtrlField& f, double display) {
     if (f.kind == "price_pct") v = v / 100.0;
     else if (f.kind == "pct_frac" && v > 1.0) v = v / 100.0;
     return v;
+}
+
+// Official DMan V3 packs. Standard is the setup on disk. The coin and the quote stay.
+nlohmann::json dman_v3_mode(const std::string& name) {
+    std::string mode = name;
+    for (char& c : mode) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+    nlohmann::json m = {
+        {"dman_mode", "STANDARD"},
+        {"interval", "3m"},
+        {"bb_length", 100},
+        {"bb_std", 2.0},
+        {"bb_long_threshold", 0.0},
+        {"bb_short_threshold", 1.0},
+        {"dca_spread_1", 0.001},
+        {"dca_spread_2", 0.018},
+        {"dca_spread_3", 0.15},
+        {"dca_spread_4", 0.25},
+        {"dca_amount_1", 0.25},
+        {"dca_amount_2", 0.25},
+        {"dca_amount_3", 0.25},
+        {"dca_amount_4", 0.25},
+        {"max_executors_per_side", 2},
+        {"stop_loss", 0.03},
+        {"take_profit", 0.02},
+        {"trail_activation", 0.015},
+        {"trail_delta", 0.005},
+        {"time_limit", 2700},
+        {"cooldown_time", 15},
+        {"dynamic_order_spread", false},
+        {"dynamic_target", false},
+        {"sl_roe_pct", 20},
+    };
+    if (mode == "AGGRESSIVE") {
+        m = {
+            {"dman_mode", "AGGRESSIVE"},
+            {"interval", "1m"},
+            {"bb_length", 20},
+            {"bb_std", 1.5},
+            {"bb_long_threshold", 0.20},
+            {"bb_short_threshold", 0.80},
+            {"dca_spread_1", 0.001},
+            {"dca_spread_2", 0.004},
+            {"dca_spread_3", 0.008},
+            {"dca_spread_4", 0.012},
+            {"dca_amount_1", 0.50},
+            {"dca_amount_2", 0.25},
+            {"dca_amount_3", 0.15},
+            {"dca_amount_4", 0.10},
+            {"max_executors_per_side", 1},
+            {"stop_loss", 0.012},
+            {"take_profit", 0.008},
+            {"trail_activation", 0.006},
+            {"trail_delta", 0.002},
+            {"time_limit", 600},
+            {"cooldown_time", 30},
+            {"dynamic_order_spread", false},
+            {"dynamic_target", false},
+            {"sl_roe_pct", 20},
+        };
+    } else if (mode == "GOD") {
+        m = {
+            {"dman_mode", "GOD"},
+            {"interval", "1m"},
+            {"bb_length", 8},
+            {"bb_std", 1.2},
+            {"bb_long_threshold", 0.35},
+            {"bb_short_threshold", 0.65},
+            {"dca_spread_1", 0.0005},
+            {"dca_spread_2", 0.0015},
+            {"dca_spread_3", 0.003},
+            {"dca_spread_4", 0.005},
+            {"dca_amount_1", 0.82},
+            {"dca_amount_2", 0.10},
+            {"dca_amount_3", 0.05},
+            {"dca_amount_4", 0.03},
+            {"max_executors_per_side", 1},
+            {"stop_loss", 0.006},
+            {"take_profit", 0.004},
+            {"trail_activation", 0.0025},
+            {"trail_delta", 0.001},
+            {"time_limit", 180},
+            {"cooldown_time", 8},
+            {"dynamic_order_spread", false},
+            {"dynamic_target", false},
+            {"sl_roe_pct", 20},
+        };
+    }
+    return m;
+}
+
+const char* dman_v3_mode_line(const std::string& mode) {
+    if (mode == "AGGRESSIVE")
+        return "1m band 20. Close ladder, one clip, 10 min. Same side the band prints.";
+    if (mode == "GOD")
+        return "1m band 8. Most of the quote on the touch. 3 min. A fantasy scalp.";
+    return "3m band 100. Ladder out to 25%. 45 min. The setup on disk.";
 }
 
 struct PmmDisp {
@@ -811,6 +907,7 @@ struct DeskUi {
     std::string preset_bot;
     std::map<std::string, std::string> preset_by_bot;
     bool preset_open = false;
+    bool dman_mode_open = false;
     bool preset_edit = false;
     std::string preset_buf;
     Rect preset_drop_r{};
@@ -3066,6 +3163,10 @@ std::string action_tip(const DeskUi& ui, const Hit& h) {
             return "DMan V3 market " + h.key + "-USD. Bollinger picks the side. No order from this click.";
         case Hit::DmanSize:
             return "DMan V3 size " + h.key + "% of leftover. Writes the quote. No order from this click.";
+        case Hit::DmanMode:
+            if (h.key.empty() || h.key == "open")
+                return "DMan V3 mode. Standard, aggressive, or god. No order from this click.";
+            return "DMan V3 " + h.key + ". Writes that setup. Coin and quote stay. No order from this click.";
         case Hit::CoinOpen100: {
             std::string n = (h.i >= 0 && h.i < (int)ui.snap.bots.size()) ? ui.snap.bots[h.i].name : "hunter";
             std::string side;
@@ -5745,6 +5846,34 @@ int run_desk(FlaskApi& api) {
                     snprintf(qline, sizeof(qline), "quote $0. Pick a share of leftover. No order.");
                 text(dpy, buf, gc, C.muted, x, yy, fit_px(qline, inner));
                 yy += 18;
+                std::string mode = "STANDARD";
+                if (b->controller.contains("dman_mode") && b->controller["dman_mode"].is_string()) {
+                    mode = b->controller["dman_mode"].get<std::string>();
+                    for (char& c : mode) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+                    if (mode != "STANDARD" && mode != "AGGRESSIVE" && mode != "GOD") mode = "STANDARD";
+                }
+                text(dpy, buf, gc, C.gold, x, yy, "MODE");
+                yy += 18;
+                Rect md{bx0, yy, 168, 22};
+                fill(dpy, buf, gc, ui.dman_mode_open ? C.gold : C.bg, md);
+                stroke(dpy, buf, gc, C.gold, md);
+                text(dpy, buf, gc, ui.dman_mode_open ? C.bg : C.gold, md.x + 8, md.y + 15, mode + "  v");
+                ui.hits.push_back({Hit::DmanMode, ui.sel, md, "open"});
+                yy += 26;
+                if (ui.dman_mode_open) {
+                    const char* modes[] = {"STANDARD", "AGGRESSIVE", "GOD"};
+                    for (int mi = 0; mi < 3; ++mi) {
+                        Rect row{bx0, yy, 168, 20};
+                        bool on = mode == modes[mi];
+                        fill(dpy, buf, gc, on ? C.gold : C.bg, row);
+                        stroke(dpy, buf, gc, C.gold, row);
+                        text(dpy, buf, gc, on ? C.bg : C.gold, row.x + 8, row.y + 14, modes[mi]);
+                        ui.hits.push_back({Hit::DmanMode, ui.sel, row, modes[mi]});
+                        yy += 22;
+                    }
+                }
+                text(dpy, buf, gc, C.muted, x, yy, fit_px(dman_v3_mode_line(mode), inner));
+                yy += 18;
             } else {
             text(dpy, buf, gc, C.gold, x, yy, "BIAS");
             yy += 18;
@@ -8062,6 +8191,13 @@ int run_desk(FlaskApi& api) {
                         }
                         if (!on_menu) ui.preset_open = false;
                     }
+                    if (ui.dman_mode_open) {
+                        bool on_menu = false;
+                        for (auto& hh : ui.hits) {
+                            if (hh.kind == Hit::DmanMode && inside(hh.r, mx, my)) { on_menu = true; break; }
+                        }
+                        if (!on_menu) ui.dman_mode_open = false;
+                    }
                     if (ui.knob_edit) {
                         bool on_same = false;
                         for (auto& hh : ui.hits) {
@@ -8442,6 +8578,24 @@ int run_desk(FlaskApi& api) {
                                 ui.refresh(false);
                             }
                             redraw();
+                        } else if (h.kind == Hit::DmanMode) {
+                            if (h.key.empty() || h.key == "open") {
+                                ui.dman_mode_open = !ui.dman_mode_open;
+                            } else if (h.i >= 0 && h.i < (int)ui.snap.bots.size()) {
+                                ui.dman_mode_open = false;
+                                auto& b = ui.snap.bots[h.i];
+                                auto m = dman_v3_mode(h.key);
+                                for (auto it = m.begin(); it != m.end(); ++it)
+                                    b.controller[it.key()] = it.value();
+                                ui.api->post_live_knobs(b.id, b.controller);
+                                std::string msg = ui.api->post_ctrl_map(b.id, m);
+                                ui.api->post_sl(b.id, 20);
+                                ui.say(msg);
+                                ui.say(std::string("DMan V3 ") + h.key + " — " + dman_v3_mode_line(h.key)
+                                       + " No order.");
+                                ui.refresh(false);
+                            }
+                            redraw();
                         } else if (h.kind == Hit::CoinClose) {
                             if (h.i >= 0 && h.i < (int)ui.snap.bots.size()) {
                                 auto& b = ui.snap.bots[h.i];
@@ -8558,30 +8712,15 @@ int run_desk(FlaskApi& api) {
                             if (h.i >= 0 && h.i < (int)ui.snap.bots.size()
                                 && ui.snap.bots[h.i].id == "hummingbot-v2-dman-v3") {
                                 auto& bstd = ui.snap.bots[h.i];
-                                nlohmann::json m = {
-                                    {"stop_loss", 0.03},
-                                    {"take_profit", 0.02},
-                                    {"trail_activation", 0.015},
-                                    {"trail_delta", 0.005},
-                                    {"dca_spread_1", 0.001},
-                                    {"dca_spread_2", 0.018},
-                                    {"dca_spread_3", 0.15},
-                                    {"dca_spread_4", 0.25},
-                                    {"bb_length", 100},
-                                    {"bb_std", 2.0},
-                                    {"bb_long_threshold", 0.0},
-                                    {"bb_short_threshold", 1.0},
-                                    {"dynamic_order_spread", false},
-                                    {"dynamic_target", false},
-                                    {"sl_roe_pct", 20},
-                                };
+                                nlohmann::json m = dman_v3_mode("STANDARD");
                                 for (auto it = m.begin(); it != m.end(); ++it)
                                     bstd.controller[it.key()] = it.value();
                                 ui.api->post_live_knobs(bstd.id, bstd.controller);
                                 ui.say(ui.api->post_ctrl_map(bstd.id, m));
                                 ui.api->post_sl(bstd.id, 20);
                                 ui.preset_cur = "STD";
-                                ui.say("DMan V3 STD - stop 3% - TP 2% - ARM 1.5% - trail 0.5% - DCA 0.1 / 1.8 / 15 / 25 - BB 100 / 2 - SL 20");
+                                ui.dman_mode_open = false;
+                                ui.say("DMan V3 STANDARD — 3m band 100, ladder out to 25%, 45 min. No order.");
                                 ui.refresh(false);
                             } else if (h.i >= 0 && h.i < (int)ui.snap.bots.size()
                                 && ui.snap.bots[h.i].id == "hummingbot-bn-swing") {
