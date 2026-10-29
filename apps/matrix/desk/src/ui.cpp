@@ -3178,8 +3178,7 @@ std::string action_tip(const DeskUi& ui, const Hit& h) {
                 && ui.snap.bots[h.i].id == "hummingbot-v2-dman-v3") {
                 if (side != "LONG" && side != "SHORT")
                     return "set " + h.key + " BIAS to LONG or SHORT first";
-                return "DMan V3 cannot sign a 100% " + side
-                    + ". No Hyperliquid key in the sleeper. Load the wired wallet on /confiig and restart that container. Nothing is sent.";
+                return "DMan V3 opens and closes from its controller on the wired subaccount. This 100% click sends nothing.";
             }
             if (side == "LONG" || side == "SHORT")
                 return "queue 100% leftover " + side + " " + h.key + " on " + n;

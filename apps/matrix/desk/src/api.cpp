@@ -1325,7 +1325,7 @@ std::string FlaskApi::integrate_wire(DeskSnap& snap) {
         body["board"] = snap.wire_board.empty() ? "desk" : snap.wire_board;
         if (!snap.compile.compile_id.empty()) body["compile_id"] = snap.compile.compile_id;
         // Same Flask endpoint as the website. Spring never CLOSE/OPEN.
-        auto r = http_request(flask_host, flask_port, "POST", "/api/wire/integrate", body.dump());
+        auto r = http_request(flask_host, flask_port, "POST", "/api/wire/integrate", body.dump(), 90000);
         if (!r.error.empty()) return r.error;
         json j = parse_or(r.body);
         if (r.status != 200 || flag(j, "ok") == false)
@@ -1443,7 +1443,7 @@ std::string FlaskApi::wallet_delete(const std::string& id) {
 std::string FlaskApi::sleeper_start(const std::string& id) {
     if (!can_post()) return writes_off_msg();
     json body = {{"id", id}, {"op", "start"}};
-    auto r = http_request(host, port, "POST", "/api/wire/sleeper", body.dump(), 20000);
+    auto r = http_request(host, port, "POST", "/api/wire/sleeper", body.dump(), 90000);
     json j = parse_or(r.body);
     if (r.status != 200 || flag(j, "ok") == false)
         return str(j, "error", "sleeper start failed");
