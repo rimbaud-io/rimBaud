@@ -133,11 +133,11 @@ header {
   overflow: hidden;
   margin-bottom: 8px;
 }
-.home-top .grok-bias {
+.home-top .pilot-bias {
   padding: calc(4px + 4px * var(--home-top-scale, 0.7)) 12px;
   margin-bottom: calc(4px + 4px * var(--home-top-scale, 0.7));
 }
-.home-top .grok-chip .gm { font-size: calc(11px + 3px * var(--home-top-scale, 0.7)); }
+.home-top .pilot-chip .gm { font-size: calc(11px + 3px * var(--home-top-scale, 0.7)); }
 .home-top .btn-bias { padding: calc(3px + 3px * var(--home-top-scale, 0.7)) 10px; }
 .home-mid { min-height: 60vh; padding: 4px 0 16px; }
 .home-bot {
@@ -523,8 +523,8 @@ tr:hover td { background: rgba(0,255,106,0.04); }
   color: var(--muted);
   letter-spacing: 1px;
 }
-.grok-bias { margin-bottom: 8px; padding: 8px 12px; }
-.grok-bias .rate-row { gap: 16px; align-items: center; flex-wrap: wrap; }
+.pilot-bias { margin-bottom: 8px; padding: 8px 12px; }
+.pilot-bias .rate-row { gap: 16px; align-items: center; flex-wrap: wrap; }
 .bias-split { display: flex; gap: 14px; flex-wrap: nowrap; align-items: stretch; width: 100%; }
 .bias-split .col { min-width: 0; flex: 1 1 0; }
 .bias-split .col.tokens { flex: 1.15 1 220px; }
@@ -532,25 +532,25 @@ tr:hover td { background: rgba(0,255,106,0.04); }
 .bias-split .col.tokens .rate-nums { font-size: 14px; }
 .bias-split .col.tokens .rate-bar { margin: 6px 0 4px; height: 8px; }
 .bias-split .col.tokens .rate-meta { padding: 0; font-size: 10px; max-height: 2.6em; overflow: hidden; }
-.grok-chips { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
-.grok-chip {
+.pilot-chips { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.pilot-chip {
   display: flex; align-items: baseline; gap: 6px;
   border: 1px solid var(--border);
   padding: 4px 8px;
   min-width: 0;
 }
-.grok-chip .gc { font-size: 10px; letter-spacing: 1.2px; color: var(--muted); }
-.grok-chip .gm { font-size: 13px; letter-spacing: 1px; font-weight: 600; }
-.grok-chip.long { border-color: var(--cyan); }
-.grok-chip.long .gm { color: var(--cyan); }
-.grok-chip.short { border-color: var(--rose); }
-.grok-chip.short .gm { color: var(--rose); }
-.grok-chip.flat { border-color: var(--gold); }
-.grok-chip.flat .gm { color: var(--gold); }
-.grok-chip.on { box-shadow: 0 0 12px rgba(240,185,11,0.35); background: rgba(240,185,11,0.14); }
-.grok-chip.on.long { box-shadow: 0 0 12px rgba(126,203,255,0.4); background: rgba(126,203,255,0.16); }
-.grok-chip.on.short { box-shadow: 0 0 12px rgba(255,77,109,0.4); background: var(--rose-dim); }
-.grok-chip.on .gm { font-size: 15px; }
+.pilot-chip .gc { font-size: 10px; letter-spacing: 1.2px; color: var(--muted); }
+.pilot-chip .gm { font-size: 13px; letter-spacing: 1px; font-weight: 600; }
+.pilot-chip.long { border-color: var(--cyan); }
+.pilot-chip.long .gm { color: var(--cyan); }
+.pilot-chip.short { border-color: var(--rose); }
+.pilot-chip.short .gm { color: var(--rose); }
+.pilot-chip.flat { border-color: var(--gold); }
+.pilot-chip.flat .gm { color: var(--gold); }
+.pilot-chip.on { box-shadow: 0 0 12px rgba(240,185,11,0.35); background: rgba(240,185,11,0.14); }
+.pilot-chip.on.long { box-shadow: 0 0 12px rgba(126,203,255,0.4); background: rgba(126,203,255,0.16); }
+.pilot-chip.on.short { box-shadow: 0 0 12px rgba(255,77,109,0.4); background: var(--rose-dim); }
+.pilot-chip.on .gm { font-size: 15px; }
 
 .risk-badge {
   border: 1px solid var(--rose);
@@ -744,12 +744,12 @@ body.flask-writes-off .crazy-row input { pointer-events: none; opacity: 0.4; }
   </p>
   <div class="home-top" id="bandTop">
   <div class="band-lbl">TOP · stats</div>
-  <div class="panel grok-bias" id="fixedGrok">
+  <div class="panel pilot-bias" id="fixedPilot">
     <div class="bias-split">
       <div class="col">
-        <div class="rate-title">GROK BIAS</div>
-        <div class="rate-meta" id="grokBiasMeta">report only · BIAS BOT · never writes hunters</div>
-        <div class="grok-chips" id="grokChips" style="margin-top:6px"></div>
+        <div class="rate-title">PILOT BIAS</div>
+        <div class="rate-meta" id="pilotBiasMeta">report only · BIAS BOT · never writes hunters</div>
+        <div class="pilot-chips" id="pilotChips" style="margin-top:6px"></div>
       </div>
       <div class="col tokens" id="fixedRate">
         <div class="rate-title">HL IP tokens</div>
@@ -1562,7 +1562,7 @@ function homestatTileHtml(n, snap) {
   if (kind === "pos") return kpiBoxHtml("Open positions", t.n_pos ?? 0, "cyan");
   if (kind === "equity") return kpiBoxHtml("Total equity", money(t.equity_usd), "");
   if (kind === "upnl") return kpiBoxHtml("Open uPnL", money(t.upnl_usd), clsPnl(t.upnl_usd) === "pnl-neg" ? "rose" : "");
-  if (kind === "grok" || kind === "condor") return "";
+  if (kind === "pilot" || kind === "condor") return "";
   if (kind === "book") {
     return `<div class="panel"><div class="panel-h"><h2>Active positions</h2>
       <span class="sub">${esc((snap && snap.ts) || "live")} · ${t.n_pos || 0} open</span></div>
@@ -1571,18 +1571,18 @@ function homestatTileHtml(n, snap) {
   return "";
 }
 
-function grokChipsHtml(cg) {
+function pilotChipsHtml(cg) {
   cg = cg || {};
-  const cmd = String(cg.grok_cmd || "").toUpperCase();
+  const cmd = String(cg.pilot_cmd || "").toUpperCase();
   const post = ["LONG", "FLAT", "SHORT"].map(function (m) {
     const cls = m === "LONG" ? "long" : m === "SHORT" ? "short" : "flat";
     const on = cmd === m ? " on" : "";
-    return '<div class="grok-chip ' + cls + on + '"><span class="gc">' + (cmd === m ? "LAST" : "POST") + '</span><span class="gm">' + m + "</span></div>";
+    return '<div class="pilot-chip ' + cls + on + '"><span class="gc">' + (cmd === m ? "LAST" : "POST") + '</span><span class="gm">' + m + "</span></div>";
   });
   const coins = ["BTC", "ETH", "LTC", "TAO"].map(function (c) {
     const m = String((cg.bias || {})[c] || "FLAT").toUpperCase();
     const cls = m === "LONG" ? "long" : m === "SHORT" ? "short" : "flat";
-    return '<div class="grok-chip ' + cls + '"><span class="gc">' + c + '</span><span class="gm">' + m + "</span></div>";
+    return '<div class="pilot-chip ' + cls + '"><span class="gc">' + c + '</span><span class="gm">' + m + "</span></div>";
   });
   return post.join("") + coins.join("");
 }
@@ -1671,23 +1671,23 @@ async function sendRiskFunds() {
   riskSendBusy = false;
   load();
 }
-function renderGrokBias(cg, desk) {
-  const chips = document.getElementById("grokChips");
-  const meta = document.getElementById("grokBiasMeta");
-  if (chips) chips.innerHTML = grokChipsHtml(cg);
+function renderPilotBias(cg, desk) {
+  const chips = document.getElementById("pilotChips");
+  const meta = document.getElementById("pilotBiasMeta");
+  if (chips) chips.innerHTML = pilotChipsHtml(cg);
   if (meta) {
-    const src = (cg && cg.source === "grok") ? "GROK" : "heuristic";
+    const src = (cg && cg.source === "pilot") ? "PILOT" : "heuristic";
     const regime = String((cg && cg.regime) || "—").toUpperCase();
-    const cmd = String((cg && cg.grok_cmd) || "").toUpperCase();
+    const cmd = String((cg && cg.pilot_cmd) || "").toUpperCase();
     const posted = cmd ? (" · last post " + cmd) : " · no BIAS BOT post yet";
-    const when = cg && cg.grok_cmd_ts ? (" @ " + String(cg.grok_cmd_ts).slice(11, 19)) : "";
+    const when = cg && cg.pilot_cmd_ts ? (" @ " + String(cg.pilot_cmd_ts).slice(11, 19)) : "";
     meta.textContent = src + " · " + regime + posted + when + " · never writes hunters";
   }
 }
 
 const HOME_TILE = {
   homebot: { w: 320, h: 520 },
-  grok: { w: 992, h: 128 },
+  pilot: { w: 992, h: 128 },
   tokens: { w: 992, h: 118 },
   live: { w: 186, h: 88 },
   pos: { w: 186, h: 88 },
@@ -1784,7 +1784,7 @@ function renderBots(bots, layout, health, condor, snap) {
   const botRoot = document.getElementById("homeBot");
   document.body.classList.add("home-banded");
   if (wrap) wrap.classList.remove("staged");
-  showEl("fixedGrok", true);
+  showEl("fixedPilot", true);
   showEl("fixedRate", true);
   showEl("fixedKpis", true);
   showEl("kpiLive", true);
@@ -1866,11 +1866,11 @@ async function load() {
     showEl("kpiPos", true);
     showEl("kpiEq", true);
     showEl("kpiPnl", true);
-    showEl("fixedGrok", true);
+    showEl("fixedPilot", true);
     showEl("fixedKpis", true);
     showEl("fixedPos", true);
     renderRate(d.rate || {});
-    renderGrokBias(d.condor, d.desk_bias);
+    renderPilotBias(d.condor, d.desk_bias);
     renderDeskBias(d.desk_bias);
     homePositions = d.positions || [];
     renderRiskReport(d.risk);

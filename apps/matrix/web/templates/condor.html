@@ -84,9 +84,9 @@ code { color: var(--amber); }
     Condor measures BTC / ETH / LTC / TAO and predicts LONG / SHORT / FLAT.
     It does not trade. Bias is written only when you wire <code>REGIME → hunter BIAS</code> on Wire.
     Copy is never steered. Up-only hunters store SHORT as FLAT; Shorty stores LONG as FLAT.
-    Telegram and Grok: drop bots from the <a href="/wire">Wire</a> Condor toolbox, paste token / xAI key, wire <code>TG</code> / <code>GROK</code> into Condor.
+    Telegram and Pilot: drop bots from the <a href="/wire">Wire</a> Condor toolbox, paste token / xAI key, wire <code>TG</code> / <code>PILOT</code> into Condor.
     Env <code>TELEGRAM_BOT_TOKEN</code> / <code>XAI_API_KEY</code> still work if no bot is wired.
-    From iPhone Telegram: <code>/grok key xai-…</code> then <code>/ask</code> or just type. Commands: /status /tick /wired /grok — no orders.
+    From iPhone Telegram: <code>/pilot key xai-…</code> then <code>/ask</code> or just type. Commands: /status /tick /wired /pilot — no orders.
   </p>
   <div class="kpis">
     <div class="kpi"><div class="lbl">Regime</div><div class="val" id="kReg">—</div></div>
@@ -94,7 +94,7 @@ code { color: var(--amber); }
     <div class="kpi"><div class="lbl">Container</div><div class="val" id="kRun">—</div></div>
     <div class="kpi"><div class="lbl">Last tick</div><div class="val" id="kTs" style="font-size:13px">—</div></div>
     <div class="kpi"><div class="lbl">Telegram</div><div class="val" id="kTg">—</div></div>
-    <div class="kpi"><div class="lbl">Grok</div><div class="val" id="kGrok">—</div></div>
+    <div class="kpi"><div class="lbl">Pilot</div><div class="val" id="kPilot">—</div></div>
   </div>
   <div class="panel">
     <div class="panel-h">
@@ -143,15 +143,15 @@ function paint(d) {
       kTg.className = "val " + (tg.ok ? "gold" : "");
     }
   }
-  const grok = g.grok_bot || {};
-  const kGrok = document.getElementById("kGrok");
-  if (kGrok) {
-    if (!grok.configured) {
-      kGrok.textContent = "HEURISTIC";
-      kGrok.className = "val";
+  const pilot = g.pilot_bot || {};
+  const kPilot = document.getElementById("kPilot");
+  if (kPilot) {
+    if (!pilot.configured) {
+      kPilot.textContent = "HEURISTIC";
+      kPilot.className = "val";
     } else {
-      kGrok.textContent = grok.model || grok.name || "ON";
-      kGrok.className = "val gold";
+      kPilot.textContent = pilot.model || pilot.name || "ON";
+      kPilot.className = "val gold";
     }
   }
   const dl = document.getElementById("biasDl");
