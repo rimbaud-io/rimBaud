@@ -19,4 +19,4 @@ limitations under the License.
 Wire page source. Canvas, toolbox, and the wallet window.
 
 The page source. A wallet here is a subaccount name. The key is not in this folder.
-<!-- archy-folder 0.2g26 -->
+<!-- archy-folder 0.2g33 -->
