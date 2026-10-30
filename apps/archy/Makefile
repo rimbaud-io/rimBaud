@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# rimbaud-archy — version desk. Grok --bump-g. Operator LEVEL UP in the window.
+# rimbaud-archy — version desk. Pilot --bump-g. Operator LEVEL UP in the window.
 CXX ?= g++
 CXXFLAGS ?= -std=c++17 -O2 -Wall -Wextra -I../../third_party
 LDFLAGS ?= -lX11 -lpthread

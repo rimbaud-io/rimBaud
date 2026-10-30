@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""rimBaud Archy — version sqlite. Grok may only --bump-g. Operator LEVEL UP is the C++ desk."""
+"""rimBaud Archy — version sqlite. Pilot may only --bump-g. Operator LEVEL UP is the C++ desk."""
 from __future__ import annotations
 
 import json
@@ -35,9 +35,9 @@ def _utc():
     return time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())
 
 
-def _display(major: int, minor: int, grok: int) -> str:
-    if grok and grok > 0:
-        return f"{major}.{minor}g{grok}"
+def _display(major: int, minor: int, pilot: int) -> str:
+    if pilot and pilot > 0:
+        return f"{major}.{minor}g{pilot}"
     return f"{major}.{minor}"
 
 
@@ -50,7 +50,7 @@ def _con():
             id INTEGER PRIMARY KEY CHECK (id=1),
             major INTEGER NOT NULL,
             minor INTEGER NOT NULL,
-            grok INTEGER NOT NULL DEFAULT 0,
+            pilot INTEGER NOT NULL DEFAULT 0,
             display TEXT NOT NULL,
             updated TEXT NOT NULL
         )"""
@@ -80,7 +80,7 @@ def _con():
     if not row:
         disp = _display(0, 1, 0)
         c.execute(
-            "INSERT INTO archy_state (id, major, minor, grok, display, updated) VALUES (1,0,1,0,?,?)",
+            "INSERT INTO archy_state (id, major, minor, pilot, display, updated) VALUES (1,0,1,0,?,?)",
             (disp, _utc()),
         )
         c.execute(
@@ -98,9 +98,9 @@ def _write_json(state, deploys=None):
         "version": state["display"],
         "major": state["major"],
         "minor": state["minor"],
-        "grok": state["grok"],
+        "pilot": state["pilot"],
         "updated": state["updated"],
-        "note": "gN = Grok edits on this minor. LEVEL UP (0.1→0.2) is operator-only in rimbaud-archy.",
+        "note": "gN = Pilot edits on this minor. LEVEL UP (0.1→0.2) is operator-only in rimbaud-archy.",
     }
     tmp = JSON + ".tmp"
     with open(tmp, "w") as f:
@@ -164,7 +164,10 @@ def dump_status():
 
 
 def publish_github(version: str, summary: str) -> None:
-    """Refresh the GitHub tree and commit this Archy version. Does not push."""
+    """Refresh the GitHub tree and commit this Archy version. Does not push.
+
+    The publisher removes assistant note files and that name from the copy.
+    """
     if os.environ.get("ARCHY_NO_PUBLISH") == "1":
         return
     script = os.path.join(ROOT, "scripts", "rimbaud_publish.py")
@@ -240,21 +243,21 @@ def send_github() -> dict:
     return data
 
 
-def bump_g(summary: str, files: str = "", who: str = "grok"):
-    """Grok-only: 0.1 → 0.1g1 → 0.1g2. Never raises 0.1 to 0.2."""
+def bump_g(summary: str, files: str = "", who: str = "pilot"):
+    """Pilot-only: 0.1 → 0.1g1 → 0.1g2. Never raises 0.1 to 0.2."""
     c = _con()
     st = state_dict(c)
     old = st["display"]
-    grok = int(st["grok"] or 0) + 1
-    disp = _display(int(st["major"]), int(st["minor"]), grok)
+    pilot = int(st["pilot"] or 0) + 1
+    disp = _display(int(st["major"]), int(st["minor"]), pilot)
     now = _utc()
     c.execute(
-        "UPDATE archy_state SET grok=?, display=?, updated=? WHERE id=1",
-        (grok, disp, now),
+        "UPDATE archy_state SET pilot=?, display=?, updated=? WHERE id=1",
+        (pilot, disp, now),
     )
     c.execute(
         "INSERT INTO archy_log (ts, kind, who, from_ver, to_ver, summary, files) VALUES (?,?,?,?,?,?,?)",
-        (now, "grok", who, old, disp, summary or "code edit", files or ""),
+        (now, "pilot", who, old, disp, summary or "code edit", files or ""),
     )
     c.commit()
     st = state_dict(c)
@@ -274,7 +277,7 @@ def level_up(summary: str = "", who: str = "operator"):
     disp = _display(int(st["major"]), minor, 0)
     now = _utc()
     c.execute(
-        "UPDATE archy_state SET minor=?, grok=0, display=?, updated=? WHERE id=1",
+        "UPDATE archy_state SET minor=?, pilot=0, display=?, updated=? WHERE id=1",
         (minor, disp, now),
     )
     c.execute(
@@ -316,7 +319,7 @@ def log_edit(summary: str, files: str = ""):
     st = state_dict(c)
     c.execute(
         "INSERT INTO archy_log (ts, kind, who, from_ver, to_ver, summary, files) VALUES (?,?,?,?,?,?,?)",
-        (_utc(), "edit", "grok", st["display"], st["display"], summary, files),
+        (_utc(), "edit", "pilot", st["display"], st["display"], summary, files),
     )
     c.commit()
     c.close()
@@ -348,7 +351,7 @@ def main(argv):
         print(json.dumps(log_edit(args[1] if len(args) > 1 else "edit", args[2] if len(args) > 2 else ""), indent=2))
         return 0
     if cmd in ("--level-up", "level-up"):
-        print("LEVEL UP is operator-only in the rimbaud-archy desk. Grok cannot raise 0.1 → 0.2.", file=sys.stderr)
+        print("LEVEL UP is operator-only in the rimbaud-archy desk. Pilot cannot raise 0.1 → 0.2.", file=sys.stderr)
         return 3
     if cmd == "--operator-level-up":
         if os.environ.get("ARCHY_OPERATOR") != "1":
