@@ -491,6 +491,13 @@ std::vector<CtrlField> standard_fields(const std::string& id) {
         fs.push_back(mkf("st_max_dist", "ST max dist %", "pct_frac", 0.1, 0, 100));
         fs.push_back(mkf("margin_pct", "Margin % leftover", "pct_frac", 1, 0, 100));
     } else if (id == "hummingbot-dman-maker" || id == "hummingbot-dman-maker-bch") {
+        // BCH only. Hyperliquid max is 10x, so MID is 5x and LOW is 2x.
+        // The saved value stays MAX, MID, or LOW. The script divides the cap.
+        if (id == "hummingbot-dman-maker-bch") {
+            CtrlField lev = mkf("leverage_tier", "Leverage", "select");
+            lev.options = {"MAX", "MID", "LOW"};
+            fs.push_back(lev);
+        }
         fs.push_back(mkf("sendEvery2Win", "send every 2 win to risk wallet", "bool"));
         fs.push_back(mkf("dontGoCrazy", "dontGoCrazy", "bool"));
         fs.push_back(mkf("afterLossNoRebuy", "afterLossNoRebuy", "bool"));
@@ -1704,7 +1711,7 @@ struct DeskUi {
             std::vector<CtrlField> front, extra;
             for (auto& f : stdf) {
                 if (have.count(f.key)) continue;
-                if (f.key == "sendEvery2Win") front.push_back(f);
+                if (f.key == "sendEvery2Win" || f.key == "leverage_tier") front.push_back(f);
                 else extra.push_back(f);
             }
             if (!front.empty())
@@ -3346,23 +3353,34 @@ int draw_sl_strip(Display* d, Drawable dr, GC gc, const Colors& C,
 }
 
 // Every hunter except HL Copy. MAX = Hyperliquid cap, MID = cap/2, LOW = cap/4.
+// One coin paints the x on the button. BCH is 10x, 5x, and 2x.
 int draw_lev_strip(Display* d, Drawable dr, GC gc, const Colors& C,
                    int x, int y, const Bot& b, std::vector<Hit>* hits, int bot_i,
                    const Rect* hover) {
     std::string tier = lev_tier_of(b);
     text(d, dr, gc, C.gold, x, y + 14, "LEV");
+    std::string coin;
+    if (b.coins.size() == 1) coin = b.coins[0];
     const char* tiers[] = {"MAX", "MID", "LOW"};
     int cx = x + 40;
     for (int k = 0; k < 3; ++k) {
-        Rect br{cx + k * 56, y, 52, 20};
+        std::string lab = tiers[k];
+        if (!coin.empty()) {
+            lab += " ";
+            lab += std::to_string(lev_for_tier(coin, tiers[k]));
+            lab += "x";
+        }
+        int bw = std::max(52, static_cast<int>(lab.size()) * CHAR_W + 12);
+        Rect br{cx, y, bw, 20};
         bool on = tier == tiers[k];
         unsigned long pc = lev_tier_col(C, tiers[k]);
         bool hot = hover && rects_overlap(*hover, br);
         fill(d, dr, gc, on || hot ? pc : C.bg, br);
         stroke(d, dr, gc, hot ? C.white : pc, br);
-        int tx = br.x + (br.w - 3 * CHAR_W) / 2;
-        text(d, dr, gc, on || hot ? C.bg : pc, tx, br.y + 14, tiers[k]);
+        int tx = br.x + (br.w - static_cast<int>(lab.size()) * CHAR_W) / 2;
+        text(d, dr, gc, on || hot ? C.bg : pc, tx, br.y + 14, lab.c_str());
         if (hits) hits->push_back({Hit::Lev, bot_i, br, tiers[k]});
+        cx += bw + 4;
     }
     return 26;
 }
@@ -4967,6 +4985,19 @@ int run_desk(FlaskApi& api) {
                         int colx = 0;
                         unsigned long kcol = ncol;
                         for (auto& f : fields) {
+                            if (f.key == "leverage_tier" && lb) {
+                                if (colx) { colx = 0; iy += cellh; }
+                                iy += draw_lev_strip(dpy, buf, gc, C, np.x + 10, iy, *lb,
+                                                     &ui.hits, bix, &ui.hover_r);
+                                std::string coin = lb->coins.empty() ? std::string("BCH") : lb->coins[0];
+                                int cap = hl_cap_for(coin);
+                                char note[96];
+                                snprintf(note, sizeof(note), "HL %s  %dx  %dx  %dx",
+                                         coin.c_str(), cap, std::max(1, cap / 2), std::max(1, cap / 4));
+                                text(dpy, buf, gc, C.ab_muted, np.x + 10, iy + 12, note);
+                                iy += 16;
+                                continue;
+                            }
                             auto stored = lb->controller.contains(f.key) ? lb->controller[f.key] : nlohmann::json();
                             double dv = display_value(f, stored);
                             if ((ui.knob_drag || ui.knob_focus_bot == bix)
@@ -6092,6 +6123,20 @@ int run_desk(FlaskApi& api) {
                         yy += 26;
                         break;
                     }
+                    for (auto& f : fields) {
+                        if (f.key != "leverage_tier") continue;
+                        draw_lev_strip(dpy, buf, gc, C, x, yy, *b, &ui.hits, ui.sel, &ui.hover_r);
+                        yy += 26;
+                        std::string coin = b->coins.empty() ? std::string("BCH") : b->coins[0];
+                        int cap = hl_cap_for(coin);
+                        char note[128];
+                        snprintf(note, sizeof(note),
+                                 "Hyperliquid %s max %dx   mid %dx   low %dx. An open coin stays until flat.",
+                                 coin.c_str(), cap, std::max(1, cap / 2), std::max(1, cap / 4));
+                        text(dpy, buf, gc, C.muted, x, yy, fit_px(note, inner));
+                        yy += 18;
+                        break;
+                    }
                 }
                 const int cellw = 124;
                 const int cellh = 132;
@@ -6432,7 +6477,7 @@ int run_desk(FlaskApi& api) {
             const int boxgap = 10;
             int drawn = 0;
             for (auto& f : fields) {
-                if (f.key == "sendEvery2Win") continue;
+                if (f.key == "sendEvery2Win" || f.key == "leverage_tier") continue;
                 if (kx + boxw > right) {
                     kx = x;
                     ky += boxh + boxgap;
