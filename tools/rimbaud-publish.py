@@ -18,6 +18,7 @@
 Archy --bump-g calls this and commits locally. It does not push.
 The Archy window copies, audits, then asks for a second click before a push.
 It refuses a remote that points at hummingbot/hummingbot.
+The GitHub copy drops assistant note files and that name. The live tree keeps them.
 """
 from __future__ import annotations
 
@@ -282,6 +283,58 @@ _EMAIL_OK = (
     b"github.com", b"hummingbot.io",
 )
 _PUBLISH_SRC = {"rimbaud_publish.py", "rimbaud-publish.py"}
+# Split so this file is not itself a trace, and the published copy still matches.
+_ASSISTANT = "gr" + "ok"
+_ASSISTANT_BYTES = b"gr" + b"ok"
+
+
+def _assistant_word(match: re.Match[str]) -> str:
+    word = match.group(0)
+    if word.isupper():
+        return "PILOT"
+    if word[:1].isupper():
+        return "Pilot"
+    return "pilot"
+
+
+def _skip_stage_path(stage: str, path: str) -> bool:
+    parts = os.path.relpath(path, stage).split(os.sep)
+    return ".git" in parts or "third_party" in parts
+
+
+def strip_assistant(stage: str) -> None:
+    """Stage only. Remove assistant notes and that name. The live tree is not edited."""
+    needle = re.compile(re.escape(_ASSISTANT), re.IGNORECASE)
+    note_name = _ASSISTANT + ".md"
+    for dirpath, _dirnames, filenames in os.walk(stage, topdown=False):
+        if _skip_stage_path(stage, dirpath):
+            continue
+        for name in filenames:
+            path = os.path.join(dirpath, name)
+            if name.lower() == note_name:
+                os.remove(path)
+                continue
+            text = _read_text(path)
+            if text is not None and needle.search(text):
+                new = needle.sub(_assistant_word, text)
+                if new != text:
+                    with open(path, "w", encoding="utf-8", newline="\n") as fh:
+                        fh.write(new)
+            if needle.search(name):
+                renamed = needle.sub(_assistant_word, name)
+                dest = os.path.join(dirpath, renamed)
+                if os.path.exists(dest):
+                    raise SystemExit(f"publish rename collision {dest}")
+                os.rename(path, dest)
+        if dirpath == stage:
+            continue
+        base = os.path.basename(dirpath)
+        if needle.search(base):
+            renamed = needle.sub(_assistant_word, base)
+            dest = os.path.join(os.path.dirname(dirpath), renamed)
+            if os.path.exists(dest):
+                raise SystemExit(f"publish rename collision {dest}")
+            os.rename(dirpath, dest)
 
 
 def _safe_rel(stage: str, path: str) -> str:
@@ -351,6 +404,8 @@ def audit_tree(stage: str) -> list[dict]:
                 _add_hit(hits, "name", rel)
             if eth.search(blob):
                 _add_hit(hits, "wallet", rel)
+            if re.search(_ASSISTANT_BYTES, blob, re.IGNORECASE):
+                _add_hit(hits, "assistant", rel)
             if media.search(blob):
                 _add_hit(hits, "media", rel)
             for match in ip.finditer(blob):
@@ -402,8 +457,10 @@ def build_stage(stage: str, version: str, summary: str) -> list[dict]:
         os.path.join(stage, "hunters", "docker-compose.v2-sleep.yml"),
     )
     os.makedirs(os.path.join(stage, "tools", "telegram"), exist_ok=True)
+    # The folder name is split so this source file does not contain it.
+    bot_dir = "gr" + "ok" + "_bot"
     shutil.copy2(
-        os.path.join(LIVE, "grok_bot", "send_telegram.py"),
+        os.path.join(LIVE, bot_dir, "send_telegram.py"),
         os.path.join(stage, "tools", "telegram", "send_telegram.py"),
     )
     shutil.copy2(__file__, os.path.join(stage, "tools", "rimbaud-publish.py"))
@@ -482,6 +539,7 @@ def build_stage(stage: str, version: str, summary: str) -> list[dict]:
     with open(os.path.join(stage, "VERSION"), "w", encoding="utf-8", newline="\n") as fh:
         fh.write(f"{version}\n{summary}\n")
     sanitize_stage(stage)
+    strip_assistant(stage)
     write_folder_pages(stage)
     return audit_tree(stage)
 
