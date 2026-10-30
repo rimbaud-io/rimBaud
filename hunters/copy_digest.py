@@ -146,7 +146,7 @@ def positions_bots() -> List[dict]:
         if not tgt:
             continue
         td = tgt.get("data") if isinstance(tgt.get("data"), dict) else {}
-        if str(td.get("kind") or "telegram") == "grok":
+        if str(td.get("kind") or "telegram") == "pilot":
             continue
         if tgt.get("type") == "agent" or str(td.get("kind") or "") == "telegram":
             pos_ids.add(str(tgt.get("id")))
