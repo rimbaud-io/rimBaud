@@ -218,29 +218,70 @@ def prepare_github() -> dict:
     return _operator_github("--prepare-json")
 
 
-def send_github() -> dict:
-    """Second click. Re-audits the GitHub folder, then pushes."""
-    data = _operator_github("--send-json")
+def _log_github(summary: str) -> dict:
+    """One ledger row for a GitHub send. A bump never calls this."""
+    text = " ".join(str(summary or "").split())
+    if len(text) > 180:
+        text = text[:177] + "..."
+    c = _con()
+    st = state_dict(c)
+    ver = str(st["display"] or "")
+    c.execute(
+        "INSERT INTO archy_log (ts, kind, who, from_ver, to_ver, summary, files) VALUES (?,?,?,?,?,?,?)",
+        (_utc(), "github", "operator", ver, ver, text, ""),
+    )
+    c.commit()
+    c.close()
+    return dump_status()
+
+
+def _send_summary(data: dict, version: str) -> str:
     if data.get("ok") and data.get("pushed"):
-        c = _con()
-        st = state_dict(c)
-        ver = str(data.get("version") or st["display"])
-        c.execute(
-            "INSERT INTO archy_log (ts, kind, who, from_ver, to_ver, summary, files) VALUES (?,?,?,?,?,?,?)",
-            (_utc(), "github", "operator", st["display"], ver, "sent " + ver + " to github", ""),
-        )
-        c.commit()
-        c.close()
-        fresh = dump_status()
-        fresh["ok"] = True
-        fresh["clean"] = True
-        fresh["pushed"] = True
-        fresh["message"] = data.get("message") or ("sent " + ver + " to github")
-        fresh["findings"] = []
-        if data.get("remote"):
-            fresh["remote"] = data.get("remote")
-        return fresh
-    return data
+        return "sent " + str(data.get("version") or version) + " to github"
+    findings = data.get("findings") or []
+    if findings and isinstance(findings[0], dict):
+        row = findings[0]
+        return "push blocked, %s in %s" % (row.get("kind") or "audit", row.get("file") or "?")
+    detail = str(data.get("detail") or "").strip()
+    err = str(data.get("error") or data.get("message") or "github push failed").strip()
+    if err.startswith("github push failed"):
+        err = "push failed" + err[len("github push failed"):]
+    if detail and detail not in err:
+        text = (err + ": " + detail) if err else detail
+    else:
+        text = err or detail or "push failed"
+    if not text.startswith("push "):
+        text = "push failed: " + text
+    return " ".join(text.split())
+
+
+def send_github() -> dict:
+    """Second click. Re-audits the GitHub folder, then pushes.
+
+    The ledger records the try before the push, then the result. A refusal
+    keeps the git reason. The first click, the copy, is not a push.
+    """
+    c = _con()
+    st = state_dict(c)
+    c.close()
+    ver = str(st["display"] or "")
+    _log_github("push " + ver + " to github")
+    data = _operator_github("--send-json")
+    summary = _send_summary(data, ver)
+    fresh = _log_github(summary)
+    pushed = bool(data.get("ok") and data.get("pushed"))
+    fresh["ok"] = pushed
+    fresh["clean"] = bool(data.get("clean")) if not pushed else True
+    fresh["pushed"] = pushed
+    fresh["message"] = summary
+    fresh["findings"] = [] if pushed else (data.get("findings") or [])
+    if data.get("error") and not pushed:
+        fresh["error"] = data.get("error")
+    if data.get("detail"):
+        fresh["detail"] = data.get("detail")
+    if data.get("remote"):
+        fresh["remote"] = data.get("remote")
+    return fresh
 
 
 def bump_g(summary: str, files: str = "", who: str = "pilot"):
