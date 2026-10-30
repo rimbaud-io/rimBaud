@@ -2022,7 +2022,7 @@ static json api_home(const Brain& br) {
         {"bias", gauge.value("bias", json::object())},
         {"feed", json::array()},
         {"telegram", {{"ok", false}}},
-        {"grok_bot", {{"configured", false}}},
+        {"pilot_bot", {{"configured", false}}},
     };
     auto feed = read_json(join(br.conf, "condor_feed.json"));
     if (feed.contains("lines") && feed["lines"].is_array()) {
