@@ -207,7 +207,7 @@ struct CondorInfo {
     std::map<std::string, std::string> bias;
     std::vector<std::string> feed;
     bool telegram_ok = false;
-    bool grok_ok = false;
+    bool pilot_ok = false;
 };
 
 struct Leader {

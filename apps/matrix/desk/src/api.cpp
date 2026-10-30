@@ -311,8 +311,8 @@ static void parse_home_extras(DeskSnap& snap, const json& j) {
         }
         if (c.contains("telegram") && c["telegram"].is_object())
             snap.condor.telegram_ok = flag(c["telegram"], "ok");
-        if (c.contains("grok_bot") && c["grok_bot"].is_object())
-            snap.condor.grok_ok = flag(c["grok_bot"], "configured");
+        if (c.contains("pilot_bot") && c["pilot_bot"].is_object())
+            snap.condor.pilot_ok = flag(c["pilot_bot"], "configured");
         if (c.contains("feed") && c["feed"].is_array()) {
             for (auto& f : c["feed"]) {
                 if (!f.is_object()) continue;
@@ -597,7 +597,7 @@ void FlaskApi::load_fields(DeskSnap& snap) {
     snap.tools.push_back(tool("moon-pct", "settings", "pct", "Moon %", "wire into bot MOON", "#ffd24a", false, "moon"));
     snap.tools.push_back(tool("bias-manual", "bias", "bias", "Manual BIAS", "LONG / SHORT / FLAT", "#ffc857", false));
     snap.tools.push_back(tool("desk-bias", "bias", "desk_bias", "Desk BIAS", "does not close", "#f0b90b", true, "desk"));
-    snap.tools.push_back(tool("gauge-condor", "gauges", "gauge", "Condor", "Grok / heuristic BIAS", "#c084fc", true, "condor"));
+    snap.tools.push_back(tool("gauge-condor", "gauges", "gauge", "Condor", "Pilot / heuristic BIAS", "#c084fc", true, "condor"));
     snap.tools.push_back(tool("gauge-hmm", "gauges", "gauge", "HMM / vol", "regime meter", "#c084fc", true, "hmm"));
     snap.tools.push_back(tool("gauge-vol", "gauges", "gauge", "Vol meter", "realized vol", "#a78bfa", true, "vol"));
     snap.tools.push_back(tool("gauge-bb", "gauges", "gauge", "BB width", "squeeze / expansion", "#818cf8", true, "bb"));
@@ -605,7 +605,7 @@ void FlaskApi::load_fields(DeskSnap& snap) {
     snap.tools.push_back(tool("bias-xlate", "condor", "xlate", "Translator", "LONG SHORT FLAT CLOSE", "#34d399", false, "translator"));
     snap.tools.push_back(tool("close-xlate", "condor", "xlate", "Close translator", "CLOSE only", "#ff4d6d", false, "closer"));
     snap.tools.push_back(tool("telegram-bot", "condor", "agent", "Telegram bot", "token + chat ids", "#34d399", false, "telegram"));
-    snap.tools.push_back(tool("grok-bot", "condor", "agent", "Grok bot", "xAI key + model", "#2A9FD6", false, "grok"));
+    snap.tools.push_back(tool("pilot-bot", "condor", "agent", "Pilot bot", "xAI key + model", "#2A9FD6", false, "pilot"));
     snap.tools.push_back(tool("email-bot", "condor", "agent", "Email alerts", "Health ALERT", "#ffc857", false, "email"));
     snap.tools.push_back(tool("funds", "wallets", "funds", "FUNDS bus", "all HL subs", "#f0b90b"));
     snap.tools.push_back(tool("risk-wallet", "wallets", "risk_wallet", "RISK wallet", "skim / parked", "#ff4d6d", false));
@@ -616,7 +616,7 @@ void FlaskApi::load_fields(DeskSnap& snap) {
     snap.tools.push_back(tool("logs", "output", "logs", "LOGS bus", "live tail", "#7ecbff"));
     snap.tools.push_back(tool("out-xml", "output", "output", "XML file", "conf/wire_graph.xml", "#86efac", false, "xml"));
     snap.tools.push_back(tool("out-live", "output", "output", "Live stream", "positions + logs", "#7ecbff", false, "live"));
-    snap.tools.push_back(tool("out-stream", "output", "output", "Stream", "Telegram / Grok feed", "#34d399", false, "stream"));
+    snap.tools.push_back(tool("out-stream", "output", "output", "Stream", "Telegram / Pilot feed", "#34d399", false, "stream"));
     snap.tools.push_back(tool("draw-box", "draw", "frame", "Group box", "caption to group nodes", "#3d7a55", false, "box"));
     snap.tools.push_back(tool("draw-circle", "draw", "circle", "Circle note", "caption + color", "#7ecbff", false, "circle"));
     } catch (...) {}

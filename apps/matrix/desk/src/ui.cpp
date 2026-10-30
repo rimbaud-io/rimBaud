@@ -3503,7 +3503,7 @@ std::vector<std::string> src_ports(const WireNode& n) {
     if (n.type == "trader") return {"trader"};
     if (n.type == "gauge") return {"bias", "live"};
     if (n.type == "xlate") return {n.kind == "closer" ? "eclose" : "bias"};
-    if (n.type == "agent") return {n.kind == "grok" ? "grok" : "out"};
+    if (n.type == "agent") return {n.kind == "pilot" ? "pilot" : "out"};
     if (n.type == "health") return {"live", "alert"};
     if (n.type == "funds") return {"funds"};
     return {"out"};
@@ -3525,7 +3525,7 @@ std::vector<std::string> tgt_ports(const WireNode& n) {
     if (n.type == "logs" || n.type == "output" || n.type == "funds") return {"in"};
     if (n.type == "bias" || n.type == "desk_bias") return {"in"};
     if (n.type == "xlate") return {"tg"};
-    if (n.type == "gauge") return {"tg", "grok"};
+    if (n.type == "gauge") return {"tg", "pilot"};
     if (n.type == "agent") return {"in"};
     return {"in"};
 }
@@ -3647,9 +3647,9 @@ bool handles_ok(const std::string& src, const std::string& tgt) {
     if (src == "bias" && tgt == "bias") return true;
     if (src == "ctrl" && tgt == "ctrl") return true;
     if ((src == "tg" || src == "out") && tgt == "tg") return true;
-    if (src == "grok" && tgt == "grok") return true;
+    if (src == "pilot" && tgt == "pilot") return true;
     if (tgt == "in" && (src == "logs" || src == "income" || src == "funds" || src == "bias" ||
-                        src == "tg" || src == "grok" || src == "out" || src == "live" || src == "alert"))
+                        src == "tg" || src == "pilot" || src == "out" || src == "live" || src == "alert"))
         return true;
     return src == tgt;
 }
@@ -3697,7 +3697,7 @@ unsigned long handle_col(const Colors& C, const std::string& h) {
     if (h == "risk" || h == "sl" || h == "eclose" || h == "alert") return C.rose;
     if (h == "logs" || h == "live") return C.cyan;
     if (h == "moon") return C.amber;
-    if (h == "ctrl" || h == "tg" || h == "grok" || h == "out") return C.ab_orange;
+    if (h == "ctrl" || h == "tg" || h == "pilot" || h == "out") return C.ab_orange;
     if (h == "trader") return C.gold;
     return C.ab_line;
 }
@@ -3720,7 +3720,7 @@ std::string port_role(const std::string& handle, bool source) {
     if (handle == "live") return "pulse";
     if (handle == "alert") return "alarm";
     if (handle == "funds") return "balances";
-    if (handle == "grok") return "model";
+    if (handle == "pilot") return "model";
     if (handle == "tg") return "signal";
     if (handle == "out") return "message";
     if (handle == "in") return "inlet";
@@ -4366,8 +4366,8 @@ int run_desk(FlaskApi& api) {
             int x = 14;
             int inner = W - 28;
 
-            // Condor / Grok chips
-            text(dpy, buf, gc, C.gold, x, y + 14, "CONDOR / GROK");
+            // Condor / Pilot chips
+            text(dpy, buf, gc, C.gold, x, y + 14, "CONDOR / PILOT");
             int cx = x + 130;
             for (auto& kv : ui.snap.condor.bias) {
                 Rect chip{cx, y, 86, 22};
@@ -4378,11 +4378,11 @@ int run_desk(FlaskApi& api) {
                 cx += 94;
             }
             char src[96];
-            snprintf(src, sizeof(src), "%s  %s  tg %s  grok %s",
+            snprintf(src, sizeof(src), "%s  %s  tg %s  pilot %s",
                      ascii(ui.snap.condor.source, 12).c_str(),
                      ascii(ui.snap.condor.regime, 12).c_str(),
                      ui.snap.condor.telegram_ok ? "ok" : "off",
-                     ui.snap.condor.grok_ok ? "ok" : "off");
+                     ui.snap.condor.pilot_ok ? "ok" : "off");
             text(dpy, buf, gc, C.muted, cx + 8, y + 15, src);
             y += 32;
 
@@ -5599,7 +5599,7 @@ int run_desk(FlaskApi& api) {
                 {"SOURCE", ascii(ui.snap.condor.source, 16), C.gold},
                 {"CONTAINER", ui.snap.condor.running ? "running" : "off", ui.snap.condor.running ? C.green : C.rose},
                 {"TELEGRAM", ui.snap.condor.telegram_ok ? "ok" : "off", ui.snap.condor.telegram_ok ? C.green : C.muted},
-                {"GROK", ui.snap.condor.grok_ok ? "ok" : "off", ui.snap.condor.grok_ok ? C.green : C.muted},
+                {"PILOT", ui.snap.condor.pilot_ok ? "ok" : "off", ui.snap.condor.pilot_ok ? C.green : C.muted},
             };
             for (int i = 0; i < 5; ++i) {
                 Rect r{x + i * 210, y, 200, 52};
