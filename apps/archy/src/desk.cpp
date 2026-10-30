@@ -18,6 +18,7 @@
 #include <X11/Xutil.h>
 #include <X11/keysym.h>
 #include <X11/cursorfont.h>
+#include <X11/Xatom.h>
 
 #include <algorithm>
 #include <cstdio>
@@ -179,7 +180,8 @@ int archy_desk_main() {
     int W = 920, H = 760;
     XSetWindowAttributes wa{};
     wa.background_pixel = bg;
-    wa.event_mask = ExposureMask | StructureNotifyMask | ButtonPressMask | KeyPressMask | PointerMotionMask;
+    wa.event_mask = ExposureMask | StructureNotifyMask | ButtonPressMask | ButtonReleaseMask
+        | KeyPressMask | PointerMotionMask | ButtonMotionMask;
     Window win = XCreateWindow(dpy, RootWindow(dpy, scr), 80, 80, W, H, 0,
                                DefaultDepth(dpy, scr), InputOutput, DefaultVisual(dpy, scr),
                                CWBackPixel | CWEventMask, &wa);
@@ -195,6 +197,12 @@ int archy_desk_main() {
     Pixmap buf = XCreatePixmap(dpy, win, W, H, DefaultDepth(dpy, scr));
     Cursor cur_arrow = XCreateFontCursor(dpy, XC_left_ptr);
     Cursor cur_hand = XCreateFontCursor(dpy, XC_hand2);
+    Cursor cur_ibeam = XCreateFontCursor(dpy, XC_xterm);
+    Atom atom_clip = XInternAtom(dpy, "CLIPBOARD", False);
+    Atom atom_utf8 = XInternAtom(dpy, "UTF8_STRING", False);
+    Atom atom_targets = XInternAtom(dpy, "TARGETS", False);
+    Atom atom_text = XInternAtom(dpy, "TEXT", False);
+    unsigned long mark_bg = rgb(dpy, cm, 14, 78, 52);
     XMapWindow(dpy, win);
 
     auto fill = [&](unsigned long c, Rect r) {
@@ -225,6 +233,85 @@ int archy_desk_main() {
     auto say = [&](const std::string& s) { toast = s; toast_until = now() + 4; };
 
     std::vector<Hit> hits;
+    struct LogRow {
+        std::string shown;
+        std::string full;
+        int x = 0;
+        int base = 0;
+    };
+    std::vector<LogRow> log_rows;
+    Rect log_box{0, 0, 0, 0};
+    int mark_a_row = -1, mark_a_col = 0, mark_b_row = -1, mark_b_col = 0;
+    bool marking = false;
+    std::string clip_text;
+
+    auto glyphs_width = [&](const std::string& s, int n) -> int {
+        if (n <= 0) return 0;
+        if (n > (int)s.size()) n = (int)s.size();
+        if (!fs) return n * 6;
+        return XTextWidth(fs, s.c_str(), n);
+    };
+    auto col_at = [&](const std::string& s, int px, int x0) -> int {
+        if (!fs) {
+            int col = (px - x0 + 3) / 6;
+            if (col < 0) col = 0;
+            if (col > (int)s.size()) col = (int)s.size();
+            return col;
+        }
+        int prev = 0;
+        for (int n = 0; n < (int)s.size(); n++) {
+            int w = XTextWidth(fs, s.c_str(), n + 1);
+            if (px < x0 + (prev + w) / 2) return n;
+            prev = w;
+        }
+        return (int)s.size();
+    };
+    auto mark_from_pixel = [&](int px, int py) {
+        if (log_rows.empty()) return;
+        int row = 0;
+        if (py >= log_rows.back().base) row = (int)log_rows.size() - 1;
+        else if (py > log_rows.front().base - 14) {
+            int bestd = 100000;
+            for (int i = 0; i < (int)log_rows.size(); i++) {
+                int d = py - log_rows[i].base;
+                if (d < 0) d = -d;
+                if (d < bestd) { bestd = d; row = i; }
+            }
+        }
+        mark_b_row = row;
+        mark_b_col = col_at(log_rows[row].shown, px, log_rows[row].x);
+    };
+    auto marked_text = [&]() -> std::string {
+        if (mark_a_row < 0 || mark_b_row < 0 || log_rows.empty()) return "";
+        int r0 = mark_a_row, c0 = mark_a_col, r1 = mark_b_row, c1 = mark_b_col;
+        if (r0 > r1 || (r0 == r1 && c0 > c1)) {
+            std::swap(r0, r1);
+            std::swap(c0, c1);
+        }
+        if (r0 >= (int)log_rows.size()) return "";
+        if (r1 >= (int)log_rows.size()) r1 = (int)log_rows.size() - 1;
+        std::string out;
+        for (int i = r0; i <= r1; i++) {
+            const LogRow& row = log_rows[i];
+            int a = (i == r0) ? c0 : 0;
+            int b = (i == r1) ? c1 : (int)row.shown.size();
+            if (a < 0) a = 0;
+            if (a > (int)row.shown.size()) a = (int)row.shown.size();
+            if (b < a) b = a;
+            if (b > (int)row.shown.size()) b = (int)row.shown.size();
+            bool whole = a == 0 && b == (int)row.shown.size() && !row.shown.empty();
+            if (i > r0) out += "\n";
+            out += whole ? row.full : row.shown.substr((size_t)a, (size_t)(b - a));
+        }
+        return out;
+    };
+    auto offer_clip = [&](const std::string& s) {
+        if (s.empty()) return;
+        clip_text = s;
+        XSetSelectionOwner(dpy, XA_PRIMARY, win, CurrentTime);
+        XSetSelectionOwner(dpy, atom_clip, win, CurrentTime);
+    };
+
     auto redraw = [&]() {
         hits.clear();
         fill(bg, {0, 0, W, H});
@@ -319,14 +406,19 @@ int archy_desk_main() {
         }
 
         y += 8;
-        txt(gold, 18, y, "CHANGE LOG  (sqlite conf/archy.db)");
+        txt(gold, 18, y, "CHANGE LOG");
+        txt(muted, 130, y, "drag to mark  ·  release copies");
         y += 16;
         Rect logp{18, y, W - 36, H - y - 16};
+        log_box = logp;
         fill(rgb(dpy, cm, 2, 10, 6), logp); stroke(border, logp);
         json logs = st.contains("log") ? st["log"] : json::array();
         int ly = logp.y + 18;
         int maxl = std::max(4, (logp.h - 24) / 16);
         int n = 0;
+        int text_x = logp.x + 10;
+        int max_px = logp.w - 20;
+        log_rows.clear();
         if (logs.is_array()) {
             for (auto& e : logs) {
                 if (n >= maxl) break;
@@ -337,17 +429,43 @@ int archy_desk_main() {
                 else if (kind == "pilot") col = cyan;
                 else if (kind == "deploy") col = green;
                 else if (kind == "github") col = orange;
-                char line[220];
-                snprintf(line, sizeof(line), "%s  %-6s  %-8s -> %-8s  %s",
+                char head[96];
+                snprintf(head, sizeof(head), "%s  %-6s  %-8s -> %-8s  ",
                          ascii(jstr(e, "ts"), 19).c_str(),
                          ascii(kind, 6).c_str(),
-                         ascii(jstr(e, "from_ver"), 8).c_str(),
-                         ascii(jstr(e, "to_ver"), 8).c_str(),
-                         ascii(jstr(e, "summary"), 72).c_str());
-                txt(col, logp.x + 10, ly, line);
+                         ascii(jstr(e, "from_ver"), 12).c_str(),
+                         ascii(jstr(e, "to_ver"), 12).c_str());
+                std::string full = std::string(head) + ascii(jstr(e, "summary"), 500);
+                std::string shown = full;
+                while ((int)shown.size() > 8 && glyphs_width(shown, (int)shown.size()) > max_px)
+                    shown.pop_back();
+                int r0 = mark_a_row, c0 = mark_a_col, r1 = mark_b_row, c1 = mark_b_col;
+                if (r0 > r1 || (r0 == r1 && c0 > c1)) {
+                    std::swap(r0, r1);
+                    std::swap(c0, c1);
+                }
+                if (r0 >= 0 && n >= r0 && n <= r1) {
+                    int a = (n == r0) ? c0 : 0;
+                    int b = (n == r1) ? c1 : (int)shown.size();
+                    if (a < 0) a = 0;
+                    if (b > (int)shown.size()) b = (int)shown.size();
+                    if (b < a) b = a;
+                    if (b > a) {
+                        int x0 = text_x + glyphs_width(shown, a);
+                        int x1 = text_x + glyphs_width(shown, b);
+                        int top = ly - (fs ? fs->ascent : 12);
+                        int h = (fs ? fs->ascent + fs->descent : 14) + 1;
+                        fill(mark_bg, {x0, top, std::max(1, x1 - x0), h});
+                    }
+                }
+                txt(col, text_x, ly, shown);
+                log_rows.push_back({shown, full, text_x, ly});
                 ly += 16;
                 n++;
             }
+        }
+        if (mark_a_row >= (int)log_rows.size() || mark_b_row >= (int)log_rows.size()) {
+            mark_a_row = mark_b_row = -1;
         }
 
         XCopyArea(dpy, buf, win, gc, 0, 0, W, H, 0, 0);
@@ -425,13 +543,63 @@ int archy_desk_main() {
                 buf = XCreatePixmap(dpy, win, W, H, DefaultDepth(dpy, scr));
                 redraw();
             } else if (e.type == MotionNotify) {
+                if (marking) {
+                    int before_r = mark_b_row, before_c = mark_b_col;
+                    mark_from_pixel(e.xmotion.x, e.xmotion.y);
+                    if (mark_b_row != before_r || mark_b_col != before_c) redraw();
+                }
                 bool hand = false;
-                for (auto& h : hits) if (inside(h.r, e.xmotion.x, e.xmotion.y) && h.kind != Hit::Idle) hand = true;
-                XDefineCursor(dpy, win, hand ? cur_hand : cur_arrow);
+                if (!marking) {
+                    for (auto& h : hits)
+                        if (inside(h.r, e.xmotion.x, e.xmotion.y) && h.kind != Hit::Idle) hand = true;
+                }
+                bool in_log = inside(log_box, e.xmotion.x, e.xmotion.y);
+                XDefineCursor(dpy, win, hand ? cur_hand : ((in_log || marking) ? cur_ibeam : cur_arrow));
+            } else if (e.type == SelectionRequest) {
+                XSelectionRequestEvent* req = &e.xselectionrequest;
+                XSelectionEvent sev{};
+                sev.type = SelectionNotify;
+                sev.display = req->display;
+                sev.requestor = req->requestor;
+                sev.selection = req->selection;
+                sev.target = req->target;
+                sev.time = req->time;
+                sev.property = req->property == None ? req->target : req->property;
+                bool ok = false;
+                if (req->target == atom_targets) {
+                    Atom list[4] = {atom_utf8, XA_STRING, atom_text, atom_targets};
+                    XChangeProperty(dpy, req->requestor, sev.property, XA_ATOM, 32,
+                                    PropModeReplace, reinterpret_cast<unsigned char*>(list), 4);
+                    ok = true;
+                } else if (req->target == XA_STRING || req->target == atom_utf8 || req->target == atom_text) {
+                    XChangeProperty(dpy, req->requestor, sev.property, req->target, 8,
+                                    PropModeReplace, reinterpret_cast<const unsigned char*>(clip_text.data()),
+                                    (int)clip_text.size());
+                    ok = true;
+                }
+                if (!ok) sev.property = None;
+                XSendEvent(dpy, req->requestor, False, 0, reinterpret_cast<XEvent*>(&sev));
+                XFlush(dpy);
             } else if (e.type == KeyPress) {
                 KeySym ks = XLookupKeysym(&e.xkey, 0);
                 if (ks == XK_q || ks == XK_Escape) g_run = 0;
                 else if (ks == XK_r) { st = load_status(); say("refreshed"); redraw(); }
+                else if ((e.xkey.state & ControlMask) && (ks == XK_c || ks == XK_C)) {
+                    std::string text = marked_text();
+                    if (!text.empty()) { offer_clip(text); say("copied"); redraw(); }
+                }
+            } else if (e.type == ButtonRelease && e.xbutton.button == 1 && marking) {
+                mark_from_pixel(e.xbutton.x, e.xbutton.y);
+                if (mark_a_row == mark_b_row && mark_a_col == mark_b_col && mark_a_row >= 0
+                    && mark_a_row < (int)log_rows.size()) {
+                    mark_a_col = 0;
+                    mark_b_col = (int)log_rows[mark_a_row].shown.size();
+                }
+                marking = false;
+                XUngrabPointer(dpy, CurrentTime);
+                std::string text = marked_text();
+                if (!text.empty()) { offer_clip(text); say("copied"); }
+                redraw();
             } else if (e.type == ButtonPress && e.xbutton.button == 1) {
                 for (auto& h : hits) {
                     if (!inside(h.r, e.xbutton.x, e.xbutton.y)) continue;
@@ -470,6 +638,17 @@ int archy_desk_main() {
                     redraw();
                     break;
                 }
+                bool hit = false;
+                for (auto& h : hits) if (inside(h.r, e.xbutton.x, e.xbutton.y)) hit = true;
+                if (!hit && inside(log_box, e.xbutton.x, e.xbutton.y) && !log_rows.empty()) {
+                    mark_from_pixel(e.xbutton.x, e.xbutton.y);
+                    mark_a_row = mark_b_row;
+                    mark_a_col = mark_b_col;
+                    marking = true;
+                    XGrabPointer(dpy, win, True, ButtonReleaseMask | PointerMotionMask,
+                                 GrabModeAsync, GrabModeAsync, None, cur_ibeam, CurrentTime);
+                    redraw();
+                }
             }
         }
         struct timespec sl{0, 40 * 1000 * 1000};
@@ -480,6 +659,7 @@ int archy_desk_main() {
     if (fs) XFreeFont(dpy, fs);
     XFreeCursor(dpy, cur_arrow);
     XFreeCursor(dpy, cur_hand);
+    XFreeCursor(dpy, cur_ibeam);
     XDestroyWindow(dpy, win);
     XCloseDisplay(dpy);
     return 0;
