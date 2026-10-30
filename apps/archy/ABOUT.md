@@ -19,4 +19,4 @@ limitations under the License.
 Archy records each change. The operator levels up and sends to GitHub.
 
 A bump adds the next g number and refreshes this tree on the machine. It does not push. LEVEL UP and the second GitHub click belong to the operator.
-<!-- archy-folder -->
+<!-- archy-folder 0.2g38 -->
