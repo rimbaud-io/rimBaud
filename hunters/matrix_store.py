@@ -39,6 +39,7 @@ HUNTER_IDS = (
     "hummingbot-dman",
     "hummingbot-onlyup",
     "hummingbot-dman-maker",
+    "hummingbot-dman-maker-bch",
 )
 
 BIAS_BOTS = {
@@ -49,6 +50,7 @@ BIAS_BOTS = {
     "hummingbot-dman": "dman_bias.json",
     "hummingbot-onlyup": "onlyup_bias.json",
     "hummingbot-dman-maker": "dman_maker_bias.json",
+    "hummingbot-dman-maker-bch": "dman_maker_bch_bias.json",
 }
 
 STATUS_FILES = {
@@ -60,6 +62,7 @@ STATUS_FILES = {
     "hummingbot-dman": "dman_status.json",
     "hummingbot-onlyup": "onlyup_status.json",
     "hummingbot-dman-maker": "dman_maker_status.json",
+    "hummingbot-dman-maker-bch": "dman_maker_bch_status.json",
 }
 
 
