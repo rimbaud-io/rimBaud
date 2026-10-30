@@ -336,13 +336,14 @@ int archy_desk_main() {
                 if (kind == "user") col = gold;
                 else if (kind == "pilot") col = cyan;
                 else if (kind == "deploy") col = green;
+                else if (kind == "github") col = orange;
                 char line[220];
                 snprintf(line, sizeof(line), "%s  %-6s  %-8s -> %-8s  %s",
                          ascii(jstr(e, "ts"), 19).c_str(),
                          ascii(kind, 6).c_str(),
                          ascii(jstr(e, "from_ver"), 8).c_str(),
                          ascii(jstr(e, "to_ver"), 8).c_str(),
-                         ascii(jstr(e, "summary"), 48).c_str());
+                         ascii(jstr(e, "summary"), 72).c_str());
                 txt(col, logp.x + 10, ly, line);
                 ly += 16;
                 n++;
@@ -355,6 +356,7 @@ int archy_desk_main() {
 
     auto apply_github = [&](const json& rep, int kind) {
         gh_lines.clear();
+        if (rep.contains("log") && rep["log"].is_array()) st = rep;
         bool clean = false;
         bool pushed = false;
         try { if (rep.contains("clean") && rep["clean"].is_boolean()) clean = rep["clean"].get<bool>(); } catch (...) {}
