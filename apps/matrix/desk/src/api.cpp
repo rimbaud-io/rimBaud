@@ -585,7 +585,7 @@ void FlaskApi::load_fields(DeskSnap& snap) {
             snap.tools.push_back(tw);
         }
     }
-    const char* coins[][2] = {{"BTC","#f0b90b"},{"ETH","#7ecbff"},{"LTC","#9dffc0"},{"TAO","#24c3cf"},{"HBAR","#34d399"},{"POL","#c084fc"}};
+    const char* coins[][2] = {{"BTC","#f0b90b"},{"ETH","#7ecbff"},{"LTC","#9dffc0"},{"TAO","#24c3cf"},{"BCH","#0ac18e"},{"HBAR","#34d399"},{"POL","#c084fc"}};
     for (auto& c : coins)
         snap.tools.push_back(tool(std::string("coin-") + c[0], "coins", "coin", c[0], "wire into hunter COIN", c[1]));
     for (auto& kv : snap.mids) {

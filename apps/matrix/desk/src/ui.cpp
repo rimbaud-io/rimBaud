@@ -490,7 +490,7 @@ std::vector<CtrlField> standard_fields(const std::string& id) {
         fs.push_back(mkf("sl_roe_pct", "Stop loss ROE %", "num", 1, 1, 200));
         fs.push_back(mkf("st_max_dist", "ST max dist %", "pct_frac", 0.1, 0, 100));
         fs.push_back(mkf("margin_pct", "Margin % leftover", "pct_frac", 1, 0, 100));
-    } else if (id == "hummingbot-dman-maker") {
+    } else if (id == "hummingbot-dman-maker" || id == "hummingbot-dman-maker-bch") {
         fs.push_back(mkf("sendEvery2Win", "send every 2 win to risk wallet", "bool"));
         fs.push_back(mkf("dontGoCrazy", "dontGoCrazy", "bool"));
         fs.push_back(mkf("afterLossNoRebuy", "afterLossNoRebuy", "bool"));
@@ -767,6 +767,7 @@ std::string hunter_tag(const std::string& id, const std::string& name) {
     if (id == "hummingbot-dman") return "Dman";
     if (id == "hummingbot-onlyup") return "OnlyUp";
     if (id == "hummingbot-dman-maker") return "DManM";
+    if (id == "hummingbot-dman-maker-bch") return "DManBCH";
     if (!name.empty()) return ascii(name, 8);
     return ascii(id, 8);
 }
@@ -3028,6 +3029,7 @@ int hl_cap_for(const std::string& coin) {
     if (coin == "ETH") return 25;
     if (coin == "LTC") return 10;
     if (coin == "TAO") return 5;
+    if (coin == "BCH") return 10;
     return 1;
 }
 
@@ -3818,6 +3820,13 @@ std::vector<std::string> sheet_ports(const WireNode& n, bool source) {
 }
 
 std::string hunter_what(const std::string& id) {
+    if (id == "hummingbot-dman-maker-bch")
+        return "Copy of DMan Maker for BCH only. The wallet is Helliot, the same subaccount as DMan V3. "
+               "LONG and flat market-buys leftover USD. SHORT and flat market-sells it, then holds. "
+               "Exit is take-profit, trail, or the ROE stop, then the same BIAS re-enters. "
+               "While Helliot holds another coin this process does not order and does not cancel. "
+               "The container stays stopped until that coin is flat and DMan V3 is disabled. "
+               "hummingbot-helliot is the same vault and is still a separate process.";
     if (id == "hummingbot-dman-maker")
         return "Hummingbot calls D-Man Maker V2 a market maker that moves spread and size with indicators. "
                "On this desk it is a BIAS gate: LONG and flat market-buys leftover USD, SHORT and flat market-sells it, then holds. "

@@ -610,6 +610,7 @@ static bool apply_pmm_live(std::vector<Overlay>& ov, const std::string& bot_id) 
             if (nsl > 0) setd(o.sl_roe, nsl);
         }
         if (o.bot_id == "hummingbot-bn-swing" || o.bot_id == "hummingbot-dman-maker"
+            || o.bot_id == "hummingbot-dman-maker-bch"
             || o.bot_id == "hummingbot-v2-dman-v3")
             o.tp_roe = 0;
         else {
@@ -750,7 +751,7 @@ static void read_entry_knobs(Overlay& o, const json& ctrl) {
 static void apply_entry_defaults(Overlay& o) {
     const std::string& id = o.bot_id;
     if (id == "hummingbot-hl") { o.entry_kind = 0; return; }
-    if (id == "hummingbot-dman-maker") { o.entry_kind = 6; return; }
+    if (id == "hummingbot-dman-maker" || id == "hummingbot-dman-maker-bch") { o.entry_kind = 6; return; }
     if (id == "hummingbot-helliot") {
         o.entry_kind = 5;
         if (o.entry_iv.empty()) o.entry_iv = "15m";
@@ -1179,6 +1180,7 @@ static void fill_ctrl(Overlay& o, const json& b) {
     o.trail_delta = jn(ctrl, "trail_delta");
     o.rebuy_pct = ctrl.contains("rebuy_pct") ? jn(ctrl, "rebuy_pct", 0) : 0;
     if (o.bot_id == "hummingbot-bn-swing" || o.bot_id == "hummingbot-dman-maker"
+        || o.bot_id == "hummingbot-dman-maker-bch"
         || o.bot_id == "hummingbot-v2-dman-v3")
         o.tp_roe = 0;
     else {
