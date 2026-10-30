@@ -75,7 +75,7 @@ rsync -a \
   --exclude 'conf/hl_ip_budget.json' \
   --exclude 'conf/hl_ip_budget.json.lock' \
   --exclude 'conf/brief_token.txt' \
-  --exclude 'conf/grok_brief.md' \
+  --exclude 'conf/pilot_brief.md' \
   --exclude 'conf/condor_setup.json' \
   --exclude 'conf/vpn/' \
   --exclude 'conf/hl_wallets/' \
@@ -87,7 +87,7 @@ rsync -a \
   --exclude 'doku/' \
   --exclude '**/*.tmp' \
   --exclude 'website/' \
-  --exclude 'grok_bot/' \
+  --exclude 'pilot_bot/' \
   --exclude 'c++/' \
   --exclude 'brain_c++/' \
   --exclude 'prompts/' \
