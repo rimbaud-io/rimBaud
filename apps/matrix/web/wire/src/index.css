@@ -1103,7 +1103,7 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 .wn.gauge.pump { width: 300px; border-color: #6b4a12; }
 .wn.agent { width: 268px; border-left: 3px solid var(--bot, #34d399); }
 .wn.agent.telegram { border-color: #14532d; }
-.wn.agent.grok { border-color: #1e4a66; }
+.wn.agent.pilot { border-color: #1e4a66; }
 .ctrl-fields label {
   display: block;
   font-size: 9px;
@@ -1182,7 +1182,7 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
   border-left: 3px solid var(--bot, #f0b90b);
 }
 .wn.homestat.wide, .wn.homestat.tokens { width: 992px; height: 118px; }
-.wn.homestat.grok-report { width: 320px; height: 150px; overflow: visible; }
+.wn.homestat.pilot-report { width: 320px; height: 150px; overflow: visible; }
 .wn.homestat.book { width: 992px; height: 380px; overflow: hidden; }
 .wn.homestat .hstat-lbl {
   color: var(--muted); font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase;
@@ -1378,7 +1378,7 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
   background: var(--bg);
   padding: 0 4px;
 }
-.port.left.grok {
+.port.left.pilot {
   top: 46%;
   left: 8px;
   color: #2A9FD6;
@@ -1510,7 +1510,7 @@ input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 .h-logs { background: var(--cyan); }
 .h-gauge { background: #c084fc; }
 .h-tg { background: #34d399; }
-.h-grok { background: #2A9FD6; }
+.h-pilot { background: #2A9FD6; }
 .h-coin { background: #94a3b8; }
 .h-wallet { background: var(--gold); }
 .h-risk { background: #ff4d6d; }

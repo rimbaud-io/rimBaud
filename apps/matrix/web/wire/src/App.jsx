@@ -319,7 +319,7 @@ function mergeHome(nodes, edges, home, hunters = HUNTERS) {
       const lines = feed
         .filter((r) => {
           const k = String(r.kind || "");
-          if (kind === "grok") return k === "grok" || k === "xlate";
+          if (kind === "pilot") return k === "pilot" || k === "xlate";
           return k.startsWith("tg") || k === "xlate";
         })
         .slice(-8)
@@ -421,7 +421,7 @@ function mergeHome(nodes, edges, home, hunters = HUNTERS) {
         const k = String(row.kind || "");
         return {
           name: k || "feed",
-          color: k.startsWith("tg") ? "#34d399" : k === "grok" ? "#2A9FD6" : k === "xlate" ? "#ffc857" : "#c084fc",
+          color: k.startsWith("tg") ? "#34d399" : k === "pilot" ? "#2A9FD6" : k === "xlate" ? "#ffc857" : "#c084fc",
           text: row.text,
           ts: row.ts,
           botId: "condor",
@@ -2033,8 +2033,8 @@ function Board() {
         return;
       }
       if (d.kind === "agent" && d.nodeId) {
-        const botKind = d.botKind === "grok" ? "grok" : d.botKind === "email" ? "email" : "telegram";
-        remember(botKind === "grok" ? "grok bot" : botKind === "email" ? "email" : "telegram bot");
+        const botKind = d.botKind === "pilot" ? "pilot" : d.botKind === "email" ? "email" : "telegram";
+        remember(botKind === "pilot" ? "pilot bot" : botKind === "email" ? "email" : "telegram bot");
         const patch = { ...d };
         delete patch.kind;
         delete patch.nodeId;
@@ -2218,7 +2218,7 @@ function Board() {
           {kind === "xml"
             ? "Download or write conf/wire_graph.xml."
             : kind === "stream"
-              ? "Wire Telegram OUT (or Grok OUT, Condor REGIME, hunter LOGS) into IN. Shows the live feed."
+              ? "Wire Telegram OUT (or Pilot OUT, Condor REGIME, hunter LOGS) into IN. Shows the live feed."
               : "Live tail of wired hunters."}
         </p>
       </>
@@ -2368,11 +2368,11 @@ function Board() {
           <div><dt>Telegram</dt><dd>{((g.setup || {}).wired || {}).telegram?.length
             ? ((g.setup || {}).wired.telegram.length + " wired")
             : (g.telegram && g.telegram.configured ? "env" : "none")}</dd></div>
-          <div><dt>Grok</dt><dd>{((g.setup || {}).wired || {}).grok?.length
-            ? ((g.setup || {}).wired.grok.length + " wired")
-            : (g.source === "grok" ? "env" : "heuristic")}</dd></div>
+          <div><dt>Pilot</dt><dd>{((g.setup || {}).wired || {}).pilot?.length
+            ? ((g.setup || {}).wired.pilot.length + " wired")
+            : (g.source === "pilot" ? "env" : "heuristic")}</dd></div>
         </dl>
-        <p className="health">Condor toolbox: drop Telegram bot / Grok bot, paste token or xAI key, wire TG / GROK into this node.</p>
+        <p className="health">Condor toolbox: drop Telegram bot / Pilot bot, paste token or xAI key, wire TG / PILOT into this node.</p>
         <a className="wn-link" href="/condor">Open Condor →</a>
       </>
     ) : (
@@ -2386,8 +2386,8 @@ function Board() {
       <>
         <h3>{selected.data.name || "Home box"}</h3>
         <p>
-          {selected.data.kind === "grok"
-            ? "GROK BIAS is report-only: wire TG out into BIAS BOT IN. Never writes hunter BIAS. Desk buttons on the right apply after autoclose only."
+          {selected.data.kind === "pilot"
+            ? "PILOT BIAS is report-only: wire TG out into BIAS BOT IN. Never writes hunter BIAS. Desk buttons on the right apply after autoclose only."
             : "Display tile for /. Fit bands snaps it to TOP (stats), MIDDLE (hunters) or BOTTOM (health). Compile then Integrate to push to /. Does not trade."}
         </p>
       </>
@@ -2478,15 +2478,15 @@ function Board() {
       </>
     );
   } else if (selected && selected.type === "agent") {
-    const k = selected.data.kind === "grok" ? "Grok" : selected.data.kind === "email" ? "Email" : "Telegram";
+    const k = selected.data.kind === "pilot" ? "Pilot" : selected.data.kind === "email" ? "Email" : "Telegram";
     inspect = (
       <>
         <h3 style={{ color: selected.data.color }}>{k}{k === "Email" ? " alerts" : " bot"}</h3>
         <p>
           {k === "Email"
             ? "Health ALERT → IN. SMTP send comes later. Saved on this canvas only — not a Condor BIAS bot."
-            : k === "Grok"
-              ? "Wire into Condor GROK. Secrets stay in conf/condor_setup.json, not on the canvas file."
+            : k === "Pilot"
+              ? "Wire into Condor PILOT. Secrets stay in conf/condor_setup.json, not on the canvas file."
               : "On Desk: wire OUT into Condor TG, a Translator, or Desk BIAS. On Home / Health: output and error alerts, not BIAS."}
         </p>
         <dl>
@@ -2494,8 +2494,8 @@ function Board() {
           {k === "Email"
             ? <div><dt>To</dt><dd>{selected.data.to || "—"}</dd></div>
             : <div><dt>Secret</dt><dd>{selected.data.has_token || selected.data.has_key ? "saved" : "missing"}</dd></div>}
-          {k === "Grok"
-            ? <div><dt>Model</dt><dd>{selected.data.model || "grok-4.5"}</dd></div>
+          {k === "Pilot"
+            ? <div><dt>Model</dt><dd>{selected.data.model || "pilot-4.5"}</dd></div>
             : k === "Telegram"
               ? <div><dt>Chats</dt><dd>{selected.data.chat_ids || "—"}</dd></div>
               : null}
@@ -3122,7 +3122,7 @@ function Board() {
               (n.type === "bias" || n.type === "desk_bias" || n.type === "xlate"
                 ? (n.type === "xlate" ? (n.data?.kind === "closer" ? "#ff4d6d" : "#34d399") : "#f0b90b")
                 : n.type === "agent"
-                    ? (n.data?.kind === "grok" ? "#2A9FD6" : "#34d399")
+                    ? (n.data?.kind === "pilot" ? "#2A9FD6" : "#34d399")
                 : n.type === "gauge" || n.type === "ctrl"
                   ? "#c084fc"
                   : n.type === "pct"
