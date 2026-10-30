@@ -40,7 +40,7 @@ SETUP_FILE = os.path.join(CONF_DIR, "condor_setup.json")
 FEED_FILE = os.path.join(CONF_DIR, "condor_feed.json")
 XLATE_FILE = os.path.join(CONF_DIR, "condor_xlate.json")
 DESK_BIAS_FILE = os.path.join(CONF_DIR, "desk_bias.json")
-GROK_BIAS_FILE = os.path.join(CONF_DIR, "grok_bias.json")
+PILOT_BIAS_FILE = os.path.join(CONF_DIR, "pilot_bias.json")
 KOORD_CMD_FILE = os.path.join(CONF_DIR, "koordinator_cmd.json")
 DASHBOARD_URL = (os.environ.get("DASHBOARD_URL") or "http://hummingbot-dashboard:5000").rstrip("/")
 REGISTRY_FILE = os.path.join(CONF_DIR, "wire_registry.json")
@@ -48,7 +48,7 @@ LOG_FILE = os.path.join(LOGS_DIR, "condor_gauge.log")
 INTERVAL = max(60, int(os.environ.get("CONDOR_INTERVAL", "600")))
 PORT = int(os.environ.get("CONDOR_PORT", "8088"))
 XAI_KEY = (os.environ.get("XAI_API_KEY") or "").strip()
-XAI_MODEL = os.environ.get("XAI_MODEL", "grok-4.5")
+XAI_MODEL = os.environ.get("XAI_MODEL", "pilot-4.5")
 XAI_URL = os.environ.get("XAI_BASE_URL", "https://api.x.ai/v1/chat/completions")
 TG_TOKEN = (os.environ.get("TELEGRAM_BOT_TOKEN") or os.environ.get("CONDOR_TELEGRAM_TOKEN") or "").strip()
 TG_CHATS = [
@@ -63,8 +63,8 @@ TG_GAUGE = os.environ.get("CONDOR_TG_GAUGE", "").strip().lower() in ("1", "true"
 COINS = ("BTC", "ETH", "LTC", "TAO")
 VALID = ("LONG", "SHORT", "FLAT")
 REGIMES = ("calm", "trend", "shock")
-PHONE_GROK_ID = "grok-bot-telegram"
-GROK_MODELS = ("grok-4.5", "grok-4.6", "grok-4-fast-non-reasoning")
+PHONE_PILOT_ID = "pilot-bot-telegram"
+PILOT_MODELS = ("pilot-4.5", "pilot-4.6", "pilot-4-fast-non-reasoning")
 
 HUNTERS = {
     "hummingbot-bn-swing": {"bias": "bn_swing_bias.json", "coins": ["BTC", "ETH", "LTC", "TAO"], "mode": "both", "status": "bn_swing_status.json"},
@@ -271,7 +271,7 @@ def _parse_chats(v):
 
 
 def load_setup():
-    """Wired Telegram / Grok bots from Wire. Env is fallback when none are ready."""
+    """Wired Telegram / Pilot bots from Wire. Env is fallback when none are ready."""
     data = _read_json(SETUP_FILE)
     bots = data.get("bots") if isinstance(data.get("bots"), dict) else {}
     wired = data.get("wired") if isinstance(data.get("wired"), dict) else {}
@@ -281,7 +281,7 @@ def load_setup():
         tg_ids = [
             nid for nid, row in bots.items()
             if isinstance(row, dict)
-            and str(row.get("kind") or "telegram") != "grok"
+            and str(row.get("kind") or "telegram") != "pilot"
             and str(row.get("token") or "").strip()
         ]
     for nid in tg_ids:
@@ -295,17 +295,17 @@ def load_setup():
             "token": token,
             "chats": _parse_chats(row.get("chat_ids")),
         })
-    grok = None
-    for nid in [str(x) for x in (wired.get("grok") or [])]:
+    pilot = None
+    for nid in [str(x) for x in (wired.get("pilot") or [])]:
         row = bots.get(nid) if isinstance(bots.get(nid), dict) else {}
         key = str(row.get("api_key") or "").strip()
         if not key:
             continue
-        grok = {
+        pilot = {
             "id": nid,
-            "name": str(row.get("name") or "Grok")[:60],
+            "name": str(row.get("name") or "Pilot")[:60],
             "api_key": key,
-            "model": str(row.get("model") or XAI_MODEL or "grok-4.5").strip() or "grok-4.5",
+            "model": str(row.get("model") or XAI_MODEL or "pilot-4.5").strip() or "pilot-4.5",
         }
         break
     if not telegram and TG_TOKEN:
@@ -315,14 +315,14 @@ def load_setup():
             "token": TG_TOKEN,
             "chats": list(TG_CHATS),
         }]
-    if grok is None and XAI_KEY:
-        grok = {
+    if pilot is None and XAI_KEY:
+        pilot = {
             "id": "env",
             "name": "env",
             "api_key": XAI_KEY,
-            "model": XAI_MODEL or "grok-4.5",
+            "model": XAI_MODEL or "pilot-4.5",
         }
-    return telegram, grok
+    return telegram, pilot
 
 
 def _looks_like_xai_key(s):
@@ -341,47 +341,47 @@ def _mask_key(s):
     return s[:4] + "••••" + s[-4:]
 
 
-def upsert_phone_grok(api_key=None, model=None, clear=False):
-    """Save a Grok key sent from Telegram. Survives Wire canvas saves."""
+def upsert_phone_pilot(api_key=None, model=None, clear=False):
+    """Save a Pilot key sent from Telegram. Survives Wire canvas saves."""
     data = _read_json(SETUP_FILE)
     bots = data.get("bots") if isinstance(data.get("bots"), dict) else {}
     wired = data.get("wired") if isinstance(data.get("wired"), dict) else {}
-    grok_ids = [str(x) for x in (wired.get("grok") or []) if str(x).strip()]
+    pilot_ids = [str(x) for x in (wired.get("pilot") or []) if str(x).strip()]
     tg_ids = [str(x) for x in (wired.get("telegram") or []) if str(x).strip()]
-    nid = PHONE_GROK_ID
+    nid = PHONE_PILOT_ID
     if clear:
         bots.pop(nid, None)
-        grok_ids = [x for x in grok_ids if x != nid]
+        pilot_ids = [x for x in pilot_ids if x != nid]
         row = None
     else:
         row = bots.get(nid) if isinstance(bots.get(nid), dict) else {}
         row["id"] = nid
-        row["kind"] = "grok"
-        row["name"] = str(row.get("name") or "Grok (Telegram)")[:60]
+        row["kind"] = "pilot"
+        row["name"] = str(row.get("name") or "Pilot (Telegram)")[:60]
         if api_key:
             row["api_key"] = str(api_key).strip()
         if model:
             row["model"] = str(model).strip()[:80]
         if not row.get("model"):
-            row["model"] = XAI_MODEL or "grok-4.5"
+            row["model"] = XAI_MODEL or "pilot-4.5"
         bots[nid] = row
-        grok_ids = [x for x in grok_ids if x != nid]
-        grok_ids.insert(0, nid)
+        pilot_ids = [x for x in pilot_ids if x != nid]
+        pilot_ids.insert(0, nid)
     payload = {
         "updated": _utc(),
         "bots": bots,
-        "wired": {"telegram": tg_ids, "grok": grok_ids},
+        "wired": {"telegram": tg_ids, "pilot": pilot_ids},
     }
     _write_json(SETUP_FILE, payload)
     return row
 
 
-def grok_chat(question, api_key=None, model=None):
-    """Plain-language Grok reply about the desk. Never places orders."""
+def pilot_chat(question, api_key=None, model=None):
+    """Plain-language Pilot reply about the desk. Never places orders."""
     api_key = (api_key or "").strip()
-    model = (model or XAI_MODEL or "grok-4.5").strip() or "grok-4.5"
+    model = (model or XAI_MODEL or "pilot-4.5").strip() or "pilot-4.5"
     if not api_key:
-        raise RuntimeError("no grok api key")
+        raise RuntimeError("no pilot api key")
     with _lock:
         last = dict(_last) if _last else _read_json(GAUGE_FILE)
     context = {
@@ -431,14 +431,14 @@ def grok_chat(question, api_key=None, model=None):
         if text.lower().startswith("json"):
             text = text[4:]
         text = text.strip()
-    return text[:3500] or "(empty grok reply)"
+    return text[:3500] or "(empty pilot reply)"
 
 
-def grok_predict(tape, api_key=None, model=None):
+def pilot_predict(tape, api_key=None, model=None):
     api_key = (api_key or XAI_KEY or "").strip()
-    model = (model or XAI_MODEL or "grok-4.5").strip() or "grok-4.5"
+    model = (model or XAI_MODEL or "pilot-4.5").strip() or "pilot-4.5"
     if not api_key:
-        raise RuntimeError("no grok api key")
+        raise RuntimeError("no pilot api key")
     payload = {
         "model": model,
         "temperature": 0.1,
@@ -487,7 +487,7 @@ def grok_predict(tape, api_key=None, model=None):
     for coin in COINS:
         v = str((data.get("bias") or {}).get(coin) or "FLAT").upper()
         bias[coin] = v if v in VALID else "FLAT"
-    why = str(data.get("why") or "grok")[:240]
+    why = str(data.get("why") or "pilot")[:240]
     reasons = data.get("reasons") if isinstance(data.get("reasons"), dict) else {}
     return regime, bias, why, {c: str(reasons.get(c) or "")[:80] for c in COINS}
 
@@ -951,7 +951,7 @@ HELP = (
     "Emergency: extra Telegram → Close translator → hunter E-CLOSE. Idle does nothing.\n"
     "E-CLOSE also writes BIAS FLAT on that hunter (Copy has no BIAS).\n"
     "/status /tick /wired /help\n"
-    "/grok — Grok status  ·  /ask … — ask Grok\n\n"
+    "/pilot — Pilot status  ·  /ask … — ask Pilot\n\n"
     "You can also type: <code>long</code>  <code>flat</code>  <code>close all</code>"
 )
 
@@ -1037,7 +1037,7 @@ def _parse_desk_cmd(raw):
     rest = " ".join(parts[1:])
     if w in ("long", "short", "flat"):
         return ("bias", w.upper(), _parse_coins(rest))
-    # Grok Koordinator: "LONG" / "please post short" / "SIGNAL LTC DOWN"
+    # Pilot Koordinator: "LONG" / "please post short" / "SIGNAL LTC DOWN"
     low = text.lower()
     m = re.search(r"/(long|short|flat)\b", low)
     if m:
@@ -1086,7 +1086,7 @@ def upsert_telegram_chat(bot_id, chat_id, add_wired=None):
     _write_json(SETUP_FILE, {
         "updated": _utc(),
         "bots": bots,
-        "wired": {"telegram": tg_ids, "grok": [str(x) for x in (wired.get("grok") or [])]},
+        "wired": {"telegram": tg_ids, "pilot": [str(x) for x in (wired.get("pilot") or [])]},
     })
     return chats
 
@@ -1117,7 +1117,7 @@ def positions_wires():
         if not tgt or tgt.get("type") != "agent":
             continue
         td = tgt.get("data") if isinstance(tgt.get("data"), dict) else {}
-        if str(td.get("kind") or "telegram") == "grok":
+        if str(td.get("kind") or "telegram") == "pilot":
             continue
         bot_id = str(tgt.get("id"))
         src = by_id.get(str(e.get("source") or ""))
@@ -1934,105 +1934,105 @@ def telegram_desk(bot, kind, mode, coins, raw):
     return "\n".join([x for x in lines if x]) or "no desk BIAS or translator applied"
 
 
-def grok_status_text():
-    _, grok = load_setup()
-    if not grok:
+def pilot_status_text():
+    _, pilot = load_setup()
+    if not pilot:
         return (
-            "Grok <b>off</b> — Condor is on heuristic.\n"
+            "Pilot <b>off</b> — Condor is on heuristic.\n"
             "From this chat send:\n"
-            "<code>/grok key xai-your-key</code>\n"
+            "<code>/pilot key xai-your-key</code>\n"
             "or paste the key as its own message.\n"
-            "Key from console.x.ai — then /tick uses Grok."
+            "Key from console.x.ai — then /tick uses Pilot."
         )
-    src = grok.get("id") or ""
-    via = "Telegram" if src == PHONE_GROK_ID else ("env" if src == "env" else "Wire")
+    src = pilot.get("id") or ""
+    via = "Telegram" if src == PHONE_PILOT_ID else ("env" if src == "env" else "Wire")
     return (
-        f"Grok <b>on</b> via { _tg_esc(via) }\n"
-        f"model {_tg_esc(grok.get('model') or 'grok-4.5')}\n"
-        f"key {_tg_esc(_mask_key(grok.get('api_key')))}\n"
+        f"Pilot <b>on</b> via { _tg_esc(via) }\n"
+        f"model {_tg_esc(pilot.get('model') or 'pilot-4.5')}\n"
+        f"key {_tg_esc(_mask_key(pilot.get('api_key')))}\n"
         "/ask why is ETH short — or just type a question."
     )
 
 
-def _connect_grok_key(bot, chat_id, key, message_id=None):
+def _connect_pilot_key(bot, chat_id, key, message_id=None):
     key = _looks_like_xai_key(key) or str(key or "").strip()
     if not (key.lower().startswith("xai-") and len(key) >= 16):
         tg_send_bot(
             bot,
             "need an xAI key starting with <code>xai-</code>.\n"
             "create one at console.x.ai then:\n"
-            "<code>/grok key xai-…</code>",
+            "<code>/pilot key xai-…</code>",
             chat_id=chat_id,
         )
         return
-    row = upsert_phone_grok(api_key=key)
+    row = upsert_phone_pilot(api_key=key)
     tg_delete(bot, chat_id, message_id)
-    _log(f"grok key saved via telegram chat={chat_id}")
-    model = (row or {}).get("model") or "grok-4.5"
+    _log(f"pilot key saved via telegram chat={chat_id}")
+    model = (row or {}).get("model") or "pilot-4.5"
     try:
-        grok_chat("Say OK in one word.", key, model)
+        pilot_chat("Say OK in one word.", key, model)
         ping = "key works"
     except Exception as e:
         ping = "saved, ping failed: " + _tg_esc(str(e)[:160])
     tg_send_bot(
         bot,
-        "Grok connected from Telegram.\n"
+        "Pilot connected from Telegram.\n"
         f"key {_tg_esc(_mask_key(key))}  ·  model {_tg_esc(model)}\n"
         f"{ping}\n"
         "I deleted your key message if Telegram allowed it.\n"
-        "/tick to read the tape with Grok. /ask … to chat.",
+        "/tick to read the tape with Pilot. /ask … to chat.",
         chat_id=chat_id,
     )
 
 
-def _ask_grok(bot, chat_id, question):
+def _ask_pilot(bot, chat_id, question):
     q = str(question or "").strip()
     if not q:
         tg_send_bot(bot, "ask what?  e.g. /ask why is ETH short", chat_id=chat_id)
         return
-    _, grok = load_setup()
-    if not grok or not grok.get("api_key"):
-        tg_send_bot(bot, grok_status_text(), chat_id=chat_id)
+    _, pilot = load_setup()
+    if not pilot or not pilot.get("api_key"):
+        tg_send_bot(bot, pilot_status_text(), chat_id=chat_id)
         return
-    tg_send_bot(bot, "asking Grok…", chat_id=chat_id)
+    tg_send_bot(bot, "asking Pilot…", chat_id=chat_id)
     try:
-        answer = grok_chat(q, grok.get("api_key"), grok.get("model"))
-        feed_append("grok", "Q: " + q, "grok")
-        feed_append("grok", answer, grok.get("name") or "grok")
+        answer = pilot_chat(q, pilot.get("api_key"), pilot.get("model"))
+        feed_append("pilot", "Q: " + q, "pilot")
+        feed_append("pilot", answer, pilot.get("name") or "pilot")
         tg_send_bot(bot, _tg_esc(answer), chat_id=chat_id)
     except Exception as e:
-        tg_send_bot(bot, "grok failed: " + _tg_esc(e), chat_id=chat_id)
+        tg_send_bot(bot, "pilot failed: " + _tg_esc(e), chat_id=chat_id)
 
 
-def _handle_grok_cmd(bot, chat_id, raw, message_id=None):
+def _handle_pilot_cmd(bot, chat_id, raw, message_id=None):
     rest = raw.split(None, 1)[1].strip() if " " in raw.strip() else ""
     low = rest.lower()
     if not rest:
-        tg_send_bot(bot, grok_status_text(), chat_id=chat_id)
+        tg_send_bot(bot, pilot_status_text(), chat_id=chat_id)
         return
     if low in ("off", "clear", "disconnect"):
-        upsert_phone_grok(clear=True)
-        _log("grok phone key cleared via telegram")
-        tg_send_bot(bot, "Telegram Grok disconnected. /tick will use Wire/env Grok or heuristic.", chat_id=chat_id)
+        upsert_phone_pilot(clear=True)
+        _log("pilot phone key cleared via telegram")
+        tg_send_bot(bot, "Telegram Pilot disconnected. /tick will use Wire/env Pilot or heuristic.", chat_id=chat_id)
         return
     if low.startswith("model"):
         model = rest.split(None, 1)[1].strip() if " " in rest else ""
-        if model not in GROK_MODELS:
+        if model not in PILOT_MODELS:
             tg_send_bot(
                 bot,
-                "models: " + ", ".join(GROK_MODELS),
+                "models: " + ", ".join(PILOT_MODELS),
                 chat_id=chat_id,
             )
             return
-        upsert_phone_grok(model=model)
-        tg_send_bot(bot, "Grok model " + _tg_esc(model), chat_id=chat_id)
+        upsert_phone_pilot(model=model)
+        tg_send_bot(bot, "Pilot model " + _tg_esc(model), chat_id=chat_id)
         return
     if low.startswith("key"):
         rest = rest.split(None, 1)[1].strip() if " " in rest else ""
-    if rest.lower().startswith("grok "):
+    if rest.lower().startswith("pilot "):
         rest = rest[5:].strip()
     key = _looks_like_xai_key(rest) or rest
-    _connect_grok_key(bot, chat_id, key, message_id)
+    _connect_pilot_key(bot, chat_id, key, message_id)
 
 
 def _allowed_chat(bot, chat_id):
@@ -2166,7 +2166,7 @@ def _handle_tg_text(bot, chat_id, text, message_id=None, chat_type=None, from_bo
             return
     pasted = _looks_like_xai_key(raw)
     if pasted:
-        _connect_grok_key(bot, chat_id, pasted, message_id)
+        _connect_pilot_key(bot, chat_id, pasted, message_id)
         return
     if is_positions_bot(bot.get("id")):
         if name in ("info", "/info", "/help", "/start", "help"):
@@ -2393,19 +2393,19 @@ def _handle_tg_text(bot, chat_id, text, message_id=None, chat_type=None, from_bo
         except Exception as e:
             tg_send_bot(bot, "tick failed: " + _tg_esc(e), chat_id=chat_id)
         return
-    if name in ("/grok", "/connect"):
-        _handle_grok_cmd(bot, chat_id, raw, message_id)
+    if name in ("/pilot", "/connect"):
+        _handle_pilot_cmd(bot, chat_id, raw, message_id)
         return
     if name == "/ask":
         q = raw.split(None, 1)[1] if " " in raw else ""
-        _ask_grok(bot, chat_id, q)
+        _ask_pilot(bot, chat_id, q)
         return
     desk = _parse_desk_cmd(raw)
     if desk:
         kind, mode, coins = desk
         if _is_bias_bot(bot) and kind == "bias":
             try:
-                _write_json(GROK_BIAS_FILE, {
+                _write_json(PILOT_BIAS_FILE, {
                     "bias": str(mode or "").upper(),
                     "updated": _utc(),
                     "source": "bias-bot",
@@ -2415,10 +2415,10 @@ def _handle_tg_text(bot, chat_id, text, message_id=None, chat_type=None, from_bo
                 })
             except Exception:
                 pass
-            feed_append("grok", "GROK " + str(mode or "") + " → BIAS BOT · hunters unchanged", "grok-bias")
+            feed_append("pilot", "PILOT " + str(mode or "") + " → BIAS BOT · hunters unchanged", "pilot-bias")
             tg_send_bot(
                 bot,
-                "GROK BIAS <b>" + _tg_esc(str(mode or "").upper()) + "</b> · report only, hunters unchanged.",
+                "PILOT BIAS <b>" + _tg_esc(str(mode or "").upper()) + "</b> · report only, hunters unchanged.",
                 chat_id=chat_id,
             )
             return
@@ -2426,7 +2426,7 @@ def _handle_tg_text(bot, chat_id, text, message_id=None, chat_type=None, from_bo
         tg_send_bot(bot, _tg_esc(msg), chat_id=chat_id)
         return
     if not name.startswith("/"):
-        _ask_grok(bot, chat_id, raw)
+        _ask_pilot(bot, chat_id, raw)
         return
     tg_send_bot(bot, "unknown. /help", chat_id=chat_id)
 
@@ -2499,9 +2499,9 @@ def _koordinator_bot():
 
 
 def koordinator_cmd_loop():
-    """Report Grok /long /short /flat on BIAS BOT. Never writes hunter BIAS.
+    """Report Pilot /long /short /flat on BIAS BOT. Never writes hunter BIAS.
 
-    Telegram getUpdates never sees messages the bot itself sent, so Grok
+    Telegram getUpdates never sees messages the bot itself sent, so Pilot
     FIRE lands in conf/koordinator_cmd.json. This loop logs it. Flask already
     posts to BIAS BOT. Does not call telegram_desk / Desk BIAS / Translator.
     """
@@ -2522,7 +2522,7 @@ def koordinator_cmd_loop():
                 continue
             kind, mode, coins = desk
             last = cid
-            feed_append("grok", "GROK " + str(mode or "") + " → BIAS BOT · hunters unchanged", "grok-bias")
+            feed_append("pilot", "PILOT " + str(mode or "") + " → BIAS BOT · hunters unchanged", "pilot-bias")
             _log("koordinator report " + str(mode) + " (no hunter BIAS)")
         except Exception:
             _log("koordinator cmd loop failed\n" + traceback.format_exc())
@@ -2578,22 +2578,22 @@ def tick():
 def _tick_unlocked():
     global _last
     tape = collect_tape()
-    telegram, grok = load_setup()
+    telegram, pilot = load_setup()
     source = "heuristic"
     err = None
-    grok_model = (grok or {}).get("model") if grok else None
-    if grok and grok.get("api_key"):
+    pilot_model = (pilot or {}).get("model") if pilot else None
+    if pilot and pilot.get("api_key"):
         try:
-            regime, bias, why, reasons = grok_predict(tape, grok.get("api_key"), grok.get("model"))
-            source = "grok"
+            regime, bias, why, reasons = pilot_predict(tape, pilot.get("api_key"), pilot.get("model"))
+            source = "pilot"
         except Exception as e:
             err = str(e)[:240]
-            _log(f"grok failed, heuristic: {err}")
+            _log(f"pilot failed, heuristic: {err}")
             regime, bias, why, reasons = heuristic(tape)
             source = "heuristic"
     else:
         regime, bias, why, reasons = heuristic(tape)
-        why = "no grok bot wired · " + why
+        why = "no pilot bot wired · " + why
 
     applied = apply_wired(bias)
     with _lock:
@@ -2610,7 +2610,7 @@ def _tick_unlocked():
         "reasons": reasons,
         "tape": tape,
         "source": source,
-        "model": grok_model if source == "grok" else None,
+        "model": pilot_model if source == "pilot" else None,
         "error": err,
         "interval_sec": INTERVAL,
         "applied": applied,
@@ -2625,11 +2625,11 @@ def _tick_unlocked():
             "last_error": tg.get("last_error"),
             "source": "wire" if any(b.get("id") != "env" for b in telegram) else ("env" if telegram else None),
         },
-        "grok_bot": {
-            "configured": bool(grok),
-            "name": (grok or {}).get("name"),
-            "model": grok_model,
-            "source": "wire" if grok and grok.get("id") != "env" else ("env" if grok else None),
+        "pilot_bot": {
+            "configured": bool(pilot),
+            "name": (pilot or {}).get("name"),
+            "model": pilot_model,
+            "source": "wire" if pilot and pilot.get("id") != "env" else ("env" if pilot else None),
         },
     }
     _write_json(GAUGE_FILE, payload)
@@ -2717,10 +2717,10 @@ def loop():
 def main():
     os.makedirs(CONF_DIR, exist_ok=True)
     os.makedirs(LOGS_DIR, exist_ok=True)
-    telegram, grok = load_setup()
+    telegram, pilot = load_setup()
     _log(
         f"condor gauge start interval={INTERVAL}s port={PORT} "
-        f"grok={'yes' if grok else 'no'} telegram={len(telegram)}"
+        f"pilot={'yes' if pilot else 'no'} telegram={len(telegram)}"
     )
     threading.Thread(target=loop, name="condor-tick", daemon=True).start()
     threading.Thread(target=telegram_supervisor, name="condor-tg-sup", daemon=True).start()
