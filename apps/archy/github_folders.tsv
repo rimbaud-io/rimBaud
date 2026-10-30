@@ -12,6 +12,7 @@ apps/meta	Meta lists the matrices and can push a build. It does not close a clip
 apps/pettibon	Pettibon stores the trade book. It does not place an order.	It watches one hunter and writes the book. Grafana can read that book. Pettibon does not send a trade.
 apps/spring	Spring is the hunter brain on port 5004. It writes hunter files.	The matrix, Meta, and Archy talk to Spring. A bias change does not close a clip. Spring does not sign a Hyperliquid order.
 docker-windows	Windows bundle. Docker runs Hummingbot, the hunters, and Spring.	Start with up.bat or up.sh. That asks for the risk notice first. Wallets and the install password are not in this folder.
+docs	Pictures of the desk and the sequencer.	The desk shows matrix, the chart, and meta. The sequencer is the planner. These pictures stay with the public README.
 hunters	Hunter scripts that run inside Hummingbot. The engine is not in this repo.	One script for each hunter container. Shared pieces cover leverage, the risk skim, and the matrix store. Wallets and connector files are not here.
 install	Installer for a Linux machine. The risk notice is required before start.	Installs the desk, Spring, and the hunters. Hunters start only after the risk notice is accepted. The install password is not in the preseed.
 install/mint-image	Scripts for the Mint USB image. The install password is not here.	Builds and writes the rimBaud look onto an official Mint image. First boot asks for a new password.
