@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // rimbaud-archy — version desk + CLI.
-// Grok:  ./rimbaud-archy --bump-g "why" [files]
+// Pilot:  ./rimbaud-archy --bump-g "why" [files]
 // You:   ./rimbaud-archy            → X11 LEVEL UP 0.1 → 0.2
 // Never CLOSE/OPEN Hyperliquid.
 #include <cstdlib>
@@ -40,7 +40,7 @@ int main(int argc, char** argv) {
     if (argc >= 2 && argv[1] && argv[1][0] == '-' &&
         std::strcmp(argv[1], "--help") != 0 && std::strcmp(argv[1], "-h") != 0) {
         if (std::strcmp(argv[1], "--level-up") == 0 || std::strcmp(argv[1], "level-up") == 0) {
-            fprintf(stderr, "LEVEL UP is operator-only in the rimbaud-archy window. Grok uses --bump-g.\n");
+            fprintf(stderr, "LEVEL UP is operator-only in the rimbaud-archy window. Pilot uses --bump-g.\n");
             return 3;
         }
         std::string script = py();
@@ -59,10 +59,10 @@ int main(int argc, char** argv) {
                 "rimbaud-archy  version toolkit\n"
                 "  (no args)              X11 desk — LEVEL UP is you only\n"
                 "  --status               print current version JSON\n"
-                "  --bump-g MSG [files]   Grok edit: 0.1 → 0.1g1 → 0.1g2\n"
+                "  --bump-g MSG [files]   Pilot edit: 0.1 → 0.1g1 → 0.1g2\n"
                 "  --record-deploy SITE   after live-push to a matrix\n"
                 "  TO GITHUB              desk only: copy, audit, second click sends\n"
-                "Never CLOSE/OPEN. Never 0.1→0.2 from Grok. A bump does not push.\n");
+                "Never CLOSE/OPEN. Never 0.1→0.2 from Pilot. A bump does not push.\n");
         return 0;
     }
     return archy_desk_main();

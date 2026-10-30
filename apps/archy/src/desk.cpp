@@ -237,7 +237,7 @@ int archy_desk_main() {
             txt(cyan, 14, 62, ascii(toast, 90));
         else
             txt(rgb(dpy, cm, 255, 200, 87), 14, 62,
-                "Grok = g++ only   ·   LEVEL UP 0.1→0.2 is you   ·   never CLOSE/OPEN");
+                "Pilot = g++ only   ·   LEVEL UP 0.1→0.2 is you   ·   never CLOSE/OPEN");
 
         Rect rc{W - 78, 10, 64, 22};
         fill(clip, rc); stroke(orange, rc);
@@ -245,9 +245,9 @@ int archy_desk_main() {
         hits.push_back({Hit::Close, rc});
 
         std::string ver = jstr(st, "version", "0.1");
-        int minor = 1, grok = 0;
+        int minor = 1, pilot = 0;
         try { if (st.contains("minor")) minor = st["minor"].get<int>(); } catch (...) {}
-        try { if (st.contains("grok")) grok = st["grok"].get<int>(); } catch (...) {}
+        try { if (st.contains("pilot")) pilot = st["pilot"].get<int>(); } catch (...) {}
         char next[32];
         snprintf(next, sizeof(next), "0.%d", minor + 1);
 
@@ -256,8 +256,8 @@ int archy_desk_main() {
         txt(muted, hero.x + 16, hero.y + 22, "CURRENT  mothership");
         txt(green, hero.x + 16, hero.y + 52, ver);
         char sub[120];
-        snprintf(sub, sizeof(sub), "grok edits on this minor  g%d    updated %s",
-                 grok, ascii(jstr(st, "updated"), 22).c_str());
+        snprintf(sub, sizeof(sub), "pilot edits on this minor  g%d    updated %s",
+                 pilot, ascii(jstr(st, "updated"), 22).c_str());
         txt(muted, hero.x + 16, hero.y + 74, sub);
 
         Rect lup{hero.x + hero.w - 210, hero.y + 22, 190, 48};
@@ -334,7 +334,7 @@ int archy_desk_main() {
                 std::string kind = jstr(e, "kind");
                 unsigned long col = muted;
                 if (kind == "user") col = gold;
-                else if (kind == "grok") col = cyan;
+                else if (kind == "pilot") col = cyan;
                 else if (kind == "deploy") col = green;
                 char line[220];
                 snprintf(line, sizeof(line), "%s  %-6s  %-8s -> %-8s  %s",
@@ -437,12 +437,12 @@ int archy_desk_main() {
                     else if (h.kind == Hit::LevelUp) {
                         if (now() >= arm_until) {
                             arm_until = now() + 4;
-                            say("LEVEL UP armed 4s — click again to raise minor (Grok cannot do this)");
+                            say("LEVEL UP armed 4s — click again to raise minor (Pilot cannot do this)");
                         } else {
                             arm_until = 0;
                             setenv("ARCHY_OPERATOR", "1", 1);
                             st = slurp_cmd("ARCHY_OPERATOR=1 python3 \"" + db_py() + "\" --operator-level-up 2>/dev/null");
-                            say("LEVEL UP  ->  " + jstr(st, "version", "?") + "   grok suffix reset");
+                            say("LEVEL UP  ->  " + jstr(st, "version", "?") + "   pilot suffix reset");
                         }
                     } else if (h.kind == Hit::Github) {
                         if (gh.pid > 0) {
