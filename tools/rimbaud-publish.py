@@ -883,6 +883,39 @@ def prepare_json() -> int:
     return 0
 
 
+def _push_detail(text: str) -> str:
+    """One line for the Archy ledger. The window used to keep only 'github push failed'."""
+    raw = text or ""
+    low = raw.lower()
+    if "non-fast-forward" in low or "[rejected]" in low:
+        return "rejected, remote main is ahead"
+    if (
+        "authentication failed" in low
+        or "invalid username or token" in low
+        or "the requested url returned error: 403" in low
+        or "the requested url returned error: 401" in low
+    ):
+        return "github refused the login"
+    if (
+        "could not resolve" in low
+        or "failed to connect" in low
+        or "connection timed out" in low
+        or "network is unreachable" in low
+    ):
+        return "github could not be reached"
+    for line in raw.splitlines():
+        line = " ".join(line.split())
+        if not line:
+            continue
+        fold = line.lower()
+        if fold.startswith("hint:") or fold.startswith("hinweis:"):
+            continue
+        if line.startswith("To "):
+            continue
+        return line[:160]
+    return "git push failed"
+
+
 def send_json() -> int:
     """Push the GitHub folder after a fresh audit. The second Archy click."""
     if not os.path.isdir(os.path.join(DEST, ".git")):
@@ -913,7 +946,14 @@ def send_json() -> int:
         text=True,
     )
     if ran.returncode != 0:
-        _emit({"ok": False, "clean": True, "pushed": False, "error": "github push failed"})
+        _emit({
+            "ok": False,
+            "clean": True,
+            "pushed": False,
+            "error": "github push failed",
+            "detail": _push_detail((ran.stderr or "") + "\n" + (ran.stdout or "")),
+            "remote": label,
+        })
         return 1
     version, _summary = latest_archy()
     _emit({
