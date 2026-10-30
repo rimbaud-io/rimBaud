@@ -25,7 +25,7 @@ apps/matrix/     the screen. Native desk, chart, and the web wire.
 apps/spring/     the brain on port 5004. Reads and writes the hunter files.
 apps/meta/       the mothership. Lists the matrices. Does not close a clip.
 apps/pettibon/   the saved trade book for one hunter.
-apps/archy/      the version window. Grok bumps g15, g16. The operator levels up.
+apps/archy/      the version window. Pilot bumps g15, g16. The operator levels up.
 ```
 
 Around them:
