@@ -235,7 +235,7 @@ export function catalogTools({ hunters, extraWallets = [], extraHunters = [], ex
     unique: true,
     type: "gauge",
     label: "Condor",
-    hint: "Grok / heuristic BIAS Messgerät",
+    hint: "Pilot / heuristic BIAS Messgerät",
     icon: "◎",
     color: "#c084fc",
     data: { kind: "condor", title: "Condor" },
@@ -274,15 +274,15 @@ export function catalogTools({ hunters, extraWallets = [], extraHunters = [], ex
     data: { kind: "telegram", name: "Telegram bot", token: "", chat_ids: "" },
   },
   {
-    toolId: "grok-bot",
+    toolId: "pilot-bot",
     category: "condor",
     unique: false,
     type: "agent",
-    label: "Grok bot",
-    hint: "xAI key + model · wire into Condor GROK",
+    label: "Pilot bot",
+    hint: "xAI key + model · wire into Condor PILOT",
     icon: "✦",
     color: "#2A9FD6",
-    data: { kind: "grok", name: "Grok bot", api_key: "", model: "grok-4.5" },
+    data: { kind: "pilot", name: "Pilot bot", api_key: "", model: "pilot-4.5" },
   },
   {
     toolId: "gauge-hmm",
@@ -440,7 +440,7 @@ export function catalogTools({ hunters, extraWallets = [], extraHunters = [], ex
     unique: false,
     type: "output",
     label: "Stream",
-    hint: "Telegram / Grok / logs feed",
+    hint: "Telegram / Pilot / logs feed",
     icon: "☰",
     color: "#34d399",
     data: { kind: "stream", lines: [] },
@@ -623,7 +623,7 @@ export function edgeStyle(sourceHandle) {
   if (sourceHandle === "tg") {
     return { stroke: "#34d399", strokeWidth: 1.4 };
   }
-  if (sourceHandle === "grok") {
+  if (sourceHandle === "pilot") {
     return { stroke: "#2A9FD6", strokeWidth: 1.4 };
   }
   if (sourceHandle === "out") {
@@ -808,24 +808,24 @@ export function autoEdgesFor(node, existing) {
       }
     }
   }
-  if (node.type === "homestat" && node.data && node.data.kind === "grok") {
+  if (node.type === "homestat" && node.data && node.data.kind === "pilot") {
     for (const n of existing) {
       if (isBiasReportBot(n)) {
-        out.push(makeEdge("e-grok-bias-" + n.id, node.id, "out", n.id, "in"));
+        out.push(makeEdge("e-pilot-bias-" + n.id, node.id, "out", n.id, "in"));
       }
     }
   }
   if (isBiasReportBot(node)) {
     for (const n of existing) {
-      if (n.type === "homestat" && n.data && n.data.kind === "grok") {
-        out.push(makeEdge("e-grok-bias-" + node.id, n.id, "out", node.id, "in"));
+      if (n.type === "homestat" && n.data && n.data.kind === "pilot") {
+        out.push(makeEdge("e-pilot-bias-" + node.id, n.id, "out", node.id, "in"));
       }
     }
   }
   if (node.type === "agent" && has("gauge-condor") && !isBiasReportBot(node)) {
     const kind = (node.data && node.data.kind) || "telegram";
     if (kind !== "email") {
-      const h = kind === "grok" ? "grok" : "tg";
+      const h = kind === "pilot" ? "pilot" : "tg";
       out.push(makeEdge("e-condor-" + h + "-" + node.id, node.id, h, "gauge-condor", h));
     }
   }
@@ -885,8 +885,8 @@ export function isValidConnection(c) {
   if (src === "ctrl" && tgt === "ctrl") return true;
   if ((src === "tg" || src === "out") && tgt === "tg") return true;
   if (src === "tg" && tgt === "tg") return true;
-  if (src === "grok" && tgt === "grok") return true;
-  if (tgt === "in" && (src === "logs" || src === "income" || src === "funds" || src === "bias" || src === "tg" || src === "grok" || src === "out" || src === "live" || src === "alert")) return true;
+  if (src === "pilot" && tgt === "pilot") return true;
+  if (tgt === "in" && (src === "logs" || src === "income" || src === "funds" || src === "bias" || src === "tg" || src === "pilot" || src === "out" || src === "live" || src === "alert")) return true;
   return src === tgt;
 }
 

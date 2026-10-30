@@ -101,7 +101,7 @@ function portsFor(tool, hid) {
   if (type === "pct") return { inn: [], out: [tool.data && tool.data.kind === "moon" ? "moon" : "sl"] };
   if (type === "trader") return { inn: [], out: ["trader"] };
   if (type === "funds") return { inn: ["in"], out: ["funds"] };
-  if (type === "gauge") return { inn: ["tg", "grok"], out: ["bias", "live"] };
+  if (type === "gauge") return { inn: ["tg", "pilot"], out: ["bias", "live"] };
   return { inn: [], out: [] };
 }
 

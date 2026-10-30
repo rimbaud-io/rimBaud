@@ -39,7 +39,7 @@ export const HOME_ORIGIN = { x: 32, y: 16 };
 export const HOME_COLS = 3;
 export const HOME_CANVAS_W = 992;
 export const HOME_TOP_IDS = [
-  "home-stat-grok",
+  "home-stat-pilot",
   "home-stat-tokens",
   "home-stat-live",
   "home-stat-pos",
@@ -67,7 +67,7 @@ export function stepTopScale(cur, dir) {
 
 export const HOME_TILE = {
   homebot: { w: 320, h: 520 },
-  grok: { w: 992, h: 128 },
+  pilot: { w: 992, h: 128 },
   tokens: { w: 992, h: 118 },
   live: { w: 186, h: 88 },
   pos: { w: 186, h: 88 },
@@ -82,7 +82,7 @@ export const HOME_TILE = {
 };
 
 export const HOME_STAT_TOOLS = [
-  { toolId: "home-stat-grok", kind: "grok", label: "GROK BIAS", hint: "GROK report + Desk BIAS · Grok never writes hunters", icon: "✦", color: "#2A9FD6", ...HOME_TILE.grok },
+  { toolId: "home-stat-pilot", kind: "pilot", label: "PILOT BIAS", hint: "PILOT report + Desk BIAS · Pilot never writes hunters", icon: "✦", color: "#2A9FD6", ...HOME_TILE.pilot },
   { toolId: "home-stat-tokens", kind: "tokens", label: "HL Tokens", hint: "IP weight bar on /", icon: "◈", color: "#f0b90b", ...HOME_TILE.tokens },
   { toolId: "home-stat-live", kind: "live", label: "Bots live", hint: "ok / n lamps on /", icon: "●", color: "#f0b90b", ...HOME_TILE.live },
   { toolId: "home-stat-pos", kind: "pos", label: "Open positions", hint: "count across hunters", icon: "▣", color: "#7ecbff", ...HOME_TILE.pos },
@@ -266,9 +266,9 @@ export function packHomeLayout(nodes, topScale) {
     const n = byId[id];
     return n ? homeTileSize(n).h : 0;
   };
-  if (byId["home-stat-grok"]) {
-    place("home-stat-grok", x0, y);
-    y += topHOf("home-stat-grok") + g;
+  if (byId["home-stat-pilot"]) {
+    place("home-stat-pilot", x0, y);
+    y += topHOf("home-stat-pilot") + g;
   }
   if (byId["home-stat-tokens"]) {
     place("home-stat-tokens", x0, y);
