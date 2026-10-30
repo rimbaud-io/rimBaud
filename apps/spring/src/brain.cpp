@@ -276,6 +276,7 @@ static bool hunter_pausable(const std::string& id) {
         "hummingbot-dman",
         "hummingbot-onlyup",
         "hummingbot-dman-maker",
+        "hummingbot-dman-maker-bch",
         nullptr,
     };
     for (int i = 0; kAllow[i]; ++i)
@@ -637,8 +638,9 @@ static json merge_controller(const Brain& br, const std::string& id, const json&
         }
     }
     out["sl_roe_pct"] = sl_of(sl, id, jnum(out, "sl_roe_pct", 20));
-    if (id == "hummingbot-dman-maker" && !out.contains("sendEvery2Win")) {
-        bool on = true;
+    if ((id == "hummingbot-dman-maker" || id == "hummingbot-dman-maker-bch")
+        && !out.contains("sendEvery2Win")) {
+        bool on = (id == "hummingbot-dman-maker");
         auto skim = read_json(join(br.conf, "risk_skim.json"));
         if (skim.is_object() && skim.contains("hunters") && skim["hunters"].is_object()
             && skim["hunters"].contains(id) && skim["hunters"][id].is_object()) {
@@ -816,6 +818,7 @@ static json last_trades_for(const Brain& br, const std::string& id) {
     else if (id == "hummingbot-dman") file = "dman_trades.json";
     else if (id == "hummingbot-onlyup") file = "onlyup_trades.json";
     else if (id == "hummingbot-dman-maker") file = "dman_maker_trades.json";
+    else if (id == "hummingbot-dman-maker-bch") file = "dman_maker_bch_trades.json";
     if (!file) return {{"trades", json::array()}, {"n_wins", 0}, {"n_losses", 0},
                        {"n_opens", 0}, {"n_closes", 0}, {"realized_pnl_usd", 0.0}};
     return slice_trades_json(read_json(join(br.conf, file)), KEEP);
@@ -830,6 +833,7 @@ static const char* hunter_log_name(const std::string& id) {
     if (id == "hummingbot-dman") return "logs_dman_trader.log";
     if (id == "hummingbot-onlyup") return "logs_onlyup_trader.log";
     if (id == "hummingbot-dman-maker") return "logs_dman_maker_v2_trader.log";
+    if (id == "hummingbot-dman-maker-bch") return "logs_dman_maker_bch_trader.log";
     return nullptr;
 }
 
@@ -2477,8 +2481,8 @@ static bool as_bool(const json& val) {
 
 // ON is the live two_wins skim. OFF is mode keep plus skim_pct 0 and parked 0,
 // which the already-loaded hunter honors without a restart. Does not send.
-static bool apply_dman_every_2_win(const Brain& br, bool on) {
-    const char* id = "hummingbot-dman-maker";
+static bool apply_dman_every_2_win(const Brain& br, const std::string& id, bool on) {
+    if (id != "hummingbot-dman-maker" && id != "hummingbot-dman-maker-bch") return false;
     std::string path = join(br.conf, "risk_skim.json");
     std::string lockp = path + ".lock";
     int fd = ::open(lockp.c_str(), O_CREAT | O_RDWR, 0666);
@@ -2493,8 +2497,17 @@ static bool apply_dman_every_2_win(const Brain& br, bool on) {
     json data = read_json(path);
     if (!data.is_object() || !data.contains("hunters") || !data["hunters"].is_object()
         || !data["hunters"].contains(id) || !data["hunters"][id].is_object()) {
-        unlock();
-        return false;
+        if (id != "hummingbot-dman-maker-bch") {
+            unlock();
+            return false;
+        }
+        data["hunters"][id] = {
+            {"mode", "keep"},
+            {"skim_pct", 0},
+            {"parked_usd", 0},
+            {"streak_wins", 0},
+            {"note", "wins stay on the Helliot account"},
+        };
     }
     json row = data["hunters"][id];
     if (on) {
@@ -2585,8 +2598,9 @@ static json api_ctrl_post(const Brain& br, const json& data) {
             || key == "sendEvery2Win") {
             val = as_bool(val);
         }
-        if (key == "sendEvery2Win" && id == "hummingbot-dman-maker") {
-            if (!apply_dman_every_2_win(br, val.get<bool>()))
+        if (key == "sendEvery2Win"
+            && (id == "hummingbot-dman-maker" || id == "hummingbot-dman-maker-bch")) {
+            if (!apply_dman_every_2_win(br, id, val.get<bool>()))
                 return {{"ok", false}, {"error", "risk skim not saved"},
                         {"closes", false}, {"positions_untouched", true}};
         }

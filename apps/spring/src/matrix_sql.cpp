@@ -33,6 +33,7 @@ static const char* kHunters[] = {
     "hummingbot-dman",
     "hummingbot-onlyup",
     "hummingbot-dman-maker",
+    "hummingbot-dman-maker-bch",
 };
 
 static bool known_hunter(const std::string& id) {
