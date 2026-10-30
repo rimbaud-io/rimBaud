@@ -21,12 +21,14 @@ export const HUNTERS = [
   { id: "hummingbot-dman", name: "Dman", href: "/dman", icon: "▦", color: "#c084fc", hasBias: true, coins: ["BTC", "ETH", "LTC"] },
   { id: "hummingbot-onlyup", name: "Only Up", href: "/onlyup", icon: "▲", color: "#ffd166", hasBias: true, coins: ["BTC", "LTC"] },
   { id: "hummingbot-dman-maker", name: "DMan Maker", href: "/dman-maker", icon: "⧉", color: "#a78bfa", hasBias: true, coins: ["BTC", "ETH", "LTC"] },
+  { id: "hummingbot-dman-maker-bch", name: "DMan Maker BCH", href: "/dman-maker-bch", icon: "⧉", color: "#0ac18e", hasBias: true, coins: ["BCH"] },
 ];
 
 export const COINS = [
   { coin: "BTC", color: "#f7931a", hint: "wired to every bias hunter" },
   { coin: "ETH", color: "#627eea", hint: "Swing / Helliot / Surfn / Shorty / Dman" },
   { coin: "LTC", color: "#345d9d", hint: "wired to every bias hunter" },
+  { coin: "BCH", color: "#0ac18e", hint: "DMan Maker BCH on Helliot" },
   { coin: "SOL", color: "#9945ff", hint: "add and wire to a hunter" },
   { coin: "HYPE", color: "#19e5a0", hint: "add and wire to a hunter" },
   { coin: "DOGE", color: "#c2a633", hint: "add and wire to a hunter" },
@@ -56,6 +58,7 @@ const HUNTER_YS = {
   "hummingbot-dman": 24 + ROW * 5,
   "hummingbot-onlyup": 24 + ROW * 6,
   "hummingbot-dman-maker": 24 + ROW * 7,
+  "hummingbot-dman-maker-bch": 24 + ROW * 8,
 };
 
 export const LAYOUT = {
