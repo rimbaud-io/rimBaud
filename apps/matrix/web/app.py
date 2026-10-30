@@ -437,7 +437,7 @@ ONLYUP_MOON_PCT = 50.0
 BOT_ACCOUNTS_FILE = os.path.join(CONF_DIR, "bot_accounts.json")
 BOT_SL_FILE = os.path.join(CONF_DIR, "bot_sl.json")
 DESK_BIAS_FILE = os.path.join(CONF_DIR, "desk_bias.json")
-GROK_BIAS_FILE = os.path.join(CONF_DIR, "grok_bias.json")
+PILOT_BIAS_FILE = os.path.join(CONF_DIR, "pilot_bias.json")
 _DESK_BIAS_LOCK = threading.Lock()
 CONFIG_PASSWORD = os.environ.get("CONFIG_PASSWORD", "Dan2Delion")
 ENCRYPT_CONTAINERS = (
@@ -3296,7 +3296,7 @@ PUMP_TAPE_FILE = os.path.join(CONF_DIR, "pump_tape.json")
 PUMP_GAUGE_FILE = os.path.join(CONF_DIR, "pump_gauge.json")
 CONDOR_SETUP_FILE = os.path.join(CONF_DIR, "condor_setup.json")
 CONDOR_FEED_FILE = os.path.join(CONF_DIR, "condor_feed.json")
-PHONE_GROK_ID = "grok-bot-telegram"
+PHONE_PILOT_ID = "pilot-bot-telegram"
 
 CONDOR_HUNTERS = {
     "hummingbot-bn-swing": {"bias": BN_SWING_BIAS_FILE, "coins": ("BTC", "ETH", "LTC", "TAO"), "mode": "both"},
@@ -4205,7 +4205,7 @@ def _save_condor_setup(bots, wired):
         "bots": bots if isinstance(bots, dict) else {},
         "wired": {
             "telegram": [str(x) for x in (wired.get("telegram") or []) if str(x).strip()],
-            "grok": [str(x) for x in (wired.get("grok") or []) if str(x).strip()],
+            "pilot": [str(x) for x in (wired.get("pilot") or []) if str(x).strip()],
         },
     }
     _write_json_file(CONDOR_SETUP_FILE, payload)
@@ -4219,32 +4219,32 @@ def _save_condor_setup(bots, wired):
 def _public_condor_bot(nid, row):
     if not isinstance(row, dict):
         row = {}
-    kind = "grok" if row.get("kind") == "grok" else "telegram"
+    kind = "pilot" if row.get("kind") == "pilot" else "telegram"
     chats = _parse_condor_chats(row.get("chat_ids"))
     return {
         "id": str(nid),
         "kind": kind,
-        "name": str(row.get("name") or ("Grok bot" if kind == "grok" else "Telegram bot"))[:60],
+        "name": str(row.get("name") or ("Pilot bot" if kind == "pilot" else "Telegram bot"))[:60],
         "has_token": bool(str(row.get("token") or "").strip()) if kind == "telegram" else False,
-        "has_key": bool(str(row.get("api_key") or "").strip()) if kind == "grok" else False,
+        "has_key": bool(str(row.get("api_key") or "").strip()) if kind == "pilot" else False,
         "chat_ids": ", ".join(chats) if kind == "telegram" else "",
-        "model": str(row.get("model") or "grok-4.5")[:80] if kind == "grok" else None,
+        "model": str(row.get("model") or "pilot-4.5")[:80] if kind == "pilot" else None,
     }
 
 
 def _public_condor_setup():
     _, bots, wired = _load_condor_setup()
     tg_wired = [str(x) for x in (wired.get("telegram") or [])]
-    grok_wired = [str(x) for x in (wired.get("grok") or [])]
+    pilot_wired = [str(x) for x in (wired.get("pilot") or [])]
     public = []
     for nid, row in bots.items():
         item = _public_condor_bot(nid, row)
-        item["wired"] = nid in tg_wired or nid in grok_wired
+        item["wired"] = nid in tg_wired or nid in pilot_wired
         public.append(item)
     return {
         "ok": True,
         "bots": public,
-        "wired": {"telegram": tg_wired, "grok": grok_wired},
+        "wired": {"telegram": tg_wired, "pilot": pilot_wired},
     }
 
 
@@ -4252,7 +4252,7 @@ def _upsert_condor_bot(body):
     nid = str(body.get("id") or "").strip()[:80]
     if not nid:
         return {"ok": False, "error": "id required"}
-    kind = "grok" if str(body.get("kind") or "") == "grok" else "telegram"
+    kind = "pilot" if str(body.get("kind") or "") == "pilot" else "telegram"
     _, bots, wired = _load_condor_setup()
     row = bots.get(nid) if isinstance(bots.get(nid), dict) else {}
     row["id"] = nid
@@ -4266,13 +4266,13 @@ def _upsert_condor_bot(body):
             row["token"] = str(body.get("token")).strip()
     else:
         if body.get("model"):
-            row["model"] = str(body.get("model") or "grok-4.5")[:80]
+            row["model"] = str(body.get("model") or "pilot-4.5")[:80]
         if _condor_secret_is_new(body.get("api_key")):
             row["api_key"] = str(body.get("api_key")).strip()
     bots[nid] = row
     _save_condor_setup(bots, wired)
     pub = _public_condor_bot(nid, row)
-    pub["wired"] = nid in (wired.get("telegram") or []) or nid in (wired.get("grok") or [])
+    pub["wired"] = nid in (wired.get("telegram") or []) or nid in (wired.get("pilot") or [])
     bits = [kind, pub.get("name") or nid]
     if kind == "telegram":
         bits.append("token saved" if pub["has_token"] else "token missing")
@@ -4286,7 +4286,7 @@ def _upsert_condor_bot(body):
 
 
 def _apply_condor_setup(nodes, edges):
-    """Sync canvas Telegram/Grok nodes + Condor TG/GROK wires into conf/condor_setup.json.
+    """Sync canvas Telegram/Pilot nodes + Condor TG/PILOT wires into conf/condor_setup.json.
 
     Secrets stay in that file; the graph only stores has_token / has_key flags.
     """
@@ -4304,7 +4304,7 @@ def _apply_condor_setup(nodes, edges):
         if n.get("type") != "agent":
             continue
         data = n.get("data") if isinstance(n.get("data"), dict) else {}
-        kind = "grok" if data.get("kind") == "grok" else "telegram"
+        kind = "pilot" if data.get("kind") == "pilot" else "telegram"
         row = bots.get(nid) if isinstance(bots.get(nid), dict) else {}
         row["id"] = nid
         row["kind"] = kind
@@ -4312,11 +4312,11 @@ def _apply_condor_setup(nodes, edges):
             row["name"] = str(data.get("name"))[:60]
         if kind == "telegram" and "chat_ids" in data:
             row["chat_ids"] = _parse_condor_chats(data.get("chat_ids"))
-        if kind == "grok" and data.get("model"):
+        if kind == "pilot" and data.get("model"):
             row["model"] = str(data.get("model"))[:80]
         bots[nid] = row
     wired_tg = []
-    wired_grok = []
+    wired_pilot = []
     for e in edges or []:
         tgt = str(e.get("target") or "")
         src = str(e.get("source") or "")
@@ -4336,25 +4336,25 @@ def _apply_condor_setup(nodes, edges):
         th = str(e.get("targetHandle") or "")
         sh = str(e.get("sourceHandle") or "")
         src_data = src_n.get("data") if isinstance(src_n.get("data"), dict) else {}
-        kind = "grok" if src_data.get("kind") == "grok" else "telegram"
+        kind = "pilot" if src_data.get("kind") == "pilot" else "telegram"
         if kind == "telegram" and th in ("tg", "in", "") and sh in ("tg", "out", ""):
             if src not in wired_tg:
                 wired_tg.append(src)
-        elif kind == "grok" and th in ("grok", "") and sh in ("grok", "out", ""):
-            if src not in wired_grok:
-                wired_grok.append(src)
-    phone = bots.get(PHONE_GROK_ID) if isinstance(bots.get(PHONE_GROK_ID), dict) else {}
-    if str(phone.get("api_key") or "").strip() and PHONE_GROK_ID not in wired_grok:
-        wired_grok.insert(0, PHONE_GROK_ID)
+        elif kind == "pilot" and th in ("pilot", "") and sh in ("pilot", "out", ""):
+            if src not in wired_pilot:
+                wired_pilot.append(src)
+    phone = bots.get(PHONE_PILOT_ID) if isinstance(bots.get(PHONE_PILOT_ID), dict) else {}
+    if str(phone.get("api_key") or "").strip() and PHONE_PILOT_ID not in wired_pilot:
+        wired_pilot.insert(0, PHONE_PILOT_ID)
     try:
-        _save_condor_setup(bots, {"telegram": wired_tg, "grok": wired_grok})
+        _save_condor_setup(bots, {"telegram": wired_tg, "pilot": wired_pilot})
     except OSError:
         return []
     notes = []
     if wired_tg:
         notes.append("tg=" + ",".join(wired_tg))
-    if wired_grok:
-        notes.append("grok=" + ",".join(wired_grok))
+    if wired_pilot:
+        notes.append("pilot=" + ",".join(wired_pilot))
     return notes
 
 
@@ -4575,7 +4575,7 @@ def _parse_posted_bias(text):
     return None
 
 
-def _grok_bias_from_feed():
+def _pilot_bias_from_feed():
     data = _read_json_file(CONDOR_FEED_FILE) or {}
     rows = data.get("lines") if isinstance(data.get("lines"), list) else []
     if not rows and isinstance(data, list):
@@ -4606,11 +4606,11 @@ def _grok_bias_from_feed():
                 "source": "bias-bot",
                 "writes_hunters": False,
             }
-        elif kind == "grok" and not picked:
+        elif kind == "pilot" and not picked:
             picked = {
                 "bias": mode,
                 "updated": row.get("ts"),
-                "source": src or "grok",
+                "source": src or "pilot",
                 "writes_hunters": False,
             }
     if picked:
@@ -4629,20 +4629,20 @@ def _grok_bias_from_feed():
     return {}
 
 
-def _grok_bias_read():
-    raw = _read_json_file(GROK_BIAS_FILE) or {}
+def _pilot_bias_read():
+    raw = _read_json_file(PILOT_BIAS_FILE) or {}
     if not isinstance(raw, dict):
         raw = {}
     bias = str(raw.get("bias") or "").upper()
     if bias not in ("LONG", "SHORT", "FLAT"):
-        raw = _grok_bias_from_feed()
+        raw = _pilot_bias_from_feed()
         bias = str(raw.get("bias") or "").upper()
         if bias not in ("LONG", "SHORT", "FLAT"):
             bias = None
     return {
         "bias": bias,
         "updated": raw.get("updated"),
-        "source": raw.get("source") or "grok",
+        "source": raw.get("source") or "pilot",
         "writes_hunters": False,
     }
 
@@ -4657,10 +4657,10 @@ def _condor_payload():
     data["feed"] = _condor_feed_public()
     xlate = _read_json_file(os.path.join(CONF_DIR, "condor_xlate.json")) or {}
     data["xlate"] = xlate.get("nodes") if isinstance(xlate.get("nodes"), dict) else {}
-    gb = _grok_bias_read()
-    data["grok_cmd"] = gb.get("bias")
-    data["grok_cmd_ts"] = gb.get("updated")
-    data["grok_writes_hunters"] = False
+    gb = _pilot_bias_read()
+    data["pilot_cmd"] = gb.get("bias")
+    data["pilot_cmd_ts"] = gb.get("updated")
+    data["pilot_writes_hunters"] = False
     return data
 
 
@@ -5268,7 +5268,7 @@ def api_condor_xlate():
 
 @app.route("/api/condor/tick", methods=["POST"])
 def api_condor_tick():
-    """Ask the Condor container to tick now (heuristic/Grok). Does not place orders."""
+    """Ask the Condor container to tick now (heuristic/Pilot). Does not place orders."""
     try:
         r = requests.post("http://hummingbot-condor:8088/tick", json={}, timeout=40)
         data = r.json() if r.content else {}
@@ -5279,7 +5279,7 @@ def api_condor_tick():
 
 @app.route("/api/condor/setup", methods=["GET", "POST"])
 def api_condor_setup():
-    """Wire Telegram / Grok bots for Condor. Tokens live in conf/condor_setup.json."""
+    """Wire Telegram / Pilot bots for Condor. Tokens live in conf/condor_setup.json."""
     if request.method == "GET":
         return jsonify(_public_condor_setup())
     body = request.get_json(silent=True) or {}
@@ -5677,7 +5677,7 @@ def _overlay_saved_canvas(live):
         tgt = str(e.get("target") or "")
         sh = str(e.get("sourceHandle") or "")
         th = str(e.get("targetHandle") or "")
-        if src in extra_ids or tgt in extra_ids or sh in ("tg", "grok", "out", "moon", "trader", "eclose", "live", "alert", "risk", "wallet", "income", "funds") or th in ("tg", "grok", "moon", "trader", "eclose", "live", "alert", "risk", "wallet", "income") or str(sh).startswith("trader") or str(th).startswith("trader"):
+        if src in extra_ids or tgt in extra_ids or sh in ("tg", "pilot", "out", "moon", "trader", "eclose", "live", "alert", "risk", "wallet", "income", "funds") or th in ("tg", "pilot", "moon", "trader", "eclose", "live", "alert", "risk", "wallet", "income") or str(sh).startswith("trader") or str(th).startswith("trader"):
             extra_edges.append(e)
             live_ek.add(k)
     out = dict(live)
@@ -7649,7 +7649,7 @@ def api_wire_xml():
 @app.route("/api/brief")
 @app.route("/brief")
 def api_brief():
-    """Read-only Freiquell desk summary for Grok Bot. Token required."""
+    """Read-only Freiquell desk summary for Pilot Bot. Token required."""
     if not _brief_authorized():
         return Response("token required\n", status=401, mimetype="text/plain")
     md = _write_desk_brief_file()
@@ -8383,7 +8383,7 @@ def _sl_roe_for(bot_id, default=20.0):
 
 
 BRIEF_TOKEN_FILE = os.path.join(CONF_DIR, "brief_token.txt")
-BRIEF_MD_FILE = os.path.join(CONF_DIR, "grok_brief.md")
+BRIEF_MD_FILE = os.path.join(CONF_DIR, "pilot_brief.md")
 HOME_BRIEF_SPECS = _LazySeq(get_home_brief_specs)
 
 
@@ -10046,7 +10046,7 @@ def api_home_desk_bias():
 
 
 def _parse_koord_text(raw):
-    """Grok Koordinator often writes LONG / please post short. Map to /long /short /flat."""
+    """Pilot Koordinator often writes LONG / please post short. Map to /long /short /flat."""
     t = str(raw or "").strip()
     if not t:
         return None
@@ -10094,7 +10094,7 @@ def _notify_condor1(cmd):
 
 @app.route("/api/koordinator/post", methods=["POST"])
 def api_koordinator_post():
-    """Ingest Grok Koordinator output. Telegram bots cannot see other bots' messages.
+    """Ingest Pilot Koordinator output. Telegram bots cannot see other bots' messages.
 
     Body: {"text": "/long"} or {"text": "SHORT"} or {"text": "please post long"}
     Maps to /long /short /flat and posts that slash command on BIAS BOT condor1.
@@ -10122,7 +10122,7 @@ def api_koordinator_post():
         "raw": str(raw)[:120],
     }
     try:
-        _write_json_file(GROK_BIAS_FILE, payload)
+        _write_json_file(PILOT_BIAS_FILE, payload)
         _write_json_file(os.path.join(CONF_DIR, "koordinator_cmd.json"), {
             "id": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
             "bias": bias,
@@ -10143,8 +10143,8 @@ def api_koordinator_post():
         "writes_hunters": False,
         "telegram": posted,
         "applied": [],
-        "grok_bias": payload,
-        "message": "GROK " + cmd + " → BIAS BOT"
+        "pilot_bias": payload,
+        "message": "PILOT " + cmd + " → BIAS BOT"
         + (" posted" if posted else " (telegram notify skipped)")
         + " · hunters unchanged",
     })

@@ -269,7 +269,7 @@ def init(path):
                     source TEXT,
                     updated_at TEXT NOT NULL
                 );
-                CREATE TABLE IF NOT EXISTS grok_bias (
+                CREATE TABLE IF NOT EXISTS pilot_bias (
                     id INTEGER PRIMARY KEY CHECK (id = 1),
                     mode TEXT NOT NULL,
                     closes INTEGER NOT NULL DEFAULT 0,

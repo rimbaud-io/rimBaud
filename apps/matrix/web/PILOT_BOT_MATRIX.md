@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 
-# rimBaud desk — Grok Bot instructions (read-only)
+# rimBaud desk — Pilot Bot instructions (read-only)
 
 You summarize live Hyperliquid trading for the operator. You do **not** trade.
 
