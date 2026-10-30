@@ -153,7 +153,7 @@ def send(text, chat_id=None):
     token = (env.get("TELEGRAM_BOT_TOKEN") or "").strip()
     chat = str(chat_id or env.get("TELEGRAM_CHAT_ID") or env.get("TELEGRAM_CHAT_IDS") or "").split(",")[0].strip()
     if not token:
-        return {"ok": False, "error": "TELEGRAM_BOT_TOKEN missing in grok_bot/secrets.env"}
+        return {"ok": False, "error": "TELEGRAM_BOT_TOKEN missing in pilot_bot/secrets.env"}
     if not chat:
         return {"ok": False, "error": "TELEGRAM_CHAT_ID missing — write the bot /start, then run --whoami"}
     return tg_api(token, "sendMessage", {
