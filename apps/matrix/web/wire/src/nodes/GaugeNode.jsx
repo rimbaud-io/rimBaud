@@ -57,9 +57,9 @@ export default function GaugeNode({ data, selected }) {
       {kind === "condor" ? (
         <>
           <PortHandle type="target" position={Position.Bottom} id="tg" className="h-tg" tip={PORT_TIP.condorTg} />
-          <PortHandle type="target" position={Position.Left} id="grok" className="h-grok" tip={PORT_TIP.condorGrok} />
+          <PortHandle type="target" position={Position.Left} id="pilot" className="h-pilot" tip={PORT_TIP.condorPilot} />
           <span className="port bot" style={{ color: "#34d399" }} data-tip={PORT_TIP.condorTg}>TG</span>
-          <span className="port left grok" style={{ color: "#2A9FD6" }} data-tip={PORT_TIP.condorGrok}>GROK</span>
+          <span className="port left pilot" style={{ color: "#2A9FD6" }} data-tip={PORT_TIP.condorPilot}>PILOT</span>
         </>
       ) : null}
       <div className="wn-kicker">{isPump ? "SEE · POST PUMP" : "IN · MESSGERÄT"}</div>

@@ -26,21 +26,21 @@ function mask(v) {
 }
 
 export default function AgentNode({ id, data, selected }) {
-  const kind = data.kind === "grok" ? "grok" : data.kind === "email" ? "email" : "telegram";
-  const color = data.color || (kind === "grok" ? "#2A9FD6" : kind === "email" ? "#ffc857" : "#34d399");
-  const handleId = kind === "grok" ? "grok" : kind === "email" ? "out" : "tg";
-  const tip = kind === "grok" ? PORT_TIP.grokOut : PORT_TIP.streamOut;
-  const [name, setName] = useState(data.name || (kind === "grok" ? "Grok bot" : "Telegram bot"));
+  const kind = data.kind === "pilot" ? "pilot" : data.kind === "email" ? "email" : "telegram";
+  const color = data.color || (kind === "pilot" ? "#2A9FD6" : kind === "email" ? "#ffc857" : "#34d399");
+  const handleId = kind === "pilot" ? "pilot" : kind === "email" ? "out" : "tg";
+  const tip = kind === "pilot" ? PORT_TIP.pilotOut : PORT_TIP.streamOut;
+  const [name, setName] = useState(data.name || (kind === "pilot" ? "Pilot bot" : "Telegram bot"));
   const [secret, setSecret] = useState("");
-  const [extra, setExtra] = useState(kind === "grok" ? (data.model || "grok-4.5") : (data.chat_ids || ""));
+  const [extra, setExtra] = useState(kind === "pilot" ? (data.model || "pilot-4.5") : (data.chat_ids || ""));
   const focusRef = useRef(false);
   const hasSecret = !!(data.has_token || data.has_key || data.token || data.api_key);
 
   useEffect(() => {
     if (focusRef.current) return;
-    setName(data.name || (kind === "grok" ? "Grok bot" : kind === "email" ? "Email alerts" : "Telegram bot"));
+    setName(data.name || (kind === "pilot" ? "Pilot bot" : kind === "email" ? "Email alerts" : "Telegram bot"));
     if (kind === "email") setExtra(data.to || "");
-    else if (kind === "grok") setExtra(data.model || "grok-4.5");
+    else if (kind === "pilot") setExtra(data.model || "pilot-4.5");
     else setExtra(data.chat_ids || "");
   }, [data.name, data.chat_ids, data.model, data.to, kind]);
 
@@ -56,19 +56,19 @@ export default function AgentNode({ id, data, selected }) {
           <span className="port left" style={{ color: "#ff4d6d" }} data-tip={PORT_TIP.agentIn}>IN</span>
         </>
       ) : null}
-      <PortHandle type="source" position={Position.Top} id={handleId} className={kind === "grok" ? "h-grok" : "h-tg"} tip={tip} />
-      <span className="port top gauge" style={{ color }} data-tip={tip}>{kind === "grok" ? "GROK" : kind === "email" ? "MAIL" : "TG"}</span>
+      <PortHandle type="source" position={Position.Top} id={handleId} className={kind === "pilot" ? "h-pilot" : "h-tg"} tip={tip} />
+      <span className="port top gauge" style={{ color }} data-tip={tip}>{kind === "pilot" ? "PILOT" : kind === "email" ? "MAIL" : "TG"}</span>
       <PortHandle type="source" position={Position.Right} id="out" className="h-tg" tip={PORT_TIP.streamOut} />
       <span className="port right" style={{ color }} data-tip={PORT_TIP.streamOut}>OUT</span>
-      <div className="wn-kicker">{kind === "email" ? "MAIL · ALERTS" : kind === "grok" ? "IN · CONDOR" : "TG · OUT"}</div>
+      <div className="wn-kicker">{kind === "email" ? "MAIL · ALERTS" : kind === "pilot" ? "IN · CONDOR" : "TG · OUT"}</div>
       <div className="wn-title">
-        <span className="icon">{kind === "grok" ? "✦" : kind === "email" ? "✉" : "✈"}</span>
-        <span className="name" style={{ color }}>{name || (kind === "grok" ? "Grok bot" : kind === "email" ? "Email alerts" : "Telegram bot")}</span>
+        <span className="icon">{kind === "pilot" ? "✦" : kind === "email" ? "✉" : "✈"}</span>
+        <span className="name" style={{ color }}>{name || (kind === "pilot" ? "Pilot bot" : kind === "email" ? "Email alerts" : "Telegram bot")}</span>
       </div>
       <p className="wn-note">
         {kind === "email"
           ? "Health ALERT → here. SMTP send comes later — saved on this canvas only."
-          : kind === "grok"
+          : kind === "pilot"
             ? "Wire into Condor. Drives bias when connected."
             : "Hunter LOG → IN posts OPEN/CLOSE. TG OUT → Condor / Translator / Desk BIAS."}
       </p>
@@ -84,7 +84,7 @@ export default function AgentNode({ id, data, selected }) {
         </label>
         {kind !== "email" ? (
         <label>
-          {kind === "grok" ? "xAI API key" : "Bot token"}
+          {kind === "pilot" ? "xAI API key" : "Bot token"}
           <input
             type="password"
             autoComplete="off"
@@ -95,14 +95,14 @@ export default function AgentNode({ id, data, selected }) {
             onBlur={() => {
               focusRef.current = false;
               if (secret.trim()) {
-                commit(kind === "grok" ? { api_key: secret.trim() } : { token: secret.trim() });
+                commit(kind === "pilot" ? { api_key: secret.trim() } : { token: secret.trim() });
                 setSecret("");
               }
             }}
           />
         </label>
         ) : null}
-        {kind === "grok" ? (
+        {kind === "pilot" ? (
           <label>
             Model
             <select
@@ -112,9 +112,9 @@ export default function AgentNode({ id, data, selected }) {
                 commit({ model: e.target.value });
               }}
             >
-              <option value="grok-4.5">grok-4.5</option>
-              <option value="grok-4.6">grok-4.6</option>
-              <option value="grok-4-fast-non-reasoning">grok-4-fast</option>
+              <option value="pilot-4.5">pilot-4.5</option>
+              <option value="pilot-4.6">pilot-4.6</option>
+              <option value="pilot-4-fast-non-reasoning">pilot-4-fast</option>
             </select>
           </label>
         ) : (

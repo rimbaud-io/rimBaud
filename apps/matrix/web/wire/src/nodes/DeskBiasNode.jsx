@@ -42,7 +42,7 @@ export default function DeskBiasNode({ data, selected }) {
       </div>
       <p className="wn-note">
         Telegram OUT → here sets hunter BIAS after autoclose. Do not wire BIAS BOT
-        condor1 here — that bot is GROK report only. Does not close.
+        condor1 here — that bot is PILOT report only. Does not close.
       </p>
       <div className="xlate-now">{want || "—"}</div>
       <div className="bias-btns xlate-btns nodrag nopan" onPointerDown={(e) => e.stopPropagation()}>

@@ -34,24 +34,24 @@ export default function HomeStatNode({ data, selected }) {
   const nBots = t.n_bots || 0;
   const rows = (data.positions || []).slice(0, 8);
   const color = data.color || "#9dffc0";
-  const compact = data.toolId === "grok-bias-report";
-  const wide = !compact && (kind === "tokens" || kind === "book" || kind === "grok");
+  const compact = data.toolId === "pilot-bias-report";
+  const wide = !compact && (kind === "tokens" || kind === "book" || kind === "pilot");
 
   let body = null;
-  if (kind === "grok") {
+  if (kind === "pilot") {
     const coins = ["BTC", "ETH", "LTC", "TAO"];
-    const src = cg.source === "grok" ? "GROK" : (cg.source || "heuristic");
+    const src = cg.source === "pilot" ? "PILOT" : (cg.source || "heuristic");
     const db = data.desk_bias || {};
     const want = String(db.bias || "").toUpperCase();
     body = (
       <>
-        <PortHandle type="source" position={Position.Right} id="out" className="h-tg" tip={PORT_TIP.grokBiasOut} />
-        <span className="port right" style={{ color: "#34d399" }} data-tip={PORT_TIP.grokBiasOut}>TG</span>
-        <div className="wn-kicker">{compact ? "REPORT · GROK BIAS" : "HOME · GROK + DESK BIAS"}</div>
-        <div className="wn-title"><span className="name" style={{ color }}>GROK BIAS</span>{compact ? null : <span className="name" style={{ color: "#f0b90b", marginLeft: 16 }}>Desk BIAS</span>}</div>
+        <PortHandle type="source" position={Position.Right} id="out" className="h-tg" tip={PORT_TIP.pilotBiasOut} />
+        <span className="port right" style={{ color: "#34d399" }} data-tip={PORT_TIP.pilotBiasOut}>TG</span>
+        <div className="wn-kicker">{compact ? "REPORT · PILOT BIAS" : "HOME · PILOT + DESK BIAS"}</div>
+        <div className="wn-title"><span className="name" style={{ color }}>PILOT BIAS</span>{compact ? null : <span className="name" style={{ color: "#f0b90b", marginLeft: 16 }}>Desk BIAS</span>}</div>
         <div className="hstat-val" style={{ display: "flex", gap: 8, fontSize: 15, flexWrap: "wrap", alignItems: "center" }}>
           {["LONG", "FLAT", "SHORT"].map((m) => {
-            const on = String(cg.grok_cmd || "").toUpperCase() === m;
+            const on = String(cg.pilot_cmd || "").toUpperCase() === m;
             const col = m === "LONG" ? "#7ecbff" : m === "SHORT" ? "#ff4d6d" : "#f0b90b";
             return (
               <span
@@ -166,7 +166,7 @@ export default function HomeStatNode({ data, selected }) {
 
   return (
     <div
-      className={`wn homestat ${kind}${wide ? " wide" : ""}${compact ? " grok-report" : ""}${selected ? " selected" : ""}`}
+      className={`wn homestat ${kind}${wide ? " wide" : ""}${compact ? " pilot-report" : ""}${selected ? " selected" : ""}`}
       style={{ "--bot": color }}
     >
       {body}
